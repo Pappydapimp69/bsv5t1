@@ -267,7 +267,7 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
     // rivers sit far back: a fifth of their level at most, and dulled as if heard over a bank (occlusion low-passes them)
     {const rv=seSrc.river,dir=new GainNode(e.ctx,{gain:.2}),snd=new GainNode(e.ctx,{gain:.2});rv.node.disconnect();rv.node.connect(dir,0).connect(e.master);rv.node.connect(snd,1).connect(e.reverbIn);rv.setOcclusion(8)}if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;try{ctx.close()}catch(e){}plainAudio()});return true}
 let seVol=-1;
-function seFrame(){if(!se||se==='starting')return;const v=save.sound?.55:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
+function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.hull.setPosition(z(g.x),-z(g.y),z(1100));seSrc.hull2.setPosition(z(g.x),-z(g.y),z(500));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);

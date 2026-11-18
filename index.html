@@ -240,9 +240,13 @@ const METAL=[[61,1,9],[97,.8,7],[149,.6,6],[233,.5,4.5],[377,.38,3.5],[523,.3,2.
 function newAudioContext(){const A=window.AudioContext||window.webkitAudioContext,touch=device==='touch'||navigator.maxTouchPoints>0;
   try{return new A({latencyHint:touch?'playback':'interactive'})}catch(e){return new A()}}
 function audioSessionPlayback(){try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback'}catch(e){}}
+// the engine's master limiter clamps hard (0 dB knee, ratio 20, 2 ms attack): fast enough to bend the waveform of the
+// giant's low calls and squash every sound under a loud one. A soft knee, a slower attack and a lower master leave it
+// catching only peaks.
+function softLimit(c){const t=c.context.currentTime;c.threshold.setValueAtTime(-3,t);c.knee.setValueAtTime(6,t);c.ratio.setValueAtTime(12,t);c.attack.setValueAtTime(.006,t);c.release.setValueAtTime(.25,t)}
 function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;se='starting';let ctx;try{ctx=newAudioContext();ctx.resume().catch(()=>{})}catch(e){se=null;return false}
   const url=URL.createObjectURL(new Blob([document.getElementById('se-worklet').textContent],{type:'text/javascript'}));
-  SE.SoundEngine.create({context:ctx,workletUrl:url,device:'stereo',zone:'coniferForest',maxVoices:32}).then(e=>{se=e;actx=e.ctx;
+  SE.SoundEngine.create({context:ctx,workletUrl:url,device:'stereo',zone:'coniferForest',maxVoices:32}).then(e=>{se=e;actx=e.ctx;softLimit(e.limiter);
     seSrc={ui:e.createSource('synth',{level:78,priority:3}),groan:e.createSource('synth',{level:104,refDistance:70,priority:6}),
       metal:e.createSource('modal',{modes:METAL,level:100,refDistance:70,priority:6}),boom:e.createSource('synth',{level:100,refDistance:60,priority:5}),
       near:e.createSource('synth',{level:82,refDistance:8,priority:2}),horn:e.createSource('synth',{level:114,refDistance:150,priority:8}),
@@ -263,7 +267,7 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
     // rivers sit far back: a fifth of their level at most, and dulled as if heard over a bank (occlusion low-passes them)
     {const rv=seSrc.river,dir=new GainNode(e.ctx,{gain:.2}),snd=new GainNode(e.ctx,{gain:.2});rv.node.disconnect();rv.node.connect(dir,0).connect(e.master);rv.node.connect(snd,1).connect(e.reverbIn);rv.setOcclusion(8)}if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;try{ctx.close()}catch(e){}plainAudio()});return true}
 let seVol=-1;
-function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
+function seFrame(){if(!se||se==='starting')return;const v=save.sound?.55:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.hull.setPosition(z(g.x),-z(g.y),z(1100));seSrc.hull2.setPosition(z(g.x),-z(g.y),z(500));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
@@ -294,7 +298,7 @@ function seGiantStep(ft){if(!se||se==='starting'||!save.sound)return;const z=v=>
   if(wet){seSrc.lake.setPosition(z(ft.x),-z(ft.y),0);seSrc.lake.splash(120,1)}}
 function unlockAudio(){if(!save.sound)return;audioSessionPlayback();if(actx&&actx.state!=='running'&&actx.state!=='closed')actx.resume().catch(()=>{});if(!seFailed&&startEngine())return;plainAudio()}
 // fallback where the engine cannot load its AudioWorklet: plain Web Audio blips
-function plainAudio(){if(se)return;if(actx){if(actx.state==='suspended')actx.resume().catch(()=>{});return}try{actx=newAudioContext();master=actx.createDynamicsCompressor();master.connect(actx.destination)}catch(e){}if(actx&&actx.state==='suspended')actx.resume().catch(()=>{})}
+function plainAudio(){if(se)return;if(actx){if(actx.state==='suspended')actx.resume().catch(()=>{});return}try{actx=newAudioContext();master=actx.createDynamicsCompressor();softLimit(master);master.connect(actx.destination)}catch(e){}if(actx&&actx.state==='suspended')actx.resume().catch(()=>{})}
 document.addEventListener('visibilitychange',()=>{if(!actx||!actx.suspend)return;if(document.hidden)actx.suspend().catch(()=>{});else if(save.sound)actx.resume().catch(()=>{})});
 // the giant's groan as it moves: detuned low saws beating against each other, a swept resonance like strained metal, and
 // inharmonic ringing partials bending down. Upper partials carry it on phone speakers. Heard from far away, never loud.

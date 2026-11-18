@@ -248,6 +248,8 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
       creakL:e.createSource('modal',{modes:SHEET,level:108,refDistance:70,priority:6}),creakR:e.createSource('modal',{modes:SHEET.map(m=>({...m,freq:m.freq*1.07})),level:108,refDistance:70,priority:6}),
       // a throat the size of a hall: low, rough, wavering calls that carry for miles
       voice:e.createSource('voice',{tract:3.2,sac:1.6,level:112,refDistance:90,priority:7}),
+      // the breath has its own throat, shorter, so its rasp sits where ears and speakers hear it, and it carries far
+      breath:e.createSource('voice',{tract:1.5,sac:.7,level:116,refDistance:320,priority:7}),
       gfoot:e.createSource('footsteps',{level:108,refDistance:50,priority:5}),feet:e.createSource('footsteps',{level:70,refDistance:3,priority:2}),
       river:e.createSource('water',{preset:'stream',level:62,refDistance:12,priority:1}),lake:e.createSource('water',{preset:'drip',level:60,refDistance:15,priority:1})};
     seSrc.river.setWater('stream');seSrc.lake.setWater('drip');
@@ -259,7 +261,7 @@ function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!=
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.hull.setPosition(z(g.x),-z(g.y),z(1100));seSrc.hull2.setPosition(z(g.x),-z(g.y),z(500));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
   if(S.skyUntil>S.t)for(const k of['sky','skyLo','skyHi','skyStr','skyDrum','choir','choir2'])seSrc[k].setPosition(z(S.cam.x)+(k==='skyHi'?40:k==='skyLo'?-40:0),-z(S.cam.y),260);
-  seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
+  seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));seSrc.breath.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
   // the nearest river runs where it is; the nearest filled footprint lake drips
   let rb=null,rd=1e9;for(const rv of S.rivers)for(const q of rv){const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<rd){rd=d;rb=q}}if(rb)seSrc.river.setPosition(z(rb.x),-z(rb.y),0);
   let lb=null,ld=1e9;for(const q of S.prints){if(S.t-q.t<4)continue;const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<ld){ld=d;lb=q}}seSrc.lake.setPosition(lb?z(lb.x):9e3,lb?-z(lb.y):9e3,0);
@@ -277,7 +279,8 @@ function giantCall(kind){if(!se||se==='starting'||!save.sound||!S)return;const v
   if(kind==='moan')v.call({mode:'open',duration:2.4+r()*2.2,f0:38+r()*10,f0End:26+r()*6,amp:.8,intensity:.55,roughness:.75,breath:.35,jitter:.55,vibrato:.25,vibratoRate:2.3+r()*2,mouth:.3+r()*.3,attack:.6});
   else if(kind==='bellow')v.call({mode:'open',duration:1.6,f0:62,f0End:30,amp:1,intensity:1,roughness:.95,breath:.25,jitter:.7,vibrato:.1,mouth:.9,attack:.12});
   else if(kind==='rumble')v.call({mode:'closed',duration:2.8,amp:1,intensity:.9,roughness:.6,jitter:.3,attack:.4});
-  else if(kind==='breath')v.call({mode:'open',duration:4+r()*2,f0:24,f0End:20,amp:.45,intensity:.25,roughness:.5,breath:.9,jitter:.3,mouth:.15,attack:1.5});
+  else if(kind==='breath'){const b=seSrc.breath;b.call({mode:'open',duration:2.2+r(),f0:70,f0End:84,amp:.85,intensity:.45,roughness:.35,breath:1,jitter:.25,mouth:.35,attack:1.2});
+    setTimeout(()=>{if(se&&se!=='starting')b.call({mode:'open',duration:4+r()*2,f0:82,f0End:52,amp:1,intensity:.6,roughness:.45,breath:1,jitter:.3,mouth:.25,attack:.5})},2400+r()*600)}
   else if(kind==='pain')v.call({mode:'open',duration:2.2,f0:80,f0End:28,amp:1,intensity:1,roughness:1,breath:.5,jitter:.9,vibrato:.6,vibratoRate:7,mouth:.8,attack:.05})}
 function seGiantStep(ft){if(!se||se==='starting'||!save.sound)return;const z=v=>v*SE_M,wet=S.prints.some(q=>Math.hypot(q.x-ft.x,q.y-ft.y)<C.FOOT_R*1.3&&S.t-q.t>4);
   seSrc.gfoot.setPosition(z(ft.x),-z(ft.y),0);seSrc.gfoot.step({mass:250000,speed:.4+Math.random()*.5,surface:wet?'water':'packedDirt',gain:.45+Math.random()*.55});

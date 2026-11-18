@@ -213,6 +213,7 @@ function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!=
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
+  if(S.skyUntil>S.t)seSrc.sky.setPosition(z(S.cam.x),-z(S.cam.y),260);
   seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
   // the nearest river runs where it is; the nearest filled footprint lake drips
   let rb=null,rd=1e9;for(const rv of S.rivers)for(const q of rv){const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<rd){rd=d;rb=q}}if(rb)seSrc.river.setPosition(z(rb.x),-z(rb.y),0);
@@ -252,7 +253,7 @@ function creak(src,dur,r0,r1,amp){const t0=performance.now();let last=t0;
 // recordings of 'trumpets' heard over cities; played once, far off, with the reverb opened up
 const TRUMPETS=[[0,34,5.5],[1.2,35,5],[4.5,31,6.5],[5.4,32,6],[9.5,29,7],[10.1,30,7.5]];
 function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets();return}const z=v=>v*SE_M,s=seSrc.sky;se.setZone('rockyGully');
-  const a=S.cam;s.setPosition(z(a.x+900),-z(a.y-700),150);
+  S.skyUntil=S.t+20; // the sky source rides directly above the listener for as long as the trumpets last
   TRUMPETS.forEach(([t,m,d])=>setTimeout(()=>{if(se&&S)s.note({patch:'brass',midi:m,duration:d,velocity:.8+Math.random()*.2})},t*1000));
   setTimeout(()=>{if(se&&se!=='starting')se.setZone('openPlain')},19000)}
 // the same calls without the engine: detuned saws through a slowly opening low-pass, with a long echo

@@ -206,7 +206,7 @@ function bfs(r0,c0,isGoal,maxN){const hh=S.body.h,prev=new Int32Array(hh.length)
 
 // ================= save =================
 const SAVE_KEY='colossus.v1';
-let save={v:1,giantWins:0,giantLosses:0,humanWins:0,humanLosses:0,sound:true};
+let save={v:1,giantWins:0,giantLosses:0,humanWins:0,humanLosses:0,sound:true,firstDay:0};
 try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(s&&s.v===1)save=Object.assign(save,s)}catch(e){}
 function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(save))}catch(e){}}
 const reducedMotion=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}})();
@@ -709,6 +709,40 @@ function rivalNear(h,r){let best=null,bd=r;for(const o of S.humans){if(o===h||o.
 function strikeHuman(h,o){const d=h.atk;S.feud[o.town][h.town]+=d;o.hitT=S.t;hurtHuman(o,d,'person',h);S.fx.push({k:'txt',x:o.x,y:o.y,z:90,text:'-'+Math.round(Math.max(d*.4,d-(o.def||0))),t:0,life:.8,col:'#ffd0a0'});sfx('hit',h.you||o.you||nearPlayer(o));
   if(o.dead){const k=o.pack;let got=0;for(const w of['crystals','pelts'])while(k[w]>0&&packCount(h)<packCap(h)){k[w]--;h.pack[w]++;got++}const gold=Math.floor(o.gold*.25);o.gold-=gold;h.gold+=gold;gainXp(h,30);
     if(h.you||o.you||!S.headless)announce((h.you?'You':h.name)+' killed '+(o.you?'you':o.name)+(got||gold?', taking '+[got?got+' from the pack':'',gold?gold+' gold':''].filter(Boolean).join(' and '):'')+'.')}}
+// The first day: goals in the world, one at a time, each passed by the real game event it asks for. A goal opens on a
+// card that pauses with the view held on you; pressing on flies the camera to the goal, the next press flies it back,
+// then play resumes. Each step tops up what it spends and moves on by itself after 150 s.
+const FIRST_DAY=[
+  {id:'crystal',text:'On the first day the giant sleeps. Sky crystals glow blue across the land: pick one up.',
+   setup(h){const t=S.towns[h.town];if(!S.crystals.some(c=>Math.hypot(c.x-t.x,c.y-t.y)<900)){const a=rnd()*6.28;S.crystals.push({id:S.nextId++,x:t.x+Math.cos(a)*520,y:t.y+Math.sin(a)*520})}S.tut.base=h.pack.crystals+h.crystals},
+   target(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const c of S.crystals){const d=Math.hypot(c.x-h.x,c.y-h.y)+.5*Math.hypot(c.x-t.x,c.y-t.y);if(d<bd){bd=d;b=c}}return b},
+   check(h){return h.pack.crystals+h.crystals>S.tut.base}},
+  {id:'board',text:'Ashford\u2019s board has work. Walk into Ashford, press Town and take a job from the Board.',target(h){return S.towns[h.town]},check(h){return!!h.quest}},
+  {id:'home',text:'Coming home empties your pack: crystals go into Ashford\u2019s store, where they pay for upgrades anywhere.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
+  {id:'house',text:'Build a house inside the dashed ring around Ashford: stand there, press Build and choose House. It takes six seconds.',
+   setup(h){if(h.gold<C.COST.house+10)h.gold=C.COST.house+10},target(h){const t=S.towns[h.town];return{x:t.x+t.r+170,y:t.y+40}},
+   check(h){return S.builds.some(b=>b.owner===h.id&&b.k==='house')}},
+  {id:'upgrade',text:'Stand by your house and press Upgrade. Crystals in Ashford\u2019s store pay for it, and a raised house reaches further.',
+   setup(h){if(h.crystals<C.UP.house[0])h.crystals=C.UP.house[0]},target(h){return S.builds.find(b=>b.owner===h.id&&b.k==='house')},check(h){return S.builds.some(b=>b.owner===h.id&&lv(b)>1)}},
+  {id:'climb',text:'Now the giant. Walk to one of its feet, past the chains, and press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
+  {id:'chain',text:'Its ankles are chained. Stand on the chain and press Attack: attacks only weaken a chain; the wake horn breaks them.',
+   setup(){S.tut.base=S.chains.reduce((n,c)=>n+c.hp,0)},target(h){const ch=S.chains[h.leg?1:0],a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y}},check(){return S.chains.reduce((n,c)=>n+c.hp,0)<S.tut.base}},
+  {id:'knee',text:'Climb to the knee ledge, about 460 feet up. Push toward a hold to reach for it; rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21:10,46);return{x:a.x,y:a.y}},check(h){return h.cl&&h.cl.y>=46}},
+  {id:'end',text:'Twenty sky crystals forge a wake horn. When all four chains are weak, sounding it at the giant\u2019s head breaks them and wakes it, and it remembers who did. The rest of the day is yours.',target(){return null},check(){return true}}];
+function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
+function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
+  if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
+  S.tut.t+=dt;if(st.check(h)||S.tut.t>150){if(S.tut.t>150&&!st.check(h))toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;
+    if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist()}}}
+function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
+  openMenu({title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':'Show me',sub:last?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+    ...(last?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
+// the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
+function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
+function flyPress(){const f=S.fly;if(!f)return;if(f.phase==='out'){f.phase='back';f.t=f.dur*.7*(1-Math.min(1,f.t/f.dur));f.dur*=.7}else if(f.phase==='hold'){f.phase='back';f.t=0;f.dur*=.7}}
+function stepFly(dt){const f=S.fly;if(!f)return null;f.t+=dt;const e=u=>u<0?0:u>1?1:u*u*(3-2*u);let k;
+  if(f.phase==='out'){k=e(f.t/f.dur);if(f.t>=f.dur){f.phase='hold';f.t=0}}else if(f.phase==='hold')k=1;else{k=1-e(f.t/f.dur);if(f.t>=f.dur){S.fly=null;latchHeld();return null}}
+  const fr=S.you;return{x:fr.x+(f.to.x-fr.x)*k,y:fr.y+(f.to.y-fr.y)*k,k}}
 function cacheNear(h){return S.caches.find(c=>Math.hypot(c.x-h.x,c.y-h.y)<160)||null}
 // ruins in the old giants hold old things: gold, crystals and sometimes a kit; they fill again after a while
 function searchCache(h,c){if(S.t<c.ready){sayTo(h,'Someone has searched here lately. Come back in '+Math.ceil(c.ready-S.t)+' s.');return false}
@@ -790,7 +824,7 @@ function stepMonsters(dt){
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;
       if(d>(foe?m.r+14:town.r)){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;if(foe)hurtHuman(foe,m.atk,'beast');else hurtTown(town,m.atk*1.5)}continue}}
     let tgt=null,bd=260;
-    for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
+    for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)&&!(h.you&&S.tut&&!S.tut.done&&S.tut.i<5)){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
     if(tgt){const sp=m.kind==='troll'?85:120;if(bd>m.r+14){m.x+=(tgt.x-m.x)/bd*sp*dt;m.y+=(tgt.y-m.y)/bd*sp*dt}else if(m.cd<=0){m.cd=1;hurtHuman(tgt,m.atk,'beast')}}
     else{const dx=m.hx-m.x,dy=m.hy-m.y,d=Math.hypot(dx,dy);if(d>30){m.x+=dx/d*40*dt;m.y+=dy/d*40*dt}else if(rnd()<.01){m.hx=clamp(m.x+rr(-200,200),100,C.MAP-100);m.hy=clamp(m.y+rr(-200,200),100,C.MAP-100)}}}
   for(let i=S.monsters.length-1;i>=0;i--)if(S.monsters[i].hp<=0)S.monsters.splice(i,1);
@@ -935,7 +969,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
     stepHuman(h,dt,m)}
   for(const a of takePresses()){if(S.role==='giant'){if(!S.autoplay)giantDo({A:'stomp',B:'smash',X:'shake',Y:'swipe'}[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?{x:mv.x,y:-mv.y}:null)}
-  stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);stepEvents(dt);
+  stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);stepEvents(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
 function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
@@ -958,6 +992,7 @@ const KEYMAP={KeyJ:'A',Space:'A',KeyK:'B',KeyL:'X',KeyH:'Y'};
 addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey)return;device='keys';unlockAudio();
   if(menu){if(!e.repeat)menuKey(e.code);e.preventDefault();return}
   if(!S||S.over)return;
+  if(S.fly){if(!e.repeat)flyPress();e.preventDefault();return}
   if((e.code==='Escape'||e.code==='KeyP')&&!e.repeat){openPause();e.preventDefault();return}
   if(e.code==='KeyC'&&!e.repeat)camReset();
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
@@ -984,6 +1019,7 @@ function pollPad(){const pads=navigator.getGamepads?navigator.getGamepads():[];l
   const[sx,sy]=stickInput(ax,ay,.2);padVec={x:sx,y:sy};padZoom=zo-zi;let rx=0,ry=0;for(const gp of pads){if(!gp)continue;const a2=gp.axes[2]||0,a3=gp.axes[3]||0;if(Math.hypot(a2,a3)>Math.hypot(rx,ry)){rx=a2;ry=a3}}const[crx,cry]=stickInput(rx,ry,.2);padCam={x:crx,y:cry};if(crx||cry)device='pad';if(sx||sy||now.size)device='pad';
   for(const i of now){if(padHeld.has(i)||padLatch.has(i))continue;unlockAudio();
     if(menu){const m={12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight',0:'Enter',1:'Escape',9:'Escape'}[i];if(m)menuKey(m)}
+    else if(S&&S.fly)flyPress();
     else if(S&&!S.over){if(i===9||i===8)openPause();else if(i===11)camReset();else{const s={0:'A',1:'B',2:'X',3:'Y'}[i];if(s)presses.push(s)}}}
   for(const i of padLatch)if(!now.has(i))padLatch.delete(i);
   padHeld.clear();for(const i of now)padHeld.add(i)}
@@ -1001,7 +1037,7 @@ cv.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return
 const ptrEnd=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null};
 cv.addEventListener('pointercancel',e=>{ptrEnd(e);tapDown=null});
 cv.addEventListener('wheel',e=>{e.preventDefault();zoomBy(Math.exp(-e.deltaY*.0012))},{passive:false});
-cv.addEventListener('pointerup',e=>{ptrEnd(e);const td=tapDown;tapDown=null;if(!td||td.moved>14||!S||S.over||menu)return;
+cv.addEventListener('pointerup',e=>{ptrEnd(e);const td=tapDown;tapDown=null;if(S&&S.fly&&td){flyPress();return}if(!td||td.moved>14||!S||S.over||menu)return;
   const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
   if(S.you&&S.you.mode==='climb'&&!S.you.dead){const cl=S.you.cl;if(cl.fall||cl.move)return;const p=screenToCell(sx,sy);
     let path=bfs(Math.floor(cl.y),Math.floor(cl.x),(rr2,cc)=>Math.abs(rr2-p.r)<=1&&Math.abs(cc-p.c)<=1,12000);
@@ -1016,7 +1052,7 @@ function camReset(){if(S)S.cam.zoom=1;cam.yaw=0;cam.pitch=.12}
 const padEl=document.getElementById('pad'),SLOTS=['A','B','X','Y'];
 const KEYNAMES={keys:{A:'J',B:'K',X:'L',Y:'H'},pad:{A:'A',B:'B',X:'X',Y:'Y'},touch:{A:'',B:'',X:'',Y:''}};
 padEl.innerHTML=SLOTS.map(s=>`<button class="ab" data-s="${s}"><span class="k"></span><span class="l"></span><small></small></button>`).join('');
-padEl.querySelectorAll('.ab').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(!S||S.over||menu)return;presses.push(b.dataset.s)}));
+padEl.querySelectorAll('.ab').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(S&&S.fly){flyPress();return}if(!S||S.over||menu)return;presses.push(b.dataset.s)}));
 function slotInfo(){if(!S)return null;
   if(S.role==='giant'){const r=k=>canGiant(k);return{A:{l:'Stomp',why:r('stomp')},B:{l:'Smash',why:r('smash')},X:{l:'Shake',why:r('shake')},Y:{l:'Swipe',why:r('swipe')}}}
   return humanCtx(S.you)}
@@ -1043,7 +1079,7 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   if(best>=0)setFocus(best)}
 function record(){return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.</p>`}
 function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
-  items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
+  items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
 <p><b>Rivals.</b> People of other towns can be attacked anywhere outside a settlement's walls (Attack when one is close); a kill takes what their pack holds and a quarter of their gold. Every blow starts a feud between the towns: their people answer it on sight, and towers shoot feuding rivals inside your build area.</p>
@@ -1061,7 +1097,7 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Playing the giant.</b> You win by surviving until dusk with your Heart-stone whole and completing three of five tasks: be Freed (all four chains broken), be Braced (three braces), be Avenged (a town that angered you brought below half its walls), be Befriended (a town friendly to you), and be a Wanderer (six thousand paces walked). The HUD shows each. You cannot build: court the towns that brace you and leave the hunters to rue it. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
-function openPause(){if(!S||S.over)return;openMenu({title:'Paused',items:[{label:'Resume',act:closeMenu},{label:'How to play',act:()=>openHelp(openPause)},
+function openPause(){if(!S||S.over)return;openMenu({title:'Paused',items:[{label:'Resume',act:closeMenu},...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
   {label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();openPause()}},{label:'Quit to title',act:openTitle}],back:closeMenu})}
 function openEnd(){if(!S||!S.over)return;const o=S.over;openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+record(),items:[{label:'Play again',act:()=>start(S.role)},{label:'Title',act:openTitle}],back:openTitle})}
 function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub)=>({label:label+' \u2013 '+C.COST[k]+' gold',sub,why:canBuild(h,k),act:()=>{if(build(h,k))closeMenu();else openBuild()}});
@@ -1088,7 +1124,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
   else{body=`<p class="dim">${t.name}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses built. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p>`;
     items=[{label:'Raise '+t.name+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:'+600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}}]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
-function start(role,seed){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;farLand=null;closeMenu();lastSig='';
+function start(role,seed,first){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
   toast(role==='giant'?'You are the giant, asleep and locked in place until someone climbs to your head and wakes you. Then braces the humans bolt on let you walk: survive until dusk and complete three of five tasks.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
 
 // ================= camera and render =================
@@ -1174,6 +1210,7 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   G3.water=inst(new THREE.CircleGeometry(1,28).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x4f86a8,transparent:true,opacity:.92}),200);sc.add(G3.water);
   G3.box=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),400);G3.roof=inst(new THREE.ConeGeometry(1,1,4),new THREE.MeshLambertMaterial({color:0xffffff}),300);
   G3.disc=inst(new THREE.CylinderGeometry(1,1,1,32),new THREE.MeshLambertMaterial({color:0xffffff}),40);G3.ball=inst(new THREE.SphereGeometry(1,10,8),new THREE.MeshLambertMaterial({color:0x1d1d1d}),60);
+  G3.beacon=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,20,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:.6,depthWrite:false,side:THREE.DoubleSide,fog:false}));G3.beacon.visible=false;sc.add(G3.beacon);
   G3.hold=inst(new THREE.SphereGeometry(1,7,5),new THREE.MeshLambertMaterial({color:0xffffff}),900);sc.add(G3.hold);
   sc.add(G3.box,G3.roof,G3.disc,G3.ball)}
 const STONE3={ok:'#7a7064',hurt:'#80604f',crip:'#6a3a2c',dead:'#4e4842'};
@@ -1264,6 +1301,7 @@ function g3Update(){const g=S.g,t=S.t;
       for(const st of S.sites)if(st.build&&st.build.k==='ladder')for(const r of st.build.cells||[]){if(Math.abs(r-cl.y)>30)continue;const a=bodyWorld(st.c+.5,r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,22,3,4,'#7a5a36')}
       for(const ch of S.chains)if(ch.hp>0&&Math.abs(ch.r-cl.y)<30){const a=bodyWorld(ch.c+.5,ch.r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,24,24,24,'#2b2b2e')}
       G3.box.count=bx2;G3.box.instanceMatrix.needsUpdate=true;if(G3.box.instanceColor)G3.box.instanceColor.needsUpdate=true}}
+  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;G3.beacon.visible=!!tg;if(tg){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
   // light and haze follow the opening's sky
   const ok=openingK();G3.hemi.color.set('#e4e8ff').lerp(_c.set('#c87048'),ok*.7);G3.sun.intensity=.9-.45*ok;S.fogC=S.fogC||new THREE.Color();G3.scene.fog.color.set('#cdbfa2').lerp(_c.set('#6a3a30'),ok*.8)}
 function sizeLayer(c){const w=Math.round(W*DPR),h=Math.round(H*DPR);if(c.width!==w||c.height!==h){c.width=w;c.height=h}}
@@ -1291,6 +1329,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,a=j.kind==='site'?bodyWorld(j.s.c+.5,j.s.r+.5):{x:j.x+30,y:j.y,z:0},q=p3(a.x,a.y,a.z+(j.kind==='site'?40:120));if(q&&q.d<5000){pbar(q.x,q.y,50,j.t/j.dur,'#ffcf6a');if(o.you)lbl('Building a '+j.k,q.x,q.y-14,12,'#ffcf6a')}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   if(climbing3D())climbOverlay3D();
+  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const q=p3(tg.x,tg.y,140);if(q)lbl('Goal',q.x,q.y,13,'#ffd27a')}}
   drawMinimap();G3.calls=G3.renderer.info.render.calls}
 function cellScreen(c,r){const a=bodyWorld(c,r);return p3(a.x,a.y,a.z)}
 function climbOverlay3D(){const h=S.you,cl=h.cl,g=S.g,me=[Math.floor(cl.y),Math.floor(cl.x)],hb=S.body.h;
@@ -1475,7 +1514,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   if(S.role==='giant'&&g.tx!=null){const p=proj(g.tx,g.ty,0);if(p){ctx.strokeStyle='rgba(255,207,106,.9)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x-8,p.y-8);ctx.lineTo(p.x+8,p.y+8);ctx.moveTo(p.x+8,p.y-8);ctx.lineTo(p.x-8,p.y+8);ctx.stroke()}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   drawMinimap()}
-function drawMinimap(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);
+function drawMinimap(){drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8+tg.x*k,8+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap0(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
@@ -1566,7 +1606,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none')+duskChip;
-    const q=h.quest;b=(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
+    const st=tutStep();const q=h.quest;b=st&&S.tut.shown?'Goal: '+st.text:(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
       (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':!allWeak()?'The giant sleeps in chains: weaken all four ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' still strong), then a wake horn breaks them':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.innerHTML=String(b).replace(/^([^:.]{2,24}:)/,'<span class="k">$1</span>')}}
 
@@ -1582,9 +1622,11 @@ function introCamera(){if(!S||!S.introCam||!S.you&&S.role!=='giant')return;const
   S.cam.zoom=.75+.25*back+(t>11&&t<17?-.15*Math.sin(Math.PI*(t-11)/6):0);if(t>21.5){S.introCam=false;cam.pitch=.12;S.cam.zoom=1}}
 function frameWork(now){introCamera();if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   paintFeed(dt);
-  if(S&&!menu&&!S.over){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
+  if(S&&S.tut&&S.tut.cardDue&&!menu&&!S.fly)openTutorialCard();
+  const fl=S&&S.fly?stepFly(dt):null;
+  if(S&&!menu&&!S.over&&!S.fly){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);
-    const focus=S.role==='giant'?S.g:(S.you.mode==='climb'?S.g.feet[S.you.leg]:S.you);S.cam.x+=(focus.x-S.cam.x)*Math.min(1,dt*5);S.cam.y+=(focus.y-S.cam.y)*Math.min(1,dt*5)}
+    const focus=fl?fl:S.role==='giant'?S.g:(S.you.mode==='climb'?S.g.feet[S.you.leg]:S.you);if(fl){S.cam.zoom=1-.3*fl.k}S.cam.x+=(focus.x-S.cam.x)*Math.min(1,dt*5);S.cam.y+=(focus.y-S.cam.y)*Math.min(1,dt*5)}
   shakeA*=Math.pow(.02,dt);if(shakeA<.3)shakeA=0;
   seFrame();render();paintHud();paintButtons()}
 // test hook: run whole matches without the screen

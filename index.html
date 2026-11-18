@@ -720,16 +720,23 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
   const fitsW=COLS*px<=W-20;climbCam.x+=((fitsW?COLS/2:clamp(cl.x,W/2/px-1,COLS-W/2/px+1))-climbCam.x)*.15;
   climbCam.y+=((cl.y+3)-climbCam.y)*.12;if(Math.abs(climbCam.y-cl.y)>40)climbCam.y=cl.y;
   const toX=c=>W/2+(c-climbCam.x)*px,toY=r=>H*.55-(r-climbCam.y)*px;
+  // a lifted foot draws its leg up from the thigh: the knee bends and climbers on it ride up
+  const lift=g.feet.map(f=>f.air>0&&g.fallen<=0?Math.sin((1-f.air/f.dur)*Math.PI)*6:0),THIGH=82;
+  const ly=(c,r)=>{const L=r<THIGH?lift[c<COLS/2?0:1]:0;return L?L+r*(THIGH-L)/THIGH:r},Y=(c,r)=>toY(ly(c,r));
   // sky darkens with height, ground below
   const alt=clamp(climbCam.y/ROWS,0,1);const sk=ctx.createLinearGradient(0,0,0,H);sk.addColorStop(0,`rgb(${60-alt*30},${96-alt*40},${150-alt*40})`);sk.addColorStop(1,`rgb(${150-alt*50},${170-alt*50},${190-alt*40})`);ctx.fillStyle=sk;ctx.fillRect(0,0,W,H);
   const gy=toY(0);if(gy<H){ctx.fillStyle='#3d5a35';ctx.fillRect(0,gy,W,H-gy);ctx.fillStyle='#2a4326';for(let i=0;i<30;i++){const x=((i*137+Math.floor(S.g.x))%Math.max(1,W));ctx.fillRect(x,gy+4+(i%5)*6,14,4)}}
   // walking sway: the body leans with each stride, more toward the top
   const sway=g.fallen>0?0:Math.sin(g.sway*Math.PI)*.035*(g.v/C.G_SPEED);
   ctx.save();ctx.translate(0,gy);ctx.transform(1,0,-sway,1,0,0);ctx.translate(0,-gy);
-  ctx.imageSmoothingEnabled=false;const tex=bodyTexture();ctx.drawImage(tex,toX(0),toY(ROWS),COLS*px,ROWS*px);
+  // clouds drift past at half the camera's rate, so height reads as distance
+  for(let i=0;i<14;i++){const cr=50+i*11,cx=((i*53+S.t*(1+i%3)*.4)%(COLS+40))-20,yy=H*.55-(cr-climbCam.y)*px*.5;if(yy<-40||yy>H+40)continue;ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(W/2+(cx-COLS/2)*px*.6,yy,px*(4+i%4),px*1.3,0,0,7);ctx.fill()}
+  ctx.imageSmoothingEnabled=false;const tex=bodyTexture(),P=tex.width/COLS;
+  ctx.drawImage(tex,0,0,COLS*P,(ROWS-THIGH)*P,toX(0),toY(ROWS),COLS*px,(ROWS-THIGH)*px);
+  for(const i of[0,1]){const c0=i?COLS/2:0;ctx.drawImage(tex,c0*P,(ROWS-THIGH)*P,COLS/2*P,THIGH*P,toX(c0),toY(THIGH),COLS/2*px,(THIGH-lift[i])*px)}
   if(g.wind&&g.wind.k==='swipe'){const left=g.wind.side==='L',p=1-g.wind.t/g.wind.dur;ctx.fillStyle=`rgba(255,60,40,${.12+.25*p})`;ctx.fillRect(left?toX(0):toX(COLS/2),toY(ROWS),COLS/2*px,(ROWS-30)*px);
-    const hx=left?toX(-6+6*p):toX(COLS+6-6*p);ctx.fillStyle='rgba(130,136,150,.9)';ctx.beginPath();ctx.ellipse(hx,toY(cl.y),px*4,px*7,0,0,7);ctx.fill()}
-  for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];const x=toX(J.c0),y=toY(J.r1+1),w=(J.c1-J.c0+1)*px,hh=(J.r1-J.r0+1)*px;
+    const hx=left?toX(-6+6*p):toX(COLS+6-6*p);ctx.fillStyle='rgba(130,136,150,.9)';ctx.beginPath();ctx.ellipse(hx,Y(cl.x,cl.y),px*4,px*7,0,0,7);ctx.fill()}
+  for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];const x=toX(J.c0),y=Y(J.c0,J.r1+1),w=(J.c1-J.c0+1)*px,hh=Y(J.c0,J.r0)-y;
     ctx.fillStyle=j.crip?'rgba(60,60,60,.7)':id==='heart'?`rgba(255,77,94,${.55+.25*Math.sin(S.t*4)})`:'rgba(255,150,70,.55)';ctx.fillRect(x,y,w,hh);
     ctx.strokeStyle=j.crip?'#777':id==='heart'?'#ffb0b8':'#ffcf6a';ctx.lineWidth=2;ctx.strokeRect(x+1,y+1,w-2,hh-2);
     ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x,y-8,w,5);ctx.fillStyle=id==='heart'?'#ff4d5e':'#ffcf6a';ctx.fillRect(x,y-8,w*j.hp/j.max,5);
@@ -737,10 +744,10 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
     if(Math.abs(J.r0-climbCam.y)<40){ctx.font='600 12px system-ui';ctx.textAlign='left';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const tx=x+w+4,ty=y+hh/2+4;ctx.strokeText(JOINTS[id].name,tx,ty);ctx.fillText(JOINTS[id].name,tx,ty)}}
   for(const s of S.sites){const x=toX(s.c)+px/2,y=toY(s.r)+px/2;ctx.strokeStyle='#ffcf6a';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.lineTo(x+Math.cos(a)*px*.8,y+Math.sin(a)*px*.8)}ctx.closePath();ctx.stroke();
     if(s.build){ctx.fillStyle=TOWNS[s.build.town].col;ctx.fillRect(x-px*.7,y-px*1.2,px*1.4,px*.9);ctx.fillStyle='#222';ctx.fillRect(x,y-px*1.05,px*1.3,px*.45)}}
-  for(const a of S.anchors){const x=toX(a.c)+px/2,y=toY(a.r)+px/2;ctx.strokeStyle=TOWNS[a.town].col;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,px*.35,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+px*.35);ctx.lineTo(x,y+px*1.4);ctx.stroke()}
-  if(cl.path){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(toX(cl.x),toY(cl.y));for(const[r,c]of cl.path)ctx.lineTo(toX(c+.5),toY(r+.5));ctx.stroke();ctx.setLineDash([])}
-  for(const f of S.fx)if(f.k==='cellmark'){ctx.strokeStyle='#fff';ctx.globalAlpha=1-f.t/f.life;ctx.strokeRect(toX(f.c),toY(f.r+1),px,px);ctx.globalAlpha=1}
-  for(const o of climbers()){const x=toX(o.cl.x),y=toY(o.cl.y),T=TOWNS[o.town];if(y<-20||y>H+20)continue;
+  for(const a of S.anchors){const x=toX(a.c)+px/2,y=Y(a.c,a.r+.5);ctx.strokeStyle=TOWNS[a.town].col;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,px*.35,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+px*.35);ctx.lineTo(x,y+px*1.4);ctx.stroke()}
+  if(cl.path){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(toX(cl.x),Y(cl.x,cl.y));for(const[r,c]of cl.path)ctx.lineTo(toX(c+.5),Y(c,r+.5));ctx.stroke();ctx.setLineDash([])}
+  for(const f of S.fx)if(f.k==='cellmark'){ctx.strokeStyle='#fff';ctx.globalAlpha=1-f.t/f.life;ctx.strokeRect(toX(f.c),Y(f.c,f.r+1),px,px);ctx.globalAlpha=1}
+  for(const o of climbers()){const x=toX(o.cl.x),y=Y(o.cl.x,o.cl.y),T=TOWNS[o.town];if(y<-20||y>H+20)continue;
     ctx.fillStyle=T.col;shapePath(ctx,x,y-px*.2,px*.55,T.shape);ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=2;ctx.stroke();
     ctx.strokeStyle='#111';ctx.beginPath();ctx.moveTo(x-px*.5,y-px*.6);ctx.lineTo(x-px*.8,y-px*1.1);ctx.moveTo(x+px*.5,y-px*.6);ctx.lineTo(x+px*.8,y-px*1.1);ctx.stroke();
     if(o.you){const f=clamp(o.grip/maxGrip(o),0,1);ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.beginPath();ctx.arc(x,y-px*.2,px*1.2,0,7);ctx.stroke();

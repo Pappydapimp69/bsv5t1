@@ -363,7 +363,7 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
       const t=pickHold(cl,dx,dy,C.LUNGE_REACH,C.REACH*.8);if(!t){sayTo(h,'No hold within a lunge that way.');return false}
       startMove(h,t,true);h.grip-=C.LUNGE_GRIP;cl.path=null;return true}
     if(slot==='X'&&jointAt(cl.x,cl.y)&&S.joints[jointAt(cl.x,cl.y)].wedges.length){const ws=S.joints[jointAt(cl.x,cl.y)].wedges;let i=ws.findIndex(w=>w.town!==h.town);if(i<0)i=0;ws.splice(i,1);
-      h.kits.wedge++;S.grudge[h.town]-=C.PULL_FAVOR;gainXp(h,8);sfx('build',h.you);sayTo(h,'You pull out a wedge. The giant remembers '+TOWNS[h.town].name+' kindly.');return true}
+      h.kits.wedge++;S.grudge[h.town]-=C.PULL_FAVOR;questTick(h,'tend');gainXp(h,8);sfx('build',h.you);sayTo(h,'You pull out a wedge. The giant remembers '+TOWNS[h.town].name+' kindly.');return true}
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
     if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
@@ -386,6 +386,7 @@ function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.
     S.towns.push({i:h.town,id:n,name:names[h.town][S.outposts[h.town]-1],col:TOWNS[h.town].col,shape:TOWNS[h.town].shape,x:h.x,y:h.y,r:100,hp:1500,max:1500,alive:true,outpost:true});
     announce(TOWNS[h.town].name+' founded '+S.towns[n].name+(lakesNear(h.x,h.y,500)?' beside a footprint lake.':'.'));gainXp(h,30);return true}
   S.builds.push({k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0});
+  questTick(h,'build');
   if(k==='house'){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===h.town){const d=dist(t,h);if(d<bd){bd=d;b=t}}if(b){b.max+=C.HOUSE_HP;b.hp+=C.HOUSE_HP}}
   gainXp(h,10);sayTo(h,k==='house'?'House built: the settlement grows stronger.':'Watchtower built: it shoots beasts that come near.');return true}
 function stepBuilds(dt){
@@ -394,13 +395,20 @@ function stepBuilds(dt){
   if(Math.floor(S.t/10)!==Math.floor((S.t-dt)/10))for(const t of aliveTowns()){const n=lakesNear(t.x,t.y,t.r+500);if(!n)continue;for(const h of S.humans)if(h.town===t.i)h.gold+=Math.min(3,n)*C.LAKE_GOLD/3|0||1}}
 function gainXp(h,x){h.xp+=x;while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;if(h.you){toast('Level '+h.lvl+'! Stronger arm, better grip.');sfx('coin')}}}
 function killMonster(m,h){const i=S.monsters.indexOf(m);if(i>=0)S.monsters.splice(i,1);if(!h)return;h.gold+=m.gold;gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay')}
-function newQuest(h){const lv=h.lvl,roll=rnd();
-  if(roll<.35)return{k:'slay',need:2+lv,n:0,gold:30+lv*12,xp:30+lv*10,text:'Slay '+(2+lv)+' beasts in the wilds'};
-  if(roll<.6)return{k:'gather',need:2+Math.ceil(lv/2),n:0,gold:25+lv*12,xp:25+lv*10,text:'Gather '+(2+Math.ceil(lv/2))+' sky crystals'};
-  if(roll<.8){const ft=Math.min(1500,300+lv*200);return{k:'climb',need:ft/FT,n:0,gold:35+lv*14,xp:35+lv*12,text:'Climb the giant to '+ft+' ft'}}
-  return{k:'strike',need:6+lv*2,n:0,gold:40+lv*14,xp:40+lv*12,text:'Strike the giant’s joints '+(6+lv*2)+' times'}}
+// quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
+// a quest you must take: later boards add climbing it and tending its wounds, never striking it.
+const QUEST_KINDS=['slay','gather','deliver','build'];
+function newQuest(h,kind){const lv=h.lvl,k=kind||(lv>=3&&rnd()<.3?(rnd()<.5?'climb':'tend'):QUEST_KINDS[Math.floor(rnd()*4)]);
+  if(k==='slay')return{k,need:2+lv,n:0,gold:30+lv*12,xp:30+lv*10,text:'Slay '+(2+lv)+' beasts in the wilds'};
+  if(k==='gather')return{k,need:2+Math.ceil(lv/2),n:0,gold:25+lv*12,xp:25+lv*10,text:'Fetch '+(2+Math.ceil(lv/2))+' sky crystals'};
+  if(k==='deliver'){const home=homeOf(h),far=aliveTowns().filter(t=>t!==home);const to=far.length?far[Math.floor(rnd()*far.length)]:home;
+    return{k,to:to.id,need:1,n:0,gold:30+lv*10+Math.round(dist(home||to,to)/150),xp:25+lv*10,text:'Carry a parcel to '+to.name}}
+  if(k==='build'){const w=rnd()<.6?'house':'tower';return{k,what:w,need:1,n:0,gold:C.COST[w]+20+lv*8,xp:30+lv*8,text:'Build a '+(w==='house'?'house':'watchtower')+' near home'}}
+  if(k==='tend')return{k,need:1,n:0,gold:50+lv*12,xp:40+lv*10,text:'Pull a wedge from the giant'};
+  const ft=Math.min(1500,300+lv*200);return{k:'climb',need:ft/FT,n:0,gold:35+lv*14,xp:35+lv*12,text:'Climb the giant to '+ft+' ft'}}
+function board(t){if(!t.board||S.t-t.boardT>60){t.boardT=S.t;t.board=[0,1,2].map(()=>newQuest(S.you||S.humans[0]))}return t.board}
 function questTick(h,k,v){const q=h.quest;if(!q||q.done)return;
-  if(q.k==='climb'&&k==='height'){if(v>=q.need){q.n=q.need}else return}else if(q.k===k)q.n++;else return;
+  if(q.k==='climb'&&k==='height'){if(v>=q.need){q.n=q.need}else return}else if(q.k==='deliver'&&k==='arrive'){if(v!==q.to)return;q.n=1}else if(q.k===k)q.n++;else return;
   if(q.n>=q.need){q.done=true;sayTo(h,'Quest done! Return to town for '+q.gold+' gold.')}}
 function stepHuman(h,dt,mv){
   if(h.dead){h.dead-=dt;if(h.dead<=0){h.dead=0;const home=homeOf(h)||S.towns[0];h.x=home.x+rr(-50,50);h.y=home.y+rr(-50,50);h.hp=h.max;h.mode='ground';h.cl=null}return}
@@ -412,7 +420,7 @@ function stepHuman(h,dt,mv){
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<28){S.crystals.splice(i,1);spawnCrystal();h.gold+=4;questTick(h,'gather');
     if(h.you){sfx('coin');toast('Sky crystal!'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
-  const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);
+  const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);questTick(h,'arrive',t.id);
     if(h.quest&&h.quest.done){h.gold+=h.quest.gold;gainXp(h,h.quest.xp);if(h.you){toast('Quest reward: '+h.quest.gold+' gold.');sfx('coin')}h.quest=null}
     if(!h.quest&&!h.you)h.quest=newQuest(h)}}
 function startMove(h,t,lunge){const cl=h.cl,tx=t[1]+.5,ty=t[0]+.5,d=Math.hypot(tx-cl.x,ty-cl.y);
@@ -461,6 +469,7 @@ function stepShots(dt){for(let i=S.shots.length-1;i>=0;i--){const s=S.shots[i];s
 // ================= bots =================
 function wedgedJoints(){return Object.keys(S.joints).filter(id=>S.joints[id].wedges.length)}
 function botGoalCells(h){const g=S.g,J=S.joints;
+  if(h.quest&&h.quest.k==='tend'&&!h.quest.done&&wedgedJoints().length)return{kind:'pull',id:wedgedJoints()[0]};
   if(h.role==='keeper'){const w=wedgedJoints();if(w.length)return{kind:'pull',id:w[0]};
     if(h.kits.cannon>0){const free=S.sites.filter(s=>!s.build);if(free.length)return{kind:'site',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
     return{kind:'down',test:r=>r===0}}
@@ -527,7 +536,9 @@ function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
   if(h.gold>=C.COST.house+60&&h.gloves&&rnd()<.3){const a=rr(0,6.28),d=home.r+rr(60,300);return{k:'build',what:rnd()<.3?'tower':'house',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
   if(h.gold>=C.COST.gloves+C.COST[want]&&!h.gloves)return{k:'shop',town:home,x:home.x,y:home.y};
   if(h.quest&&h.quest.k==='gather'){let b=null,bd=1e9;for(const c of S.crystals){const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'crystal',x:b.x,y:b.y}}
-  if(h.quest&&(h.quest.k==='climb'||h.quest.k==='strike')&&!g.dead&&dG<2500){let bi=0;return{k:'foot',i:g.feet[0].air>0?1:bi}}
+  if(h.quest&&h.quest.k==='deliver'){const to=S.towns.find(t=>t.id===h.quest.to);if(to&&to.alive)return{k:'go',x:to.x,y:to.y};h.quest=null}
+  if(h.quest&&h.quest.k==='build'&&h.gold>=C.COST[h.quest.what]){const a=rr(0,6.28),d=home.r+rr(60,300);return{k:'build',what:h.quest.what,x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
+  if(h.quest&&(h.quest.k==='climb'||h.quest.k==='tend')&&!g.dead&&dG<2500){let bi=0;return{k:'foot',i:g.feet[0].air>0?1:bi}}
   let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
   return b?{k:'monster',id:b.id}:null}
 function botShop(h){const want=h.role==='warden'?'wedge':'cannon';
@@ -671,6 +682,7 @@ function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Answer each town as it treats you, and last until dusk',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
+<p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Out in the wild, Build puts up houses that thicken your settlement's walls, watchtowers that shoot beasts, or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
 <p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. At dusk the giant lies down as a mountain beside the town it favours most: be that town, or shatter its Heart-stone, or be the last town standing. The giant wins by lasting until dusk or by destroying two towns.</p>
@@ -688,8 +700,9 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
   const buy=(k,cost,fn)=>({label:k+' – '+cost+' gold',why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
   const q=h.quest;
   const items=[
-    q?{label:q.done?'Claim quest reward':'Current quest',sub:q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+')',why:null,act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}}
-     :{label:'Take a quest',sub:'From the board in '+t.name,act:()=>{h.quest=newQuest(h);openTown(t)}},
+    ...(q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+') \u2013 choose Drop to give it up',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}},
+        ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
+      :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1,newQuest(h));openTown(t)}}))),
     buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
     buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++),buy('Potion',C.COST.potion,()=>h.potions++),
     buy('Sharper blade',C.COST.blade,()=>h.atk+=5),h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1),

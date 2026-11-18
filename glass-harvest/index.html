@@ -1,0 +1,186 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Glass Harvest</title>
+<style>
+:root{--bg:#0b0a12;--ink:#f4ead2;--gold:#e8b44a;--panel:#191426f2;--dim:#b9ab8c}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:17px/1.4 Georgia,'Times New Roman',serif;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;top:max(8px,env(safe-area-inset-top));left:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none}
+.chip{background:var(--panel);border:2px solid #000;box-shadow:0 0 0 1px #6a5a3a;padding:3px 10px;border-radius:6px;font-size:15px;white-space:nowrap}
+.chip b{color:var(--gold)}
+#toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);background:var(--panel);border:2px solid #000;box-shadow:0 0 0 1px var(--gold);padding:8px 16px;border-radius:8px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:86vw;text-align:center}
+#menu{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#05040a99;padding:16px;box-sizing:border-box}
+#menu.on{display:flex}
+.box{background:var(--panel);border:3px solid #000;box-shadow:0 0 0 2px var(--gold),0 0 40px #e8b44a33;border-radius:12px;padding:18px 20px;width:min(600px,100%);max-height:100%;overflow:auto;box-sizing:border-box}
+h1{margin:0 0 6px;font-size:30px;color:var(--gold);letter-spacing:1px}h2{margin:14px 0 6px;font-size:19px;color:var(--gold)}
+p{margin:6px 0;color:var(--ink)}.dim{color:var(--dim);font-size:15px}
+button{font:inherit;font-size:16px;color:var(--ink);background:#2a2340;border:2px solid #000;box-shadow:0 0 0 1px #8a7444;border-radius:8px;padding:8px 12px;margin:3px;min-height:44px;cursor:pointer}
+button:hover,button:focus{box-shadow:0 0 0 3px #fff;outline:none}button:disabled{opacity:.4;cursor:default}
+.plots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.plots button{margin:0;min-height:64px}
+.row{display:flex;flex-wrap:wrap;align-items:center}
+</style></head><body>
+<canvas id="c"></canvas><div id="hud"></div><div id="toast"></div><div id="menu"><div class="box" id="box"></div></div>
+<script>
+'use strict';
+const cv=document.getElementById('c'),cx=cv.getContext('2d'),hud=document.getElementById('hud'),menu=document.getElementById('menu'),box=document.getElementById('box'),toastEl=document.getElementById('toast');
+let W,H,DPR;function fit(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR|0;cv.height=H*DPR|0}addEventListener('resize',fit);fit();
+let seed=1;const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const KINDS={thorn:{name:'Thornvine',col:'#d0344e',gear:'Blade',desc:'longer, harder swings'},sun:{name:'Sunbloom',col:'#f2bb32',gear:'Lantern',desc:'more light, wider glow'},root:{name:'Glassroot',col:'#3aa6d2',gear:'Mail',desc:'more health'},wing:{name:'Wingpea',col:'#6ccf52',gear:'Boots',desc:'faster feet'}};
+const K=Object.keys(KINDS);
+const fresh=()=>({seeds:{thorn:2,sun:2,root:1,wing:1},crops:{thorn:0,sun:0,root:0,wing:0},gear:{thorn:1,sun:1,root:1,wing:1},light:3,relics:0,plots:[null,null,null,null,null,null],dives:0});
+let save=fresh();
+try{const s=JSON.parse(localStorage.getItem('glassHarvest1'));if(s&&Array.isArray(s.plots))save=Object.assign(fresh(),s)}catch(e){}
+function persist(){try{localStorage.setItem('glassHarvest1',JSON.stringify(save))}catch(e){}}
+let toastT=0;function toast(m){toastEl.textContent=m;toastEl.style.opacity=1;toastT=2.6}
+const stats=()=>{const g=save.gear;return{hp:60+25*(g.root-1),spd:150+18*(g.wing-1),lamp:70+25*(g.sun-1),glow:150+22*(g.sun-1),reach:48+9*(g.thorn-1),dmg:10+7*(g.thorn-1)}};
+
+// ---------- the dive ----------
+const T=32,GW=50,GH=50;let D=null,scene='title';
+function hsl(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,9-k(n),1));return[f(0)*255,f(8)*255,f(4)*255]}
+function bake(g){const R=2,w=GW*T/R,h=GH*T/R,S=11,cw=Math.ceil(w/S)+1,ch=Math.ceil(h/S)+1,sx=new Float32Array(cw*ch),sy=new Float32Array(cw*ch),col=[];
+  for(let j=0;j<ch;j++)for(let i=0;i<cw;i++){const k=j*cw+i;sx[k]=(i+.15+rnd()*.7)*S;sy[k]=(j+.15+rnd()*.7)*S;const tx=clamp(sx[k]*R/T|0,0,GW-1),ty=clamp(sy[k]*R/T|0,0,GH-1),fl=g[ty*GW+tx];
+    const r=rnd();col.push(fl?(r<.06?hsl(350,60,34):r<.1?hsl(150,40,28):hsl(28+rnd()*24,55,26+rnd()*12)):hsl(225+rnd()*55,55,13+rnd()*10))}
+  const oc=document.createElement('canvas');oc.width=w;oc.height=h;const o=oc.getContext('2d'),im=o.createImageData(w,h),d=im.data;
+  for(let y=0;y<h;y++){const cj=y/S|0;for(let x=0;x<w;x++){const ci=x/S|0;let b1=1e9,b2=1e9,bk=0;
+    for(let j=cj-1;j<=cj+1;j++){if(j<0||j>=ch)continue;for(let i=ci-1;i<=ci+1;i++){if(i<0||i>=cw)continue;const k=j*cw+i,dx=sx[k]-x,dy=sy[k]-y,dd=dx*dx+dy*dy;if(dd<b1){b2=b1;b1=dd;bk=k}else if(dd<b2)b2=dd}}
+    const p=(y*w+x)*4,e=Math.sqrt(b2)-Math.sqrt(b1);
+    if(e<1.25){d[p]=10;d[p+1]=8;d[p+2]=8}else{const c=col[bk],sh=1+.35*(1-Math.min(1,Math.sqrt(b1)/S));d[p]=c[0]*sh;d[p+1]=c[1]*sh;d[p+2]=c[2]*sh}d[p+3]=255}}
+  o.putImageData(im,0,0);return oc}
+function genDive(depth){seed=(Date.now()^(depth*99991))>>>0;const g=new Uint8Array(GW*GH),rooms=[];
+  for(let i=0;i<300&&rooms.length<8+depth;i++){const w=5+(rnd()*6|0),h=5+(rnd()*6|0),x=2+(rnd()*(GW-w-4)|0),y=2+(rnd()*(GH-h-4)|0);
+    if(rooms.some(r=>x<r.x+r.w+2&&x+w+2>r.x&&y<r.y+r.h+2&&y+h+2>r.y))continue;rooms.push({x,y,w,h,cx:x+(w>>1),cy:y+(h>>1)})}
+  for(const r of rooms)for(let yy=r.y;yy<r.y+r.h;yy++)for(let xx=r.x;xx<r.x+r.w;xx++)g[yy*GW+xx]=1;
+  for(let i=1;i<rooms.length;i++){const a=rooms[i-1],b=rooms[i];let x=a.cx,y=a.cy;while(x!==b.cx){g[y*GW+x]=g[(y+1)*GW+x]=1;x+=Math.sign(b.cx-x)}while(y!==b.cy){g[y*GW+x]=g[y*GW+x+1]=1;y+=Math.sign(b.cy-y)}}
+  const st=stats(),r0=rooms[0],items=[],foes=[];let far=rooms[1],fd=0;
+  for(const r of rooms.slice(1)){const dd=Math.hypot(r.cx-r0.cx,r.cy-r0.cy);if(dd>fd){fd=dd;far=r}
+    const at=()=>({x:(r.x+.5+rnd()*(r.w-1))*T,y:(r.y+.5+rnd()*(r.h-1))*T});
+    for(let n=1+(rnd()*3|0);n--;)items.push({k:'mote',...at()});
+    if(rnd()<.75)items.push({k:'seed',kind:K[rnd()*4|0],...at()});
+    for(let n=(rnd()*(1+depth*.7))|0;n--;){const p=at();foes.push({...p,hp:20+depth*9,max:20+depth*9,spd:62+depth*9,cd:0,ph:rnd()*6})}}
+  if(save.relics<5)items.push({k:'relic',x:far.cx*T+T/2,y:far.cy*T+T/2});
+  D={depth,g,img:bake(g),items,foes,shards:[],t:0,collapse:150-depth*10,next:4,
+    p:{x:r0.cx*T+T/2,y:r0.cy*T+T/2,fx:1,fy:0,hp:st.hp,lamp:st.lamp,cd:0,swing:0,hurt:0},exit:{x:r0.cx*T+T/2,y:r0.cy*T+T/2},
+    bag:{seeds:{thorn:0,sun:0,root:0,wing:0},light:0,relic:0},stand:0,dark:0,shake:0};
+  scene='dive';closeMenu();toast('Depth '+depth+'. Find seeds, light and the relic, then come back to this door.')}
+const wall=(x,y)=>{const tx=x/T|0,ty=y/T|0;return tx<0||ty<0||tx>=GW||ty>=GH||!D.g[ty*GW+tx]};
+function moveC(o,dx,dy,r){if(!wall(o.x+dx+Math.sign(dx)*r,o.y-r*.7)&&!wall(o.x+dx+Math.sign(dx)*r,o.y+r*.7))o.x+=dx;if(!wall(o.x-r*.7,o.y+dy+Math.sign(dy)*r)&&!wall(o.x+r*.7,o.y+dy+Math.sign(dy)*r))o.y+=dy}
+function endDive(ok){const b=D.bag;scene='farm';
+  if(ok){for(const k of K)save.seeds[k]+=b.seeds[k];save.light+=b.light;if(b.relic)save.relics=Math.min(5,save.relics+1)}
+  let grew=0;for(const pl of save.plots)if(pl&&pl.st<3&&save.light>0){save.light--;pl.st++;grew++}
+  save.dives++;persist();D=null;
+  openFarm(ok?`You came back with ${b.light} light, ${K.reduce((s,k)=>s+b.seeds[k],0)} seeds${b.relic?' and a relic: a rose window glows again':''}. ${grew} plots drank light and grew.`:`The glass took you, and everything you carried. ${grew} plots grew on stored light.`)}
+function stepDive(dt){const p=D.p,st=stats(),inp=readInput();D.t+=dt;
+  if(inp.x||inp.y){const m=Math.hypot(inp.x,inp.y),s=st.spd*Math.min(1,m)*dt;p.fx=inp.x/m;p.fy=inp.y/m;moveC(p,p.fx*s,p.fy*s,10)}
+  p.cd-=dt;p.swing-=dt;p.hurt-=dt;D.shake=Math.max(0,D.shake-dt*20);
+  if(inp.strike&&p.cd<=0){p.cd=.38;p.swing=.18;for(const f of D.foes){const dx=f.x-p.x,dy=f.y-p.y,d=Math.hypot(dx,dy);if(d<st.reach+12&&(dx*p.fx+dy*p.fy)/(d||1)>.3){f.hp-=st.dmg;f.x+=dx/d*30;f.y+=dy/d*30;f.hit=.15}}}
+  for(let i=D.foes.length;i--;){const f=D.foes[i];if(f.hp<=0){D.items.push({k:'mote',x:f.x,y:f.y});D.foes.splice(i,1)}}
+  // lantern: burns down, then the jar, then you
+  p.lamp-=dt*(D.t>D.collapse?2:1);if(p.lamp<=0){if(D.bag.light>0){D.bag.light--;p.lamp+=12;toast('Your lantern drinks from the jar.')}else{p.lamp=0;p.hp-=4*dt}}
+  const glow=st.glow*(.45+.55*Math.min(1,p.lamp/st.lamp));
+  for(const f of D.foes){f.ph+=dt;f.hit=(f.hit||0)-dt;const dx=p.x-f.x,dy=p.y-f.y,d=Math.hypot(dx,dy);f.cd-=dt;
+    if(d<330){const sl=d<glow*.55?.45:1;moveC(f,dx/d*f.spd*sl*dt,dy/d*f.spd*sl*dt,9)}else moveC(f,Math.cos(f.ph)*20*dt,Math.sin(f.ph*.7)*20*dt,9);
+    if(d<22&&f.cd<=0){f.cd=1;hurt(8+D.depth*3)}}
+  // falling glass, telegraphed
+  D.next-=dt;if(D.next<=0){D.next=D.t>D.collapse?.45:Math.max(.8,3.2-D.t/45-D.depth*.25);const a=rnd()*6.283,r=rnd()*150;D.shards.push({x:p.x+Math.cos(a)*r,y:p.y+Math.sin(a)*r,t:1.1,c:K[rnd()*4|0]})}
+  for(let i=D.shards.length;i--;){const s=D.shards[i];s.t-=dt;if(s.t<=0&&!s.hit){s.hit=1;D.shake=6;if(Math.hypot(s.x-p.x,s.y-p.y)<36)hurt(12+D.depth*3)}if(s.t<-.6)D.shards.splice(i,1)}
+  for(let i=D.items.length;i--;){const it=D.items[i];if(Math.hypot(it.x-p.x,it.y-p.y)<26){D.items.splice(i,1);
+    if(it.k==='mote'){D.bag.light++;p.lamp=Math.min(st.lamp,p.lamp+6)}else if(it.k==='seed'){D.bag.seeds[it.kind]++;toast('A '+KINDS[it.kind].name+' seed.')}else{D.bag.relic=1;toast('The relic! Carry it home to light a rose window.')}}}
+  const atExit=Math.hypot(D.exit.x-p.x,D.exit.y-p.y)<34;D.stand=atExit&&D.t>2?D.stand+dt:0;if(D.stand>1.2||(atExit&&inp.use&&D.t>2))return endDive(true);
+  if(p.hp<=0)return endDive(false);
+  if(D.t>D.collapse&&!D.warned){D.warned=1;toast('The cathedral is coming down. Get out.')}
+  hud.innerHTML=`<span class=chip>Health <b>${Math.ceil(p.hp)}</b></span><span class=chip>Lantern <b>${Math.ceil(p.lamp)}</b></span><span class=chip>Light jar <b>${D.bag.light}</b></span><span class=chip>Seeds <b>${K.reduce((s,k)=>s+D.bag.seeds[k],0)}</b></span>${D.bag.relic?'<span class=chip><b>Relic</b></span>':''}<span class=chip>${D.t>D.collapse?'<b>Collapsing</b>':'Collapse in <b>'+Math.ceil(D.collapse-D.t)+'</b>'}</span>`;
+  return glow}
+function hurt(n){D.p.hurt=.3;D.p.hp-=n;D.shake=8;if(navigator.vibrate)try{navigator.vibrate(40)}catch(e){}}
+const dark=document.createElement('canvas'),dk=dark.getContext('2d');
+function drawDive(glow,time){const p=D.p,z=W<700?.8:1,ox=W/2-p.x*z+(rnd()-.5)*D.shake,oy=H/2-p.y*z+(rnd()-.5)*D.shake;
+  cx.setTransform(DPR*z,0,0,DPR*z,ox*DPR,oy*DPR);cx.fillStyle='#050408';cx.fillRect(p.x-W/z,p.y-H/z,2*W/z,2*H/z);cx.imageSmoothingEnabled=true;cx.drawImage(D.img,0,0,GW*T,GH*T);
+  // the door home
+  cx.globalCompositeOperation='lighter';let gr=cx.createRadialGradient(D.exit.x,D.exit.y,0,D.exit.x,D.exit.y,60);gr.addColorStop(0,'#fff6c0cc');gr.addColorStop(1,'#fff6c000');cx.fillStyle=gr;cx.fillRect(D.exit.x-60,D.exit.y-60,120,120);cx.globalCompositeOperation='source-over';
+  cx.strokeStyle='#fff3c0';cx.lineWidth=3;cx.beginPath();cx.arc(D.exit.x,D.exit.y,22+Math.sin(time*3)*3,0,6.283);cx.stroke();
+  for(const s of D.shards){if(s.t>0){cx.strokeStyle=`rgba(255,80,80,${.4+.4*Math.sin(time*20)})`;cx.lineWidth=2;cx.beginPath();cx.arc(s.x,s.y,36*(1-s.t/1.1)+6,0,6.283);cx.stroke();cx.setLineDash([4,6]);cx.beginPath();cx.arc(s.x,s.y,36,0,6.283);cx.stroke();cx.setLineDash([])}
+    else{cx.fillStyle=KINDS[s.c].col;for(let k=0;k<6;k++){const a=k*1.05+s.x,r=10+k*5;gem(s.x+Math.cos(a)*r,s.y+Math.sin(a)*r,6,KINDS[s.c].col)}}}
+  for(const it of D.items){const c=it.k==='mote'?'#fff2a8':it.k==='relic'?'#ffffff':KINDS[it.kind].col,b=Math.sin(time*3+it.x)*2;halo(it.x,it.y+b,it.k==='relic'?50:24,c);gem(it.x,it.y+b,it.k==='relic'?13:it.k==='mote'?6:9,c)}
+  for(const f of D.foes){cx.globalAlpha=.85;cx.fillStyle=f.hit>0?'#fff':'#20123a';cx.strokeStyle='#9a7cff';cx.lineWidth=2;cx.beginPath();for(let k=0;k<7;k++){const a=k/7*6.283+f.ph,r=14+Math.sin(f.ph*4+k)*4;cx.lineTo(f.x+Math.cos(a)*r,f.y+Math.sin(a)*r)}cx.closePath();cx.fill();cx.stroke();cx.globalAlpha=1;
+    cx.fillStyle='#d8c8ff';cx.fillRect(f.x-5,f.y-3,3,3);cx.fillRect(f.x+2,f.y-3,3,3);if(f.hp<f.max){cx.fillStyle='#000';cx.fillRect(f.x-14,f.y-24,28,4);cx.fillStyle='#b9a0ff';cx.fillRect(f.x-14,f.y-24,28*f.hp/f.max,4)}}
+  // the keeper
+  if(p.swing>0){cx.strokeStyle=KINDS.thorn.col;cx.lineWidth=6;const a=Math.atan2(p.fy,p.fx);cx.beginPath();cx.arc(p.x,p.y,stats().reach,a-1,a+1);cx.stroke()}
+  cx.fillStyle=p.hurt>0?'#ff6a6a':'#e9dcc0';cx.strokeStyle='#000';cx.lineWidth=3;cx.beginPath();cx.arc(p.x,p.y,11,0,6.283);cx.fill();cx.stroke();gem(p.x+p.fx*13,p.y+p.fy*13,5,'#ffd34a');
+  // darkness with the lantern's hole
+  if(dark.width!==cv.width||dark.height!==cv.height){dark.width=cv.width;dark.height=cv.height}
+  dk.setTransform(1,0,0,1,0,0);dk.globalCompositeOperation='source-over';dk.clearRect(0,0,dark.width,dark.height);dk.fillStyle='rgba(4,3,10,.95)';dk.fillRect(0,0,dark.width,dark.height);
+  dk.setTransform(DPR*z,0,0,DPR*z,ox*DPR,oy*DPR);dk.globalCompositeOperation='destination-out';
+  const hole=(x,y,r,a)=>{const g=dk.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(0,0,0,${a})`);g.addColorStop(.6,`rgba(0,0,0,${a*.7})`);g.addColorStop(1,'rgba(0,0,0,0)');dk.fillStyle=g;dk.fillRect(x-r,y-r,2*r,2*r)};
+  hole(p.x,p.y,glow*(1+Math.sin(time*7)*.02),1);hole(D.exit.x,D.exit.y,90,.9);for(const it of D.items)hole(it.x,it.y,it.k==='relic'?70:34,.8);for(const s of D.shards)if(s.t>0)hole(s.x,s.y,44,.6);
+  cx.setTransform(1,0,0,1,0,0);cx.drawImage(dark,0,0);cx.setTransform(DPR,0,0,DPR,0,0);
+  if(p.hp<stats().hp*.3){cx.fillStyle=`rgba(160,0,20,${.15+.1*Math.sin(time*6)})`;cx.fillRect(0,0,W,H)}
+  drawTouch()}
+function gem(x,y,r,c){cx.fillStyle=c;cx.strokeStyle='#0a0808';cx.lineWidth=2;cx.beginPath();cx.moveTo(x,y-r);cx.lineTo(x+r*.8,y);cx.lineTo(x,y+r);cx.lineTo(x-r*.8,y);cx.closePath();cx.fill();cx.stroke()}
+function halo(x,y,r,c){cx.globalCompositeOperation='lighter';const g=cx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c+'88');g.addColorStop(1,c+'00');cx.fillStyle=g;cx.fillRect(x-r,y-r,2*r,2*r);cx.globalCompositeOperation='source-over'}
+
+// ---------- the rose window behind the farm ----------
+function drawRose(time){cx.setTransform(DPR,0,0,DPR,0,0);cx.fillStyle='#0b0a12';cx.fillRect(0,0,W,H);const R=Math.max(W,H)*.55,x0=W/2,y0=H/2;
+  for(let ring=0;ring<6;ring++){const r0=R*ring/6,r1=R*(ring+1)/6,n=ring===0?1:ring*8;
+    for(let i=0;i<n;i++){const sec=Math.floor(i/n*5),lit=sec<save.relics,a0=i/n*6.283+ring*.2,a1=(i+1)/n*6.283+ring*.2,hue=[350,45,200,130,280][(i+ring)%5];
+      const l=lit?34+10*Math.sin(time*1.3+i+ring):9;cx.fillStyle=`hsl(${hue},${lit?65:15}%,${l}%)`;cx.strokeStyle='#050404';cx.lineWidth=4;
+      cx.beginPath();if(ring===0)cx.arc(x0,y0,r1,0,6.283);else{cx.arc(x0,y0,r1,a0,a1);cx.arc(x0,y0,r0,a1,a0,true)}cx.closePath();cx.fill();cx.stroke()}}}
+
+// ---------- menus ----------
+let menuBack=null;
+function openMenu(html,back){box.innerHTML=html;menu.classList.add('on');menuBack=back||null;const b=box.querySelector('button:not(:disabled)');if(b&&!touchUsed)b.focus()}
+function closeMenu(){menu.classList.remove('on');box.innerHTML=''}
+box.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;const a=b.dataset.a,v=b.dataset.v;act(a,v)});
+function act(a,v){
+  if(a==='begin'){openFarm('Your glasshouse is dark. Dive the ruins for seeds and light; carry a relic home to relight a rose window. Light all five.')}
+  else if(a==='new'){save=fresh();persist();act('begin')}
+  else if(a==='dive'){genDive(+v)}
+  else if(a==='plot'){const pl=save.plots[v];if(!pl)openPlant(+v);else if(pl.st>=3){save.crops[pl.k]+=3;save.plots[v]=null;persist();openFarm('Harvested three '+KINDS[pl.k].name+'.')}else openFarm(KINDS[pl.k].name+' needs '+(3-pl.st)+' more light. Each dive, growing plots drink one light from your store.')}
+  else if(a==='plant'){const [i,k]=v.split(':');save.seeds[k]--;save.plots[i]={k,st:0};persist();openFarm(KINDS[k].name+' planted.')}
+  else if(a==='gear'){const c=save.gear[v]*2;save.crops[v]-=c;save.gear[v]++;persist();openFarm(KINDS[v].gear+' woven from '+KINDS[v].name+': '+KINDS[v].desc+'.')}
+  else if(a==='farm')openFarm();
+  else if(a==='resume'){closeMenu();paused=false}
+  else if(a==='abandon'){paused=false;endDive(false)}
+}
+function openPlant(i){openMenu(`<h2>Plant which seed?</h2>${K.map(k=>`<button data-a=plant data-v="${i}:${k}" ${save.seeds[k]<1?'disabled':''}>${KINDS[k].name} (${save.seeds[k]})<br><span class=dim>grows into ${KINDS[k].gear}</span></button>`).join('')}<div><button data-a=farm>Back</button></div>`,()=>openFarm())}
+function openFarm(msg){scene='farm';hud.innerHTML='';const won=save.relics>=5,maxD=Math.min(5,save.relics+1);
+  openMenu(`<h1>The Glasshouse</h1>${msg?`<p>${msg}</p>`:''}${won?'<p><b>All five rose windows burn again. The cathedral remembers you.</b> Dive on for a harder harvest.</p>':''}
+  <p class=dim>Rose windows lit ${save.relics} of 5. Stored light ${save.light}. Dives ${save.dives}.</p>
+  <h2>Plots</h2><div class=plots>${save.plots.map((pl,i)=>`<button data-a=plot data-v=${i} style="${pl?`box-shadow:0 0 0 2px ${KINDS[pl.k].col}`:''}">${pl?KINDS[pl.k].name+'<br><span class=dim>'+(pl.st>=3?'Ripe, harvest':['Seed','Sprout','Budding'][pl.st])+'</span>':'Empty<br><span class=dim>plant</span>'}</button>`).join('')}</div>
+  <h2>Weave gear from crops</h2>${K.map(k=>{const lv=save.gear[k],c=lv*2;return`<div class=row><button data-a=gear data-v=${k} ${save.crops[k]<c||lv>=6?'disabled':''}>${KINDS[k].gear} ${lv} to ${lv+1}</button><span class=dim>${lv>=6?'mastered':c+' '+KINDS[k].name+' (have '+save.crops[k]+')'}, ${KINDS[k].desc}</span></div>`}).join('')}
+  <h2>Dive</h2><div class=row>${[1,2,3,4,5].map(d=>`<button data-a=dive data-v=${d} ${d>maxD?'disabled':''}>Depth ${d}</button>`).join('')}</div><p class=dim>A relic opens the next depth. Deeper holds more and bites harder.</p>`)}
+function openTitle(){scene='title';openMenu(`<h1>Glass Harvest</h1><p>Dive into a falling cathedral for seeds and light. Grow them in your glasshouse into blades, lanterns, mail and boots. Bring back relics to relight five rose windows.</p>
+  <p class=dim>Move with WASD, arrows, a left stick or by dragging on the left. Strike with Space, J, the A button or the right-hand button. Stand in the door to go home. Esc or Start pauses.</p>
+  <button data-a=begin>${save.dives?'Continue':'Begin'}</button>${save.dives?'<button data-a=new>New garden</button>':''}`)}
+let paused=false;function openPause(){paused=true;openMenu(`<h2>Paused</h2><button data-a=resume>Resume</button><button data-a=abandon>Abandon the dive</button><p class=dim>Abandoning loses what you carry.</p>`,()=>act('resume'))}
+
+// ---------- input: keys, pad, touch ----------
+const keys={};let touchUsed=false,stick=null,strikeTouch=false;
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Escape'){if(scene==='dive'&&!paused)openPause();else if(menuBack)menuBack()}
+  if(menu.classList.contains('on')&&/Arrow/.test(e.code)){navMenu(e.code==='ArrowDown'||e.code==='ArrowRight'?1:-1);e.preventDefault()}});
+addEventListener('keyup',e=>{keys[e.code]=false});addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+function navMenu(d){const bs=[...box.querySelectorAll('button:not(:disabled)')];if(!bs.length)return;const i=bs.indexOf(document.activeElement);bs[(i+d+bs.length)%bs.length].focus()}
+const sBtn=()=>({x:W-70,y:H-80,r:46});
+cv.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')touchUsed=true;if(scene!=='dive'||paused)return;const b=sBtn();
+  if(Math.hypot(e.clientX-b.x,e.clientY-b.y)<b.r+14){strikeTouch=e.pointerId}else if(e.clientX<W*.6){stick={id:e.pointerId,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY}}else strikeTouch=e.pointerId});
+cv.addEventListener('pointermove',e=>{if(stick&&e.pointerId===stick.id){stick.x=e.clientX;stick.y=e.clientY}});
+const up=e=>{if(stick&&e.pointerId===stick.id)stick=null;if(strikeTouch===e.pointerId)strikeTouch=false};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+let padPrev={};
+function pad(){const g=navigator.getGamepads?[...navigator.getGamepads()].find(p=>p):null;if(!g)return null;const b=i=>!!(g.buttons[i]&&g.buttons[i].pressed),now={a:b(0),b:b(1),st:b(9),up:b(12)||g.axes[1]<-.6,dn:b(13)||g.axes[1]>.6};
+  const ed=k=>now[k]&&!padPrev[k];if(menu.classList.contains('on')){if(ed('dn'))navMenu(1);if(ed('up'))navMenu(-1);if(ed('a')&&document.activeElement&&box.contains(document.activeElement))document.activeElement.click();if(ed('b')&&menuBack)menuBack()}
+  else if(ed('st')&&scene==='dive')openPause();padPrev=now;return g}
+function readInput(){let x=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),y=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+  const g=pad();let strike=keys.Space||keys.KeyJ,use=keys.KeyE;
+  if(g){const ax=g.axes[0]||0,ay=g.axes[1]||0;if(Math.hypot(ax,ay)>.2){x=ax;y=ay}strike=strike||!!(g.buttons[0]&&g.buttons[0].pressed);use=use||!!(g.buttons[1]&&g.buttons[1].pressed)}
+  if(stick){const dx=stick.x-stick.x0,dy=stick.y-stick.y0,m=Math.hypot(dx,dy);if(m>8){x=dx/Math.max(m,50);y=dy/Math.max(m,50)}}
+  if(strikeTouch!==false)strike=true;const m=Math.hypot(x,y);if(m>1){x/=m;y/=m}return{x,y,strike,use}}
+function drawTouch(){if(!touchUsed)return;const b=sBtn();cx.globalAlpha=.6;cx.fillStyle=KINDS.thorn.col;cx.strokeStyle='#000';cx.lineWidth=3;cx.beginPath();cx.arc(b.x,b.y,b.r,0,6.283);cx.fill();cx.stroke();cx.globalAlpha=1;cx.fillStyle='#fff';cx.font='16px Georgia';cx.textAlign='center';cx.fillText('Strike',b.x,b.y+5);
+  if(stick){cx.globalAlpha=.4;cx.strokeStyle='#fff';cx.beginPath();cx.arc(stick.x0,stick.y0,50,0,6.283);cx.stroke();cx.beginPath();cx.arc(stick.x,stick.y,20,0,6.283);cx.stroke();cx.globalAlpha=1}}
+
+// ---------- loop ----------
+let last=performance.now();
+function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000);last=now;const time=now/1000;
+  if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.style.opacity=0}
+  if(scene==='dive'&&D){let glow=stats().glow;if(!paused){pad();if(!paused&&D){const r=stepDive(dt);if(typeof r==='number')glow=r}}else pad();if(scene==='dive'&&D)drawDive(glow,time);else drawRose(time)}
+  else{pad();drawRose(time)}}
+window.__gh={get save(){return save},get D(){return D},get scene(){return scene},dive:genDive,step(n){for(let i=0;i<n&&D;i++)stepDive(1/60)}};
+openTitle();requestAnimationFrame(frame);
+</script></body></html>

@@ -541,7 +541,7 @@ function hurtArea(x,y,r,dmg,tdmg,why){
   for(const m of S.monsters)if(Math.hypot(m.x-x,m.y-y)<r+m.r)m.hp-=dmg;
   for(const t of S.towns)if(t.alive&&Math.hypot(t.x-x,t.y-y)<r+t.r)hurtTown(t,tdmg)}
 function hurtTown(t,d){if(!t.alive)return;t.hp-=d;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;announce(t.name+' has been destroyed!');sfx('smash')}}
-function hurtHuman(h,d,why,by){if(h.dead)return;d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
+function hurtHuman(h,d,why,by){if(h.dead)return;if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
 function killHuman(h,why){dropJob(h);h.hp=0;h.dead=6;h.mode='ground';h.cl=null;h.tx=h.ty=null;h.goal=null;h.botClimb=null;h.gold=Math.floor(h.gold*.75);
@@ -617,7 +617,7 @@ function humanCtx(h){
     else Y={l:'Potion ('+h.potions+')',why:!h.potions?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
   const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
-  return{A:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach'},B:foot>=0||!up?{l:'Climb',why:foot>=0?null:S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
+  return{A:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()},B:foot>=0||!up?{l:'Climb',why:foot>=0?null:S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
     X:t?{l:'Town',why:null}:cacheNear(h)?{l:'Search ruins',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
 function humanAct(h,slot,dir){if(slot==='A'&&h.mode==='climb'&&S.chains.some(q=>q.hp>0&&q.r===Math.floor(h.cl.y)&&q.c===Math.floor(h.cl.x)))h.chainHits=(h.chainHits||0)+1;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
@@ -640,7 +640,7 @@ function humanAct(h,slot,dir){if(slot==='A'&&h.mode==='climb'&&S.chains.some(q=>
     if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
     return false}
-  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){m.hp-=h.atk;m.hitT=S.t;if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}
+  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){m.hp-=h.atk;m.hitT=S.t;onBlow(h,m,h.atk,0);if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}mount(h,nearFoot(h));return true}
   if(slot==='X'){const t=townAt(h),c=cacheNear(h);if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else openBuild()}return true}
   if(slot==='Y'){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.');return true}h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
@@ -766,7 +766,7 @@ function attackTarget(h){const R=attackReach(h);let best=null,bh=1e9,bd=1e9;
   if(!townAt(h))for(const o of S.humans){if(o===h||o.dead||o.town===h.town||o.mode!=='ground'||townAt(o))continue;take(o,Math.hypot(o.x-h.x,o.y-h.y))}
   return best}
 function rivalNear(h,r){let best=null,bd=r;for(const o of S.humans){if(o===h||o.dead||o.town===h.town||o.mode!=='ground'||townAt(o)||townAt(h))continue;const d=Math.hypot(o.x-h.x,o.y-h.y);if(d<bd){bd=d;best=o}}return best}
-function strikeHuman(h,o){const d=h.atk;S.feud[o.town][h.town]+=d;o.hitT=S.t;hurtHuman(o,d,'person',h);S.fx.push({k:'txt',x:o.x,y:o.y,z:90,text:'-'+Math.round(Math.max(d*.4,d-(o.def||0))),t:0,life:.8,col:'#ffd0a0'});sfx('hit',h.you||o.you||nearPlayer(o));
+function strikeHuman(h,o,dm,hk){if(untouchable(o)){dodgedFx(o);return}const d=dm||h.atk;onBlow(h,o,d,hk||0);S.feud[o.town][h.town]+=d;o.hitT=S.t;hurtHuman(o,d,'person',h);S.fx.push({k:'txt',x:o.x,y:o.y,z:90,text:'-'+Math.round(Math.max(d*.4,d-(o.def||0))),t:0,life:.8,col:'#ffd0a0'});sfx('hit',h.you||o.you||nearPlayer(o));
   if(o.dead){const k=o.pack;let got=0;for(const w of['crystals','pelts'])while(k[w]>0&&packCount(h)<packCap(h)){k[w]--;h.pack[w]++;got++}const gold=Math.floor(o.gold*.25);o.gold-=gold;h.gold+=gold;gainXp(h,30);
     if(h.you||o.you||!S.headless)announce((h.you?'You':h.name)+' killed '+(o.you?'you':o.name)+(got||gold?', taking '+[got?got+' from the pack':'',gold?gold+' gold':''].filter(Boolean).join(' and '):'')+'.')}}
 // The first day: goals in the world, one at a time, each passed by the real game event it asks for. A goal opens on a
@@ -779,7 +779,7 @@ const FIRST_DAY=[
    check(h){return h.pack.crystals+h.crystals>S.tut.base}},
   {id:'home',text:'Carry it home. Walking into Ashford empties your pack into the town\u2019s store, and stored crystals pay for upgrades anywhere.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
   {id:'board',text:'Ashford\u2019s board has work. In Ashford, press Town and take the job on the Board.',setup(h){if(h.quest&&!h.quest.tut)h.quest=null},target(h){return S.towns[h.town]},check(h){return!!(h.quest&&h.quest.tut)}},
-  {id:'hunt',text:'Wolves prowl outside Ashford. Walk up to one and press Attack: it strikes the weakest beast in reach, ringed in red. Your health refills in town.',
+  {id:'hunt',get text(){return'Wolves prowl outside Ashford. Walk up to one and press Attack: it strikes the weakest beast in reach, ringed in red. Hold Attack for a heavy blow. A red ring shrinking under you means a wolf is about to lunge: step out of it, or dodge ('+dodgeName()+'). Your health refills in town.'},
    setup(h){tutWolves(h)},target(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t},
    note(h){const q=h.quest;return q&&q.tut?'('+Math.min(q.n,q.need)+'/'+q.need+')':''},check(h){return!h.quest||!h.quest.tut||h.quest.done},hold:true},
   {id:'reward',text:'The job is done. Walk back into Ashford to collect your reward: finished jobs pay when you come home.',setup(h){S.tut.base=h.claimed||0},target(h){return S.towns[h.town]},check(h){return(h.claimed||0)>S.tut.base},hold:true},
@@ -848,6 +848,7 @@ function stepHuman(h,dt,mv){
   if(h.mode==='climb'){stepClimb(h,dt,mv);return}
   let vx=mv.x,vy=mv.y;
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
+  ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
   if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered%C.STAR_EVERY===0)startStar();
@@ -890,17 +891,98 @@ function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
 
 // ================= monsters and shots =================
 function stepMonsters(dt){
-  for(const m of S.monsters){m.cd=Math.max(0,m.cd-dt);
+  for(const m of S.monsters){m.cd=Math.max(0,m.cd-dt);if(beastBusy(m,dt))continue;
     if(m.raid){const town=S.towns.find(t=>t.id===m.raid.town);if(town&&town.alive&&S.t>=m.raid.go){let foe=null,fd=200;for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town===m.raid.i){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<fd){fd=d;foe=h}}
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;
-      if(d>(foe?m.r+14:town.r)){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;if(foe)hurtHuman(foe,m.atk,'beast');else hurtTown(town,m.atk*1.5)}continue}}
+      if(foe){beastFight(m,foe,dt);continue}if(d>town.r){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;hurtTown(town,m.atk*1.5)}continue}}
     let tgt=null,bd=260;
     for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)&&!(h.you&&S.tut&&!S.tut.done&&S.tut.i<FIRST_DAY.findIndex(s=>s.id==='hunt'))){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
-    if(tgt){const sp=m.kind==='troll'?85:120;if(bd>m.r+14){m.x+=(tgt.x-m.x)/bd*sp*dt;m.y+=(tgt.y-m.y)/bd*sp*dt}else if(m.cd<=0){m.cd=1;hurtHuman(tgt,m.atk,'beast')}}
+    if(tgt)beastFight(m,tgt,dt);
     else{const dx=m.hx-m.x,dy=m.hy-m.y,d=Math.hypot(dx,dy);if(d>30){m.x+=dx/d*40*dt;m.y+=dy/d*40*dt}else if(rnd()<.01){m.hx=clamp(m.x+rr(-200,200),100,C.MAP-100);m.hy=clamp(m.y+rr(-200,200),100,C.MAP-100)}}}
   for(const m of S.monsters)solidPush(m,m.r);
   for(let i=S.monsters.length-1;i>=0;i--)if(S.monsters[i].hp<=0)S.monsters.splice(i,1);
   while(S.monsters.length<C.MONSTERS)spawnMonster()}
+// ================= combat: read and answer =================
+// Every beast telegraphs. When it may strike, it marks the spot its target stands on (a red ring), crouches (a wolf)
+// or raises its club (a troll) for the wind-up, and only at its end does the blow land, on whoever is still in the ring:
+// stepping out, or the untouchable first part of a dodge, answers it. Beasts on one person take turns (attack tokens:
+// one at a time, two for a pack of four or more) while the rest circle at a slot round them. Blows you land knock back by
+// their strength, harder from a held (charged) Attack; a beast knocked into stone or a footprint lake takes more.
+// All of it is sim state on the fixed tick and uses rnd() only; hit-stop, shake and rings are presentation.
+const CB={WIND:{wolf:.7,troll:.85},RING:{wolf:34,troll:46},RECOVER:{wolf:.45,troll:.6},CD:{wolf:.9,troll:1.2},HIT:1.4,
+  CIRCLE:{wolf:80,troll:92},DODGE_T:.3,DODGE_IFR:.22,DODGE_DIST:105,DODGE_CD:.5,CHARGE_MIN:.16,CHARGE_FULL:.6,TOK_GAP:.3};
+const untouchable=h=>!!(h&&h.dodge&&h.dodge.t<CB.DODGE_IFR);
+function cstat(k){const c=S.cstat||(S.cstat={winds:0,hits:0,dodged:0,missed:0,heavy:0,slams:0,lakes:0,dodges:0,two:0});c[k]++}
+function dodgedFx(h){if(S.headless||!(h.you||nearPlayer(h))||S.t-(h.dfxT||-9)<.5)return;h.dfxT=S.t;S.fx.push({k:'txt',x:h.x,y:h.y,z:95,text:'Dodged!',t:0,life:.9,col:'#9fe8ff'})}
+const lakeAt=(x,y)=>S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<C.FOOT_R*.8);
+// a free attack token on this person: the shared gap after a strike has passed, and fewer than one (two for a big pack) wind-ups on them
+function tokenFree(m,tg){if(S.t<(tg.nextTok||0))return false;let n=0,pack=0;for(const o of S.monsters){if(o.wind&&o.wind.id===tg.id)n++;if(o.eng===tg.id&&S.t-o.engT<.3)pack++}return n<(pack>=4?2:1)}
+function beastFight(m,tg,dt){const dx=tg.x-m.x,dy=tg.y-m.y,d=Math.hypot(dx,dy)||1,sp=m.kind==='troll'?85:120,reach=m.r+(m.kind==='troll'?34:30);
+  m.eng=tg.id;m.engT=S.t;const free=m.cd<=0&&tokenFree(m,tg);
+  // the turn is ours and the target is in reach: lock the spot where it stands and wind up
+  if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:CB.WIND[m.kind]||.7,x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};cstat('winds');if(two)cstat('two');
+    if(tg.you&&!S.headless)sfx('warn',true);return}
+  if(free){m.x+=dx/d*sp*dt;m.y+=dy/d*sp*dt;return}
+  // waiting for a turn: circle at a slot round the target, kept apart from the rest of the pack; a person who walks in is not fled
+  if(m.slotFor!==tg.id){m.slot=Math.atan2(-dy,-dx);m.slotFor=tg.id}m.slot+=(m.id%2?1:-1)*.55*dt;
+  const RR=CB.CIRCLE[m.kind]||80;let gx=tg.x+Math.cos(m.slot)*RR-m.x,gy=tg.y+Math.sin(m.slot)*RR-m.y;
+  for(const o of S.monsters)if(o!==m&&o.eng===tg.id&&S.t-o.engT<.3){const ox=m.x-o.x,oy=m.y-o.y,od=Math.hypot(ox,oy);if(od>0&&od<m.r+o.r+22){gx+=ox/od*40;gy+=oy/od*40}}
+  const gl=Math.hypot(gx,gy);if(gl>4){const v=Math.min(d<RR-30?sp*.3:sp*.8,gl*4);m.x+=gx/gl*v*dt;m.y+=gy/gl*v*dt}}
+// a wind-up, a knockback or the moment after a strike holds a beast where it is
+function beastBusy(m,dt){if(m.kb)return true;
+  if(m.wind){const W=m.wind;W.t+=dt;const tg=S.humans.find(h=>h.id===W.id);if(!tg||tg.dead||tg.mode!=='ground'){m.wind=null;m.cd=.4;return true}if(W.t>=W.dur)beastStrike(m,W,tg);return true}
+  if(m.rec>0){m.rec-=dt;return true}return false}
+function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.CD[m.kind]||1;tg.nextTok=S.t+CB.TOK_GAP;
+  if(m.kind!=='troll'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy);if(d>m.r+6){m.x+=dx/d*(d-m.r-6);m.y+=dy/d*(d-m.r-6);solidPush(m,m.r)}}
+  const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
+  if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
+  if(!hit.includes(tg)){cstat('missed');if(tg.you&&!S.headless)S.fx.push({k:'txt',x:tg.x,y:tg.y,z:95,text:'Missed',t:0,life:.8,col:'#d8f0ff'})}
+  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);continue}cstat('hits');hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
+// a dodge: a quick sidestep, untouchable for its first part, then a short cooldown; no stamina
+function threatOf(h){let b=null,bd=1e9;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-(m.wind&&m.wind.id===h.id?1e4:0);if(d<bd&&d<300){bd=d;b=m}}if(!b)b=rivalNear(h,200);return b}
+function humanDodge(h,dir){if(h.dead||h.mode!=='ground'||h.job)return false;if(h.dodge||(h.dodgeCd||0)>0)return false;
+  let x=dir?dir.x:0,y=dir?dir.y:0;if(Math.hypot(x,y)<.2){const th=threatOf(h);if(th){x=h.x-th.x;y=h.y-th.y}else{x=-Math.cos(h.face||0);y=-Math.sin(h.face||0)}}
+  const l=Math.hypot(x,y)||1;h.dodge={t:0,x:x/l,y:y/l,sx:h.x,sy:h.y};h.tx=h.ty=null;h.charge=null;h.face=Math.atan2(y,x);cstat('dodges');
+  if(h.you&&!S.headless)sfx('grip',true);return true}
+function combatMove(h,dt,vx,vy){h.dodgeCd=Math.max(0,(h.dodgeCd||0)-dt);const D=h.dodge;
+  if(D){D.t+=dt;if(D.t>=CB.DODGE_T){h.dodge=null;h.dodgeCd=CB.DODGE_CD}else{const s=CB.DODGE_DIST*2*(1-(D.t-dt/2)/CB.DODGE_T)/CB.DODGE_T/C.H_SPEED;return{x:D.x*s,y:D.y*s}}}
+  return h.charge?{x:vx*.55,y:vy*.55}:{x:vx,y:vy}}
+// bots see a wind-up aimed at them and, about half the time, answer it after a reaction delay, so they can be beaten
+function botDodge(h){if(h.dodge||(h.dodgeCd||0)>0||h.job)return;
+  for(const m of S.monsters){const W=m.wind;if(!W||W.id!==h.id)continue;if(W.roll==null)W.roll=rnd()<.45?1:0;
+    if(W.roll&&W.t>=.3+(h.id%3)*.07&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+12){const ax=h.x-m.x,ay=h.y-m.y,s=h.id%2?1:-1;humanDodge(h,{x:-ay*s+ax*.4,y:ax*s+ay*.4});return}}}
+// held Attack: released before the ring fills (0.6 s) it is the plain strike, as a tap always was; held until full and
+// released, a heavy blow. Only a full charge is heavy, so a slow tap never turns into a weak half-blow.
+const chargeK=t=>clamp((t-CB.CHARGE_MIN)/(CB.CHARGE_FULL-CB.CHARGE_MIN),0,1);
+function chargeCancel(){if(S&&S.you)S.you.charge=null}
+function heavyStrike(h,k){if(h.cd>0)return false;const at=attackTarget(h);h.swing=.2;if(!at){sayTo(h,'Nothing in reach');return false}h.cd=.5;cstat('heavy');
+  const d=Math.round(h.atk*2.5);if(at.town!=null){strikeHuman(h,at,d,k);return true}
+  const m=at;m.hp-=d;m.hitT=S.t;if(k>=1&&m.wind){m.wind=null;m.rec=.6;m.cd=Math.max(m.cd,.6)}onBlow(h,m,d,k);
+  if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?95:55,text:'-'+d+(k>=1?'!':''),t:0,life:1,col:k>=1?'#ffb347':'#ffd890'});if(k>=1)S.fx.push({k:'ring',x:m.x,y:m.y,r:m.r+26,t:0,life:.35,col:'#ffcf6a'})}
+  sfx(k>=1?'cannon':'hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}
+// a blow that lands: knockback by its strength (a troll is heavier), a short hit-stop and a small shake for the player
+function onBlow(h,o,d,k){const dx=o.x-h.x,dy=o.y-h.y,l=Math.hypot(dx,dy)||1,pw=(18+150*k)*(o.kind==='troll'?.55:o.town!=null?.6:1);
+  o.kb={x:dx/l,y:dy/l,left:pw,by:h.id,dmg:d,k,wet:o.town==null&&lakeAt(o.x,o.y)};
+  if(!S.headless&&(h.you||o.you)){hitStop([h,o],55+75*k);shake(h.you?2+5*k:3)}}
+function knockStep(o,dt){const K=o.kb,s=Math.min(K.left,Math.max(3,K.left*(1-Math.exp(-dt/.08))));o.x=clamp(o.x+K.x*s,20,C.MAP-20);o.y=clamp(o.y+K.y*s,20,C.MAP-20);K.left-=s;if(K.left<=.5)o.kb=null;
+  if(o.town!=null)return;const by=S.humans.find(h=>h.id===K.by)||null;
+  if(inSolid(o.x,o.y,o.r*.9))knockImpact(o,K,'stone',by);else if(!K.wet&&lakeAt(o.x,o.y))knockImpact(o,K,'lake',by)}
+function knockImpact(m,K,what,by){const extra=Math.round(K.dmg*(what==='stone'?.6:.5)+4+10*K.k);m.hp-=extra;m.hitT=S.t;m.kb=null;m.wind=null;m.rec=Math.max(m.rec||0,.7);cstat(what==='stone'?'slams':'lakes');
+  if(what==='stone')solidPush(m,m.r);
+  if(!S.headless&&nearPlayer(m)){S.fx.push({k:'txt',x:m.x,y:m.y,z:80,text:(what==='stone'?'Into stone ':'Into the lake ')+'-'+extra,t:0,life:1.2,col:what==='stone'?'#ffcf6a':'#9fe8ff'});S.fx.push({k:'ring',x:m.x,y:m.y,r:m.r+30,t:0,life:.4,col:what==='stone'?'#ffcf6a':'#9fe8ff'});sfx('cannon',true);if(by&&by.you)shake(5)}
+  if(m.hp<=0&&S.monsters.includes(m))killMonster(m,by)}
+function stepCombat(dt){for(const m of S.monsters.slice())if(m.kb)knockStep(m,dt);for(const h of S.humans)if(h.kb){if(h.dead||h.mode!=='ground')h.kb=null;else{knockStep(h,dt);solidPush(h,12)}}
+  const h=S.you;if(!h||!h.charge)return;const c=h.charge;if(h.dead||h.mode!=='ground'||h.job||S.autoplay||S.role!=='human'){h.charge=null;return}
+  c.t+=dt;if(!aHeld()){h.charge=null;if(chargeK(c.t)<1)humanAct(h,'A');else heavyStrike(h,1)}}
+// the player's dodge and attack presses: a dodge goes the way you move (or flick), else away from the nearest threat;
+// Attack on the ground starts a charge that resolves on release
+let flickDir=null;
+function combatPresses(list,wm){const h=S.you,out=[];for(const a of list){
+    if(a==='D'){const fd=flickDir;flickDir=null;if(h&&S.role==='human'&&!S.autoplay&&h.mode==='ground'&&!h.dead){let d=fd?camRelative(fd):wm;if(!(d.x||d.y)&&h.tx!=null)d={x:h.tx-h.x,y:h.ty-h.y};humanDodge(h,d)}continue}
+    if(a==='A'&&h&&S.role==='human'&&!S.autoplay&&h.mode==='ground'&&!h.dead&&!h.job){if(!h.charge)h.charge={t:0};continue}
+    out.push(a)}return out}
+function dodgeName(){return device==='touch'?'flick the screen':device==='pad'?'RB':'Shift'}
+function attackHint(){return device==='touch'?'hold: heavy':device==='pad'?'hold: heavy · RB: dodge':'hold: heavy · Shift: dodge'}
 function stepShots(dt){for(let i=S.shots.length-1;i>=0;i--){const s=S.shots[i];s.t+=dt/s.dur;s.x=s.sx+(s.tx-s.sx)*s.t;s.y=s.sy+(s.ty-s.sy)*s.t;
   if(s.t<1)continue;S.shots.splice(i,1);S.fx.push({k:'ring',x:s.tx,y:s.ty,r:60,t:0,life:.35,col:'#ffaa45'});
   for(const t of S.towns)if(t.alive&&t.i!==s.town&&Math.hypot(t.x-s.tx,t.y-s.ty)<t.r+40){hurtTown(t,s.dmg||C.CANNON_TOWN);const o=S.humans.find(h=>h.id===s.owner);if(o)o.gold+=2}
@@ -958,6 +1040,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   return mv}
 function botHuman(h,dt){const mv={x:0,y:0};if(h.dead)return mv;const g=S.g;h.think-=dt;
   if(h.mode==='climb')return botClimb(h);
+  botDodge(h);
   if(h.hp<h.max*.45&&h.potions&&!townAt(h))humanAct(h,'Y');
   for(const f of g.feet)if(f.air>0){const d=Math.hypot(f.lx-h.x,f.ly-h.y);if(d<C.FOOT_R+50){const dx=h.x-f.lx,dy=h.y-f.ly,l=Math.hypot(dx,dy)||1;return{x:dx/l,y:dy/l}}}
   // a beast close by is fought, not walked past
@@ -1039,9 +1122,9 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
   for(const h of S.humans){let m={x:0,y:0};
     if(h.you&&!S.autoplay){if(h.mode==='climb')m={x:mv.x,y:-mv.y};else m=wm}else m=botHuman(h,dt);
     stepHuman(h,dt,m)}
-  for(const a of takePresses()){if(S.role==='giant'){if(!S.autoplay)giantDo({A:'stomp',B:'smash',X:'shake',Y:'swipe'}[a])}
+  for(const a of combatPresses(takePresses(),wm)){if(S.role==='giant'){if(!S.autoplay)giantDo({A:'stomp',B:'smash',X:'shake',Y:'swipe'}[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?{x:mv.x,y:-mv.y}:null)}
-  stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);stepEvents(dt);
+  stepCombat(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);stepEvents(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
 function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
@@ -1060,7 +1143,7 @@ function nearPlayer(p){if(!S)return false;const c=S.cam;return Math.hypot(p.x-c.
 
 // ================= input =================
 const keys=new Set(),presses=[];let device='keys';
-const KEYMAP={KeyJ:'A',Space:'A',KeyK:'B',KeyL:'X',KeyH:'Y'};
+const KEYMAP={KeyJ:'A',Space:'A',KeyK:'B',KeyL:'X',KeyH:'Y',ShiftLeft:'D',ShiftRight:'D'};
 addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey)return;device='keys';unlockAudio();
   if(menu){if(!e.repeat)menuKey(e.code);e.preventDefault();return}
   if(!S||S.over)return;
@@ -1070,7 +1153,7 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});
 addEventListener('keyup',e=>keys.delete(e.code));
-function releaseAll(){keys.clear();padHeld.clear()}
+function releaseAll(){keys.clear();padHeld.clear();touchA.clear();chargeCancel()}
 addEventListener('blur',()=>{releaseAll();if(S&&!S.over&&!menu)openPause()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){releaseAll();if(S&&!S.over&&!menu)openPause()}});
 function takePresses(){return presses.splice(0)}
@@ -1092,10 +1175,10 @@ function pollPad(){const pads=navigator.getGamepads?navigator.getGamepads():[];l
   for(const i of now){if(padHeld.has(i)||padLatch.has(i))continue;unlockAudio();
     if(menu){const m={12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight',0:'Enter',1:'Escape',9:'Escape'}[i];if(m)menuKey(m)}
     else if(S&&S.fly)flyPress();
-    else if(S&&!S.over){if(i===9||i===8)openPause();else if(i===11)camReset();else{const s={0:'A',1:'B',2:'X',3:'Y'}[i];if(s)presses.push(s)}}}
+    else if(S&&!S.over){if(i===9||i===8)openPause();else if(i===11)camReset();else{const s={0:'A',1:'B',2:'X',3:'Y',4:'D',5:'D'}[i];if(s)presses.push(s)}}}
   for(const i of padLatch)if(!now.has(i))padLatch.delete(i);
   padHeld.clear();for(const i of now)padHeld.add(i)}
-function latchHeld(){for(const i of padHeld)padLatch.add(i);keys.clear();presses.length=0}
+function latchHeld(){for(const i of padHeld)padLatch.add(i);keys.clear();presses.length=0;chargeCancel()}
 
 // pointer: tap a destination (ground) or a hold (climbing); drag pans nothing, pinch and wheel zoom
 const cv=document.getElementById('cv');const ptrs=new Map();let tapDown=null,pinch=null;
@@ -1130,8 +1213,49 @@ function slotInfo(){if(!S)return null;
   return humanCtx(S.you)}
 let lastSig='';
 function paintButtons(){const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
-  padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||'';b.classList.toggle('off',!!i.why)})}
+  padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
+// combat input. Attack is a press and a held state on every device (J or Space, pad A, a finger on the Attack button,
+// captured so a slide off the button still releases). Dodge is Shift, either pad shoulder, or on touch a quick flick
+// across the play area: a drag under 280 ms and over 48 px, faster than a slow camera drag, which it then undoes.
+const touchA=new Set();
+{const ab=padEl.querySelector('.ab[data-s="A"]');ab.addEventListener('pointerdown',e=>{try{ab.setPointerCapture(e.pointerId)}catch(_){}touchA.add(e.pointerId)});
+  for(const ev of['pointerup','pointercancel','lostpointercapture'])ab.addEventListener(ev,e=>touchA.delete(e.pointerId))}
+function aHeld(){return keys.has('KeyJ')||keys.has('Space')||(padHeld.has(0)&&!padLatch.has(0))||touchA.size>0}
+let flick=null;
+cv.addEventListener('pointerdown',e=>{flick=e.pointerType==='touch'&&ptrs.size<=1?{id:e.pointerId,x:e.clientX,y:e.clientY,t:e.timeStamp,yaw:cam.yaw,pitch:cam.pitch}:null});
+cv.addEventListener('pointerup',e=>{const f=flick;flick=null;if(!f||f.id!==e.pointerId)return;const dx=e.clientX-f.x,dy=e.clientY-f.y,dd=Math.hypot(dx,dy),dt=e.timeStamp-f.t;
+  if(dt>280||dd<48)return;const h=S&&S.you;if(!h||S.over||menu||S.fly||h.mode!=='ground'||h.dead||S.role!=='human')return;
+  cam.yaw=f.yaw;cam.pitch=f.pitch;flickDir={x:dx/dd,y:dy/dd};presses.push('D')});
+// hit-stop: the struck and the striker hold their drawn pose for a few frames; the simulation never waits for it
+const HSTOP=new Map();
+function hitStop(list,ms){const until=performance.now()+ms;for(const o of list)if(o)HSTOP.set(o,{until,x:o.x,y:o.y,swing:o.swing!=null?Math.min(o.swing,.07):o.swing,rec:o.rec,wt:o.wind?o.wind.t:null})}
+g3Update=(f=>function(){const now=performance.now(),saved=[];
+  for(const[o,H]of HSTOP){if(now>H.until){HSTOP.delete(o);continue}saved.push([o,{x:o.x,y:o.y,swing:o.swing,rec:o.rec,wind:o.wind}]);o.x=H.x;o.y=H.y;o.swing=H.swing;o.rec=H.rec;if(o.wind&&H.wt!=null)o.wind={...o.wind,t:H.wt}}
+  try{return f.apply(this,arguments)}finally{for(const[o,v]of saved)Object.assign(o,v)}})(g3Update);
+// a part of a ring on the ground, from angle a0 to a1
+function arcOnGround(x,y,r,a0,a1,col,w){const n=Math.max(3,Math.ceil(Math.abs(a1-a0)/(Math.PI/16)));ctx.beginPath();for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n,p=p3(x+Math.cos(a)*r,y+Math.sin(a)*r,2);if(!p)return;i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)}ctx.strokeStyle=col;ctx.lineWidth=w;ctx.stroke()}
+let teachN=0,teachW=null;
+// telegraphs: the marked spot as a filled red disc with a hard edge, a ring shrinking onto it, a mark over the beast;
+// aimed at you it is brighter and, while you learn, names the dodge. Then your charge and your dodge.
+function drawCombat3D(){if(!S||climbing3D())return;const you=S.you;
+  for(const m of S.monsters){const W=m.wind;if(!W||Math.hypot(W.x-S.cam.x,W.y-S.cam.y)>2600)continue;const p=Math.min(1,W.t/W.dur),mine=!!you&&W.id===you.id;
+    ringOnGround(W.x,W.y,W.R,null,0,null,`rgba(255,30,20,${(mine?.18:.1)+.34*p})`);
+    ringOnGround(W.x,W.y,W.R,mine?'rgba(255,50,35,1)':'rgba(255,90,60,.85)',mine?4:2.5);
+    ringOnGround(W.x,W.y,W.R*(1+1.7*(1-p)),`rgba(255,${200-140*p|0},${170-140*p|0},${.55+.45*p})`,mine?3.5:2);
+    const q=p3(m.x,m.y,m.kind==='troll'?118:58);if(q&&q.d<3000){const r=(mine?2:0)+Math.max(10,Math.min(15,q.s*16))*(1+.15*Math.sin(S.t*18));ctx.fillStyle=mine?'#e8231b':'rgba(200,40,30,.9)';ctx.beginPath();ctx.arc(q.x,q.y-r,r,0,7);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();
+      ctx.fillStyle='#fff';ctx.font=`800 ${Math.round(r*1.5)}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',q.x,q.y-r+1)}
+    if(mine){if(teachW!==W){teachW=W;teachN++}if(teachN<=6||(S.tut&&!S.tut.done)){const g=p3(W.x,W.y,0);if(g)lbl('Dodge: '+dodgeName(),g.x,g.y+Math.max(26,W.R*g.s+16),13,'#ffffff')}}}
+  // aimed at you: the screen's edges glow red as the wind-up runs out, readable however small the figures are
+  {let p=0;for(const m of S.monsters)if(m.wind&&you&&m.wind.id===you.id)p=Math.max(p,Math.min(1,m.wind.t/m.wind.dur));if(p>0&&!you.dead){const e=Math.min(W,H)*.09,a=.18+.4*p;ctx.save();
+    for(const[x0,y0,x1,y1,rx,ry,rw,rh]of[[0,0,0,e,0,0,W,e],[0,H,0,H-e,0,H-e,W,e],[0,0,e,0,0,0,e,H],[W,0,W-e,0,W-e,0,e,H]]){const gr=ctx.createLinearGradient(x0,y0,x1,y1);gr.addColorStop(0,`rgba(230,30,20,${a})`);gr.addColorStop(1,'rgba(230,30,20,0)');ctx.fillStyle=gr;ctx.fillRect(rx,ry,rw,rh)}ctx.restore()}}
+  if(!you||you.dead||you.mode!=='ground')return;
+  if(you.charge&&you.charge.t>CB.CHARGE_MIN){const k=chargeK(you.charge.t),full=k>=1;
+    ringOnGround(you.x,you.y,30,'rgba(0,0,0,.55)',6);
+    arcOnGround(you.x,you.y,30,-Math.PI/2,-Math.PI/2+Math.PI*2*k,full?`rgba(255,${235+20*Math.sin(S.t*30)|0},170,1)`:'#ffb347',full?6:5);
+    if(full){ringOnGround(you.x,you.y,38+4*Math.sin(S.t*20),'rgba(255,220,140,.8)',2);const q=p3(you.x,you.y,0);if(q)lbl('Heavy: release',q.x,q.y+28,13,'#ffcf6a')}}
+  if(you.dodge){const D=you.dodge;for(let i=1;i<=3;i++){const u=i/4,x=D.sx+(you.x-D.sx)*u,y=D.sy+(you.y-D.sy)*u;ringOnGround(x,y,14,`rgba(170,235,255,${.25*i})`,2,null,`rgba(160,230,255,${.14*i})`)}if(untouchable(you))ringOnGround(you.x,you.y,22,'rgba(190,240,255,1)',3.5)}}
+window.__combat={CB,humanDodge,heavyStrike,beastFight,tokenFree,get flick(){return flick}};
 // ================= menus =================
 const ov=document.getElementById('ov'),card=document.getElementById('card');let menu=null,focusI=0;
 function openMenu(m){menu=m;latchHeld();renderMenu(0)}
@@ -1154,6 +1278,7 @@ function openTitle(){S=null;document.body.classList.add('titling');ov.classList.
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
+<p><b>Fighting.</b> Beasts warn before they strike: a wolf crouches and a troll raises its club over a red ring that shrinks to the spot it chose, and the blow lands only on whoever is still in the ring. Step out, or dodge (Shift on keys, a shoulder button on a pad, a quick flick across the screen on touch): the first part of a dodge cannot be hurt. Tap Attack for a quick strike; hold it to charge a heavy blow that knocks a beast back, hardest into stone or a footprint lake. Wolves take turns: one lunges while the pack circles.</p>
 <p><b>Rivals.</b> People of other towns can be attacked anywhere outside a settlement's walls (Attack when one is close); a kill takes what their pack holds and a quarter of their gold. Every blow starts a feud between the towns: their people answer it on sight, and towers shoot feuding rivals inside your build area.</p>
 <p><b>Building takes time.</b> A house takes 6 seconds, a tower 8, an outpost 15, anything on the giant 5 or 6; you are held at the work until it is done, and on the giant your grip still counts.</p>
 <p><b>Upgrading on the map.</b> Crystals are stored at home but spent anywhere: stand by one of your houses or towers, or in your town, and press Upgrade. A raised town sells the next level of gear (blades, armour, packs, gloves, greater potions); a raised house widens your build area; a tower's first raise makes it a ballista, a volley tower or a watchfire, or simply sharpens it.</p>
@@ -1340,7 +1465,7 @@ function g3Update(){const g=S.g,t=S.t;
     if(fall){armL=2.6+Math.sin(t*21)*.5;armR=2.6-Math.sin(t*21)*.5;legA=Math.sin(t*17)*.7;legB=-legA;tool=false}
     else if(cl){const M=cl.move,k=M?Math.sin(Math.min(1,M.t)*Math.PI):0,alt=h.id%2?1:-1;armL=2.5+.45*k*alt;armR=2.5-.45*k*alt;legA=.5-.4*k*alt;legB=.5+.4*k*alt;tool=false;bob=0}
     else if(h.job){armR=1.7+Math.sin(t*11)*.9;armL=.5;legA=legB=0}
-    if(h.swing>0){const k=1-h.swing/.2;armR=3-2.5*k}
+    if(h.charge&&h.charge.t>CB.CHARGE_MIN){armR=2.5+.6*chargeK(h.charge.t)}else if(h.swing>0){const k=1-h.swing/.2;armR=3-2.5*k}
     const sx=-Math.sin(face),sy=Math.cos(face),zb=z+bob;
     put(G3.cloak,hi,x,y,zb+30*s,13*s,32*s,13*s,0);put(G3.head,hi,x,y,zb+51*s,7*s,7*s,7*s,0);put(G3.badge,hi,x,y,zb+72*s,6*s,8*s,6*s,t*2);
     G3.cloak.setColorAt(hi,_c.set(col));G3.badge.setColorAt(hi,_c.set(badge));hi++;
@@ -1355,12 +1480,12 @@ function g3Update(){const g=S.g,t=S.t;
   // beasts keep the heading they last moved on (a resting wolf no longer snaps to face east); wolves trot on four legs and lunge as they bite,
   // trolls stride and swing a club, raising it as their next blow comes due; a struck beast flashes white
   let wi=0,ti=0;for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,w=G3.walk.get(m);
-    if(w&&Math.hypot(m.x-w.x,m.y-w.y)>.2)m.fa=Math.atan2(m.y-w.y,m.x-w.x);const a=m.fa||0,ry=-a,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
-    if(m.kind==='wolf'&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.cd>.75?(m.cd-.75)/.25:0,bx=m.x+ca*lk*10,by=m.y+sa*lk*10,bz=z+14+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
-      put(G3.wolfB,wi,bx,by,bz,32,14,13,ry);put(G3.wolfH,wi,bx+ca*18,by+sa*18,bz+6-lk*6,12,10,10,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
+    if(w&&Math.hypot(m.x-w.x,m.y-w.y)>.2)m.fa=Math.atan2(m.y-w.y,m.x-w.x);if(m.wind&&Math.hypot(m.wind.x-m.x,m.wind.y-m.y)>2)m.fa=Math.atan2(m.wind.y-m.y,m.wind.x-m.x);const cw=m.wind?Math.min(1,m.wind.t/m.wind.dur):0;const a=m.fa||0,ry=-a,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
+    if(m.kind==='wolf'&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.rec>.25?1:0,bx=m.x+ca*(lk*10-cw*7),by=m.y+sa*(lk*10-cw*7),bz=z+14-cw*7+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
+      put(G3.wolfB,wi,bx,by,bz,32,14,13,ry);put(G3.wolfH,wi,bx+ca*18,by+sa*18,bz+6-lk*6-cw*5,12,10,10,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
       for(const[f,sd,ph]of[[11,1,1],[11,-1,-1],[-11,1,-1],[-11,-1,1]])L(bx+ca*f+px*sd*4,by+sa*f+py*sd*4,bz-4,11,3.5,a,sw*ph,0,lc);
       L(bx-ca*15,by-sa*15,bz+3,13,3,a,-2.3,Math.sin(t*7+m.id)*.5,lc)}
-    else if(m.kind==='troll'&&ti<80){const W=stride(m,m.x,m.y,13),sw=Math.sin(W.ph)*.6*W.sp,club=m.cd>0?(m.cd>.6?.7:.7+(.6-m.cd)/.6*2.3):.25+sw*.6,bz=z+Math.abs(Math.sin(W.ph))*2.5*W.sp,lc=fl?'#ffffff':'#6b4630';
+    else if(m.kind==='troll'&&ti<80){const W=stride(m,m.x,m.y,13),sw=Math.sin(W.ph)*.6*W.sp,club=m.wind?.4+2.7*cw:m.rec>0?1.25:.25+sw*.6,bz=z+Math.abs(Math.sin(W.ph))*2.5*W.sp,lc=fl?'#ffffff':'#6b4630';
       put(G3.trollB,ti,m.x,m.y,bz+40,18,42,15,ry);put(G3.trollH,ti,m.x,m.y,bz+68,11,10,11,0);G3.trollB.setColorAt(ti,_c.set(fl?'#ffffff':'#7a5236'));G3.trollH.setColorAt(ti,_c.set(fl?'#ffffff':'#8f6a48'));ti++;
       L(m.x+px*7,m.y+py*7,bz+22,22,8,a,sw,0,lc);L(m.x-px*7,m.y-py*7,bz+22,22,8,a,-sw,0,lc);L(m.x+px*18,m.y+py*18,bz+58,30,7,a,-sw*.8,0,lc);L(m.x-px*18,m.y-py*18,bz+58,30,7,a,club,0,lc);
       if(oi<120){const hd=tip(m.x-px*18,m.y-py*18,bz+58,30,a,club);limb(G3.tool,oi++,hd.x,hd.y,hd.z,28,7,a,club-.3,0,'#5a3b22')}}
@@ -1431,6 +1556,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,a=j.kind==='site'?bodyWorld(j.s.c+.5,j.s.r+.5):{x:j.x+30,y:j.y,z:0},q=p3(a.x,a.y,a.z+(j.kind==='site'?40:120));if(q&&q.d<5000){pbar(q.x,q.y,50,j.t/j.dur,'#ffcf6a');if(o.you)lbl('Building a '+j.k,q.x,q.y-14,12,'#ffcf6a')}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   if(S.you&&!S.you.dead&&S.you.mode==='ground'){const at=attackTarget(S.you);if(at)ringOnGround(at.x,at.y,(at.r||14)+10,'rgba(255,120,90,.95)',3)}
+  drawCombat3D();
   if(climbing3D())climbOverlay3D();
   {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const q=p3(tg.x,tg.y,tg.z!=null?tg.z:140);if(q){if(tg.z!=null){const r=12+3*Math.sin(S.t*4);ctx.strokeStyle='#ffd27a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,r,0,7);ctx.stroke()}lbl('Goal',q.x,q.y-(tg.z!=null?24:0),13,'#ffd27a')}}}
   drawMinimap();G3.calls=G3.renderer.info.render.calls}

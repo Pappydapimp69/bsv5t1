@@ -255,6 +255,9 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
       // the opening orchestra: low brass, horns, high trumpets, strings, drums and a wordless choir, all in the sky
       skyLo:e.createSource('synth',{level:112,refDistance:200,priority:8}),skyHi:e.createSource('synth',{level:110,refDistance:200,priority:8}),
       skyStr:e.createSource('synth',{level:104,refDistance:200,priority:8}),skyDrum:e.createSource('synth',{level:112,refDistance:200,priority:8}),
+      skyLo2:e.createSource('synth',{level:110,refDistance:200,priority:8}),sky2:e.createSource('synth',{level:112,refDistance:200,priority:8}),skyHi2:e.createSource('synth',{level:108,refDistance:200,priority:8}),
+      skyStr2:e.createSource('synth',{level:102,refDistance:200,priority:8}),
+      choir3:e.createSource('voice',{tract:.19,sac:.09,level:96,refDistance:200,priority:8}),choir4:e.createSource('voice',{tract:.14,sac:.07,level:94,refDistance:200,priority:8}),
       choir:e.createSource('voice',{tract:.17,sac:.08,level:100,refDistance:200,priority:8}),choir2:e.createSource('voice',{tract:.15,sac:.07,level:96,refDistance:200,priority:8}),
       creakL:e.createSource('modal',{modes:SHEET,level:108,refDistance:70,priority:6}),creakR:e.createSource('modal',{modes:SHEET.map(m=>({...m,freq:m.freq*1.07})),level:108,refDistance:70,priority:6}),
       // a throat the size of a hall: low, rough, wavering calls that carry for miles
@@ -262,25 +265,26 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
       // the breath has its own throat, shorter, so its rasp sits where ears and speakers hear it, and it carries far
       breath:e.createSource('voice',{tract:1.5,sac:.7,level:116,refDistance:320,priority:7}),
       gfoot:e.createSource('footsteps',{level:108,refDistance:50,priority:5}),feet:e.createSource('footsteps',{level:70,refDistance:3,priority:2}),
-      river:e.createSource('water',{preset:'stream',level:62,refDistance:12,priority:1}),lake:e.createSource('water',{preset:'drip',level:60,refDistance:15,priority:1})};
-    seSrc.river.setWater('stream');seSrc.lake.setWater('drip');
+      river:e.createSource('water',{preset:'stream',level:62,refDistance:12,priority:1}),river2:e.createSource('water',{preset:'stream',level:60,refDistance:12,priority:1,seed:91}),lake:e.createSource('water',{preset:'drip',level:60,refDistance:15,priority:1})};
+    seSrc.river.setWater('stream');seSrc.river2.setWater({rate:520,gamma:1.6,minRadius:7e-4,maxRadius:.0065,rising:.05});seSrc.lake.setWater('drip');
     // rivers sit far back: a fifth of their level at most, and dulled as if heard over a bank (occlusion low-passes them)
-    {const rv=seSrc.river,dir=new GainNode(e.ctx,{gain:.2}),snd=new GainNode(e.ctx,{gain:.2});rv.node.disconnect();rv.node.connect(dir,0).connect(e.master);rv.node.connect(snd,1).connect(e.reverbIn);rv.setOcclusion(8)}if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;try{ctx.close()}catch(e){}plainAudio()});return true}
+    for(const rv of[seSrc.river,seSrc.river2]){const dir=new GainNode(e.ctx,{gain:.15}),snd=new GainNode(e.ctx,{gain:.15});rv.node.disconnect();rv.node.connect(dir,0).connect(e.master);rv.node.connect(snd,1).connect(e.reverbIn);rv.setOcclusion(8)}if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;try{ctx.close()}catch(e){}plainAudio()});return true}
 let seVol=-1;
 function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.hull.setPosition(z(g.x),-z(g.y),z(1100));seSrc.hull2.setPosition(z(g.x),-z(g.y),z(500));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
-  if(S.skyUntil>S.t)for(const k of['sky','skyLo','skyHi','skyStr','skyDrum','choir','choir2'])seSrc[k].setPosition(z(S.cam.x)+(k==='skyHi'?40:k==='skyLo'?-40:0),-z(S.cam.y),260);
+  if(S.skyUntil>S.t)for(const k in SKY_SEAT){const q=SKY_SEAT[k];seSrc[k].setPosition(z(S.cam.x)+q[0],-z(S.cam.y)+q[1],260+q[2])}
   seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));seSrc.breath.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
   // the nearest river runs where it is; the nearest filled footprint lake drips
-  let rb=null,rd=1e9;for(const rv of S.rivers)for(const q of rv){const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<rd){rd=d;rb=q}}if(rb)seSrc.river.setPosition(z(rb.x),-z(rb.y),0);
+  {const near=S.rivers.map(rv=>{let b=0,bd=1e9;rv.forEach((q,i)=>{const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<bd){bd=d;b=i}});return{rv,i:b,d:bd}}).sort((a,b)=>a.d-b.d);
+    if(near[0]){const a=near[0].rv[near[0].i];seSrc.river.setPosition(z(a.x),-z(a.y),0);const n=near[1]&&near[1].d<near[0].d+900?near[1].rv[near[1].i]:near[0].rv[Math.min(near[0].rv.length-1,near[0].i+6)]||a;seSrc.river2.setPosition(z(n.x),-z(n.y),0)}}
   let lb=null,ld=1e9;for(const q of S.prints){if(S.t-q.t<4)continue;const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<ld){ld=d;lb=q}}seSrc.lake.setPosition(lb?z(lb.x):9e3,lb?-z(lb.y):9e3,0);
   // your own feet: dirt, splashing through a lake, or fingers finding stone on the giant
   const h=S.you;if(h&&!h.dead){seSrc.feet.setPosition(z(S.cam.x),-z(S.cam.y),0);
     if(h.mode==='ground'){const m=h.stepAt?Math.hypot(h.x-h.stepAt.x,h.y-h.stepAt.y):0;if(!h.stepAt||m>60){const wet=S.prints.some(q=>S.t-q.t>4&&Math.hypot(q.x-h.x,q.y-h.y)<C.FOOT_R*.8);
-        if(h.stepAt)seSrc.feet.step({mass:80,speed:wet?.8:1.4,surface:wet?'water':'packedDirt',gain:.9});h.stepAt={x:h.x,y:h.y};if(wet&&h.stepAt)seSrc.lake.splash(12,.4)}}
-    else if(h.cl){const mv=!!h.cl.move;if(h.wasMoving&&!mv)seSrc.feet.step({mass:80,speed:1,surface:'sandstone',claws:true,gain:1});h.wasMoving=mv}}
+        if(h.stepAt){h.foot=!h.foot;const r=Math.random,damp=!wet&&S.rivers.some(rv=>rv.some(q=>Math.hypot(q.x-h.x,q.y-h.y)<160));seSrc.feet.setPosition(z(S.cam.x)+(h.foot?.25:-.25),-z(S.cam.y),0);seSrc.feet.step({mass:70+r()*25,speed:(wet?.8:1.4)*(.85+r()*.3),surface:wet?'water':damp?'mud':townAt(h)?'sand':'packedDirt',gain:.75+r()*.25})}h.stepAt={x:h.x,y:h.y};if(wet&&h.stepAt)seSrc.lake.splash(8+Math.floor(Math.random()*10),.3+Math.random()*.2)}}
+    else if(h.cl){const mv=!!h.cl.move;if(h.wasMoving&&!mv)seSrc.feet.step({mass:70+Math.random()*25,speed:.85+Math.random()*.3,surface:'sandstone',claws:true,gain:.8+Math.random()*.2});h.wasMoving=mv}}
 
   if(S.t>=(S.nextCall||8)&&!S.g.dead){const g=S.g;if(!g.awake){S.nextCall=S.t+7+Math.random()*13;if(Math.random()<.5)giantCall('breath');else sleepSound()}
     else{S.nextCall=S.t+(g.target?9:14)+Math.random()*(g.target?18:28);giantCall(g.target&&Math.random()<.5?'rumble':'moan')}}
@@ -314,15 +318,25 @@ function creak(src,dur,r0,r1,amp){const t0=performance.now();let last=t0;
 // Phrygian on D: a pedal, a minor third in the horns, a semitone cluster in the trumpets, then the full chord.
 const TRUMPETS=[[0,34,5.5],[1.2,35,5],[4.5,31,6.5],[5.4,32,6],[9.5,29,7],[10.1,30,7.5]];
 const OPENING={len:22,hits:[6,9.5,12.5,13.2,14,16.5],captions:[[1.5,6.5,'On the first day the sky opened over the three towns.'],[7.5,12.5,'Trumpets sounded, though no one held them.'],[14,20,'And in its chains the stone giant slept on.']]};
+// a section is several players: each note is played on the part's two sources, a few cents apart, a few ms apart and
+// never at the same strength, which is what makes an orchestra sound like one and a synth like a synth
+const SKY_SEAT={skyLo:[-40,-10,0],skyLo2:[-75,15,-20],sky:[0,-25,10],sky2:[25,20,-10],skyHi:[45,-5,20],skyHi2:[80,15,0],skyStr:[-25,30,-30],skyStr2:[30,35,-30],
+  skyDrum:[0,40,-40],choir:[-12,-40,40],choir2:[12,-40,40],choir3:[-30,-30,30],choir4:[30,-30,30]};
+const SECTION={skyLo:['skyLo','skyLo2'],sky:['sky','sky2'],skyHi:['skyHi','skyHi2'],skyStr:['skyStr','skyStr2']};
+// bowed strings: two detuned saw-like pairs (self-modulated carriers), a slow swell and a slight vibrato
+const STRINGS={alg:4,fb:.45,vibrato:.12,ops:[{ratio:1,level:.9,attack:.04,decay:.6,sustain:.85,release:.3,vel:.4},{ratio:1,level:.8,attack:.05,decay:.8,sustain:.9,release:.35,vel:.5},
+  {ratio:1,detune:9,level:.7,attack:.06,decay:.6,sustain:.8,release:.3,vel:.4},{ratio:1,detune:-6,level:.7,attack:.05,decay:.8,sustain:.9,release:.35,vel:.5}]};
+function section(part,midi,dur,vel,patch){const r=Math.random;SECTION[part].forEach((k,n)=>{const src=seSrc[k],cents=n?(r()<.5?-1:1)*(5+r()*5):(r()-.5)*3,lag=n?8+r()*30:0;
+  const go=()=>{if(se&&se!=='starting')src.note({patch,freq:440*2**((midi-69)/12+cents/1200),duration:dur,velocity:Math.min(1,vel*(n?.82+r()*.12:1))})};lag?setTimeout(go,lag):go()})}
 function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets();return}const s=seSrc;se.setZone('rockyGully');S.skyUntil=S.t+OPENING.len+2;
-  const at=(t,f)=>setTimeout(()=>{if(se&&se!=='starting'&&S)f()},t*1000),r=Math.random,br=(src,m,d,v)=>src.note({patch:'brass',midi:m,duration:d,velocity:v});
+  const at=(t,f)=>setTimeout(()=>{if(se&&se!=='starting'&&S)f()},t*1000),r=Math.random,part=src=>Object.keys(SECTION).find(k=>seSrc[k]===src),br=(src,m,d,v)=>section(part(src),m,d,v,'brass');
   // drums: a roll that swells, then single strokes on the hits
   for(let i=0;i<34;i++){const t=i*.12;at(t,()=>s.skyDrum.note({patch:'tom',midi:33,duration:.4,velocity:.15+.6*(i/34)}))}
   OPENING.hits.forEach(t=>at(t,()=>{s.skyDrum.note({patch:'kick',midi:28,duration:.9,velocity:1});s.skyDrum.sfx('explosion',{midi:26,duration:1.4,velocity:.6})}));
   // low brass pedal, falling at the end
   at(0,()=>br(s.skyLo,26,9,.7));at(9,()=>br(s.skyLo,26,6,.9));at(15,()=>br(s.skyLo,25,6,.9));at(18.5,()=>br(s.skyLo,22,4,.8));
   // strings: a trembling cluster, repeated notes for the tremolo
-  for(let i=0;i<70;i++){const t=2.5+i*.17;at(t,()=>{s.skyStr.note({patch:'organ',midi:50+(i%2),duration:.22,velocity:.25+.35*Math.min(1,i/40)});if(i>30)s.skyStr.note({patch:'organ',midi:62,duration:.22,velocity:.3})})}
+  for(let i=0;i<70;i++){const t=2.5+i*.17;at(t,()=>{section('skyStr',50+(i%2),.24,.25+.35*Math.min(1,i/40),STRINGS);if(i>30)section('skyStr',62,.24,.3,STRINGS)})}
   // horns: a minor third, swelling, then the trumpets' semitone cluster
   at(3,()=>{br(s.sky,41,6,.75);br(s.sky,44,6,.7)});at(9.5,()=>{br(s.sky,41,5,.95);br(s.sky,45,5,.9)});
   at(6,()=>{br(s.skyHi,62,3.2,.85);br(s.skyHi,63,3.2,.8)});at(9.5,()=>{br(s.skyHi,65,2.6,.95);br(s.skyHi,66,2.6,.9)});
@@ -330,8 +344,8 @@ function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets
   [12.5,13.2,14].forEach((t,i)=>at(t,()=>{br(s.skyLo,26,i<2?.6:5,1);br(s.sky,38,i<2?.6:5,1);br(s.sky,41,i<2?.6:5,1);br(s.skyHi,62,i<2?.6:5,1);br(s.skyHi,63,i<2?.6:5,1);br(s.skyHi,68,i<2?.6:5,.9)}));
   at(16.5,()=>{br(s.skyHi,74,3,1);br(s.skyHi,75,3,.9)});
   // the choir: wordless, high and thin, entering under the trumpets
-  at(8,()=>{s.choir.call({mode:'open',duration:7,f0:294,f0End:277,amp:.7,intensity:.5,roughness:.1,breath:.35,jitter:.15,vibrato:.35,vibratoRate:5.2,mouth:.8,attack:1.6});s.choir2.call({mode:'open',duration:7,f0:349,f0End:330,amp:.6,intensity:.45,roughness:.1,breath:.35,jitter:.15,vibrato:.3,vibratoRate:4.7,mouth:.8,attack:2})});
-  at(14,()=>{s.choir.call({mode:'open',duration:6,f0:392,f0End:294,amp:.8,intensity:.7,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5.5,mouth:.9,attack:.3});s.choir2.call({mode:'open',duration:6,f0:415,f0End:311,amp:.7,intensity:.65,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5,mouth:.9,attack:.3})});
+  at(8,()=>{s.choir.call({mode:'open',duration:7,f0:294,f0End:277,amp:.7,intensity:.5,roughness:.1,breath:.35,jitter:.15,vibrato:.35,vibratoRate:5.2,mouth:.8,attack:1.6});s.choir2.call({mode:'open',duration:7,f0:349,f0End:330,amp:.6,intensity:.45,roughness:.1,breath:.35,jitter:.15,vibrato:.3,vibratoRate:4.7,mouth:.8,attack:2});s.choir3.call({mode:'open',duration:6.8,f0:293,f0End:278.5,amp:.55,intensity:.45,roughness:.12,breath:.38,jitter:.18,vibrato:.33,vibratoRate:4.9,mouth:.75,attack:1.9});s.choir4.call({mode:'open',duration:6.9,f0:350.5,f0End:329,amp:.5,intensity:.42,roughness:.1,breath:.36,jitter:.16,vibrato:.28,vibratoRate:5.4,mouth:.8,attack:2.2})});
+  at(14,()=>{s.choir.call({mode:'open',duration:6,f0:392,f0End:294,amp:.8,intensity:.7,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5.5,mouth:.9,attack:.3});s.choir2.call({mode:'open',duration:6,f0:415,f0End:311,amp:.7,intensity:.65,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5,mouth:.9,attack:.3});s.choir3.call({mode:'open',duration:5.8,f0:391,f0End:295,amp:.6,intensity:.6,roughness:.22,breath:.32,jitter:.22,vibrato:.38,vibratoRate:5.2,mouth:.85,attack:.35});s.choir4.call({mode:'open',duration:5.9,f0:416.5,f0End:310,amp:.55,intensity:.6,roughness:.2,breath:.3,jitter:.2,vibrato:.42,vibratoRate:4.8,mouth:.9,attack:.4})});
   at(OPENING.len,()=>se.setZone('coniferForest'))}
 // the same calls without the engine: detuned saws through a slowly opening low-pass, with a long echo
 function plainTrumpets(){if(!actx)return;const out=master||actx.destination,dl=actx.createDelay(2),fb=actx.createGain(),wet=actx.createGain();dl.delayTime.value=.42;fb.gain.value=.45;wet.gain.value=.5;dl.connect(fb).connect(dl);dl.connect(wet).connect(out);

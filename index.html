@@ -591,10 +591,10 @@ function humanCtx(h){
     let Y;if(j){const jj=S.joints[j];Y={l:'Wedge ('+h.kits.wedge+')',why:busy||(!S.g.awake?'It sleeps as stone':null)||(!h.kits.wedge?'No wedges':jj.crip?'Already crippled':jj.wedges.length>=C.WEDGE_MAX?'No room for more':null)}}
     else Y={l:'Potion ('+h.potions+')',why:!h.potions?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
-  const t=townAt(h),foot=nearFoot(h),m=nearMonster(h,60),foe=!m&&rivalNear(h,60),up=upgradeTarget(h);
+  const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
   return{A:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach'},B:foot>=0||!up?{l:'Climb',why:foot>=0?null:S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
     X:t?{l:'Town',why:null}:cacheNear(h)?{l:'Search ruins',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
-function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
+function humanAct(h,slot,dir){if(slot==='A'&&h.mode==='climb'&&S.chains.some(q=>q.hp>0&&q.r===Math.floor(h.cl.y)&&q.c===Math.floor(h.cl.x)))h.chainHits=(h.chainHits||0)+1;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
     if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW){if(!h.horn||!allWeak())return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}
@@ -615,7 +615,7 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
     if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
     return false}
-  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const m=nearMonster(h,60);if(!m){const o=rivalNear(h,60);if(o){strikeHuman(h,o);return true}}if(m){m.hp-=h.atk;m.hitT=S.t;if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}
+  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){m.hp-=h.atk;m.hitT=S.t;if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}mount(h,nearFoot(h));return true}
   if(slot==='X'){const t=townAt(h),c=cacheNear(h);if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else openBuild()}return true}
   if(slot==='Y'){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.');return true}h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
@@ -732,6 +732,14 @@ function finishSite(h,s,k){s.pending=null;s.build={k,town:h.town,owner:h.id,hp:C
 function openSiteMenu(h,s){const items=Object.keys(SITE_KITS).map(k=>({label:'Build a '+k+' ('+h.kits[k]+')',sub:SITE_KITS[k],why:!h.kits[k]?'No '+k+' kits: buy them in town':k==='cannon'&&cannonsOf(h.town)>=CANNONS_PER_TOWN?'Your town has '+CANNONS_PER_TOWN+' cannons on the giant already':k==='brace'&&braces()>=BRACES_MAX?'The giant carries '+BRACES_MAX+' braces already':null,act:()=>{placeOnSite(h,s,k);closeMenu()}}));
   openMenu({title:'The '+s.name,body:'<p class="dim">An empty spot on the giant. What will you build?</p>',items:[...items,{label:'Leave it',act:closeMenu}],grid:true,back:closeMenu})}
 // people of other towns can be fought anywhere outside a settlement's walls; a feud between towns grows with every blow
+// what Attack hits: of every beast and rival in reach, the weakest, and of equals the nearest; a finger is coarser
+// than a key, so on touch the reach is half again as long (the rules stay, the reach widens)
+function attackReach(h){return h.you&&device==='touch'?90:60}
+function attackTarget(h){const R=attackReach(h);let best=null,bh=1e9,bd=1e9;
+  const take=(o,d)=>{if(d>=R)return;if(o.hp<bh||(o.hp===bh&&d<bd)){best=o;bh=o.hp;bd=d}};
+  for(const m of S.monsters)take(m,Math.hypot(m.x-h.x,m.y-h.y)-m.r);
+  if(!townAt(h))for(const o of S.humans){if(o===h||o.dead||o.town===h.town||o.mode!=='ground'||townAt(o))continue;take(o,Math.hypot(o.x-h.x,o.y-h.y))}
+  return best}
 function rivalNear(h,r){let best=null,bd=r;for(const o of S.humans){if(o===h||o.dead||o.town===h.town||o.mode!=='ground'||townAt(o)||townAt(h))continue;const d=Math.hypot(o.x-h.x,o.y-h.y);if(d<bd){bd=d;best=o}}return best}
 function strikeHuman(h,o){const d=h.atk;S.feud[o.town][h.town]+=d;o.hitT=S.t;hurtHuman(o,d,'person',h);S.fx.push({k:'txt',x:o.x,y:o.y,z:90,text:'-'+Math.round(Math.max(d*.4,d-(o.def||0))),t:0,life:.8,col:'#ffd0a0'});sfx('hit',h.you||o.you||nearPlayer(o));
   if(o.dead){const k=o.pack;let got=0;for(const w of['crystals','pelts'])while(k[w]>0&&packCount(h)<packCap(h)){k[w]--;h.pack[w]++;got++}const gold=Math.floor(o.gold*.25);o.gold-=gold;h.gold+=gold;gainXp(h,30);
@@ -744,18 +752,21 @@ const FIRST_DAY=[
    setup(h){const t=S.towns[h.town];if(!S.crystals.some(c=>Math.hypot(c.x-t.x,c.y-t.y)<900)){const a=rnd()*6.28;S.crystals.push({id:S.nextId++,x:t.x+Math.cos(a)*520,y:t.y+Math.sin(a)*520})}S.tut.base=h.pack.crystals+h.crystals},
    target(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const c of S.crystals){const d=Math.hypot(c.x-h.x,c.y-h.y)+.5*Math.hypot(c.x-t.x,c.y-t.y);if(d<bd){bd=d;b=c}}return b},
    check(h){return h.pack.crystals+h.crystals>S.tut.base}},
-  {id:'board',text:'Ashford\u2019s board has work. Walk into Ashford, press Town and take a job from the Board.',target(h){return S.towns[h.town]},check(h){return!!h.quest}},
-  {id:'home',text:'Coming home empties your pack: crystals go into Ashford\u2019s store, where they pay for upgrades anywhere.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
+  {id:'home',text:'Carry it home. Walking into Ashford empties your pack into the town\u2019s store, and stored crystals pay for upgrades anywhere.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
+  {id:'board',text:'Ashford\u2019s board has work. In Ashford, press Town and take a job from the Board.',target(h){return S.towns[h.town]},check(h){return!!h.quest}},
   {id:'house',text:'Build a house inside the dashed ring around Ashford: stand there, press Build and choose House. It takes six seconds.',
    setup(h){if(h.gold<C.COST.house+10)h.gold=C.COST.house+10},target(h){const t=S.towns[h.town];return{x:t.x+t.r+170,y:t.y+40}},
    check(h){return S.builds.some(b=>b.owner===h.id&&b.k==='house')}},
   {id:'upgrade',text:'Stand by your house and press Upgrade. Crystals in Ashford\u2019s store pay for it, and a raised house reaches further.',
    setup(h){if(h.crystals<C.UP.house[0])h.crystals=C.UP.house[0]},target(h){return S.builds.find(b=>b.owner===h.id&&b.k==='house')},check(h){return S.builds.some(b=>b.owner===h.id&&lv(b)>1)}},
   {id:'climb',text:'Now the giant. Walk to one of its feet, past the chains, and press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'chain',text:'Its ankles are chained. Stand on the chain and press Attack: attacks only weaken a chain; the wake horn breaks them.',
-   setup(){S.tut.base=S.chains.reduce((n,c)=>n+c.hp,0)},target(h){const ch=S.chains[h.leg?1:0],a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y}},check(){return S.chains.reduce((n,c)=>n+c.hp,0)<S.tut.base}},
-  {id:'knee',text:'Climb to the knee ledge, about 460 feet up. Push toward a hold to reach for it; rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21:10,46);return{x:a.x,y:a.y}},check(h){return h.cl&&h.cl.y>=46}},
+  {id:'chain',text:'Its ankles are chained. Climb onto the chain marked Goal and press its button. Blows only weaken a chain; the wake horn breaks them.',
+   setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
+  {id:'knee',text:'Climb to the knee ledge, about 460 feet up. Push toward a hold to reach for it; rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21.5:9.5,46.5);return{x:a.x,y:a.y,z:a.z}},check(h){return h.cl&&h.cl.y>=46}},
   {id:'end',text:'Twenty sky crystals forge a wake horn. When all four chains are weak, sounding it at the giant\u2019s head breaks them and wakes it, and it remembers who did. The rest of the day is yours.',target(){return null},check(){return true}}];
+// the ankle chain to teach on: the one on your leg; a press on it counts even when bots have weakened it, since
+// the button then says why it no longer gives, which is the lesson
+function tutChain(h){const me=h.cl?h.cl.x:h.leg?22:9,a=S.chains.slice(0,2).filter(c=>c.hp>0).sort((p,q)=>Math.abs(p.c-me)-Math.abs(q.c-me));return a[0]||null}
 function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
 function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
   if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
@@ -1359,7 +1370,7 @@ function g3Update(){const g=S.g,t=S.t;
       for(const st of S.sites)if(st.build&&st.build.k==='ladder')for(const r of st.build.cells||[]){if(Math.abs(r-cl.y)>30)continue;const a=bodyWorld(st.c+.5,r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,22,3,4,'#7a5a36')}
       for(const ch of S.chains)if(ch.hp>0&&Math.abs(ch.r-cl.y)<30){const a=bodyWorld(ch.c+.5,ch.r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,24,24,24,'#2b2b2e')}
       G3.box.count=bx2;G3.box.instanceMatrix.needsUpdate=true;if(G3.box.instanceColor)G3.box.instanceColor.needsUpdate=true}}
-  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;G3.beacon.visible=!!tg;if(tg){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
+  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;G3.beacon.visible=!!tg&&tg.z==null;if(G3.beacon.visible){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
   // light and haze follow the opening's sky
   const ok=openingK();G3.hemi.color.set('#e4e8ff').lerp(_c.set('#c87048'),ok*.7);G3.sun.intensity=.9-.45*ok;S.fogC=S.fogC||new THREE.Color();G3.scene.fog.color.set('#cdbfa2').lerp(_c.set('#6a3a30'),ok*.8)}
 function sizeLayer(c){const w=Math.round(W*DPR),h=Math.round(H*DPR);if(c.width!==w||c.height!==h){c.width=w;c.height=h}}
@@ -1386,8 +1397,9 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(S.role==='giant'&&g.tx!=null)ringOnGround(g.tx,g.ty,40,'rgba(255,207,106,.9)',2);
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,a=j.kind==='site'?bodyWorld(j.s.c+.5,j.s.r+.5):{x:j.x+30,y:j.y,z:0},q=p3(a.x,a.y,a.z+(j.kind==='site'?40:120));if(q&&q.d<5000){pbar(q.x,q.y,50,j.t/j.dur,'#ffcf6a');if(o.you)lbl('Building a '+j.k,q.x,q.y-14,12,'#ffcf6a')}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
+  if(S.you&&!S.you.dead&&S.you.mode==='ground'){const at=attackTarget(S.you);if(at)ringOnGround(at.x,at.y,(at.r||14)+10,'rgba(255,120,90,.95)',3)}
   if(climbing3D())climbOverlay3D();
-  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const q=p3(tg.x,tg.y,140);if(q)lbl('Goal',q.x,q.y,13,'#ffd27a')}}
+  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const q=p3(tg.x,tg.y,tg.z!=null?tg.z:140);if(q){if(tg.z!=null){const r=12+3*Math.sin(S.t*4);ctx.strokeStyle='#ffd27a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,r,0,7);ctx.stroke()}lbl('Goal',q.x,q.y-(tg.z!=null?24:0),13,'#ffd27a')}}}
   drawMinimap();G3.calls=G3.renderer.info.render.calls}
 function cellScreen(c,r){const a=bodyWorld(c,r);return p3(a.x,a.y,a.z)}
 function climbOverlay3D(){const h=S.you,cl=h.cl,g=S.g,me=[Math.floor(cl.y),Math.floor(cl.x)],hb=S.body.h;

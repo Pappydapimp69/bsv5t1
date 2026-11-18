@@ -396,7 +396,7 @@ function newGame(role,seed){
   for(let ti=0;ti<3;ti++)for(let k=0;k<3;k++){const you=role==='human'&&ti===0&&k===0;S.humans.push(mkHuman(ti,you,you?'you':TOWNS[ti].roles[k]))}
   S.you=role==='human'?S.humans[0]:null;
   for(let i=0;i<C.TREES;i++){const x=rr(0,M),y=rr(0,M);if(S.towns.some(t=>Math.hypot(t.x-x,t.y-y)<260))continue;S.trees.push({x,y,r:rr(14,34)})}
-  for(const m of S.marks){const a=m.ang+Math.PI/2;S.caches.push({x:m.x+Math.cos(a)*420,y:m.y+Math.sin(a)*420,ready:0})}
+  S.markCols=null;for(const m of S.marks){const a=m.ang+Math.PI/2;let d=200;while(d<1400&&inSolid(m.x+Math.cos(a)*d,m.y+Math.sin(a)*d,80))d+=30;S.caches.push({x:m.x+Math.cos(a)*d,y:m.y+Math.sin(a)*d,ready:0})}
   for(let i=0;i<C.MONSTERS;i++)spawnMonster();
   for(let i=0;i<C.CRYSTALS;i++)spawnCrystal();
   if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}
@@ -416,9 +416,36 @@ const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0);
 function nextGear(h,k){const i=h.gear[k];return GEAR[k][i]||null}
 function buyGear(h,k){const it=nextGear(h,k);h.gold-=it.g;h.gear[k]++;if(k==='blade')h.atk+=it.v;if(k==='armour')h.def=(h.def||0)+it.v;if(k==='gloves')h.gloves++}
 function spawnMonster(){const M=C.MAP;let x,y,ok=false;const lair=S.marks&&S.marks.length&&rnd()<.3;
-  for(let k=0;k<30&&!ok;k++){if(lair){const m=S.marks[Math.floor(rnd()*S.marks.length)],a=rr(0,6.28),d=rr(250,600);x=clamp(m.x+Math.cos(a)*d,150,M-150);y=clamp(m.y+Math.sin(a)*d,150,M-150)}else{x=rr(150,M-150);y=rr(150,M-150)}ok=S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>520)}
+  for(let k=0;k<30&&!ok;k++){if(lair){const m=S.marks[Math.floor(rnd()*S.marks.length)],a=rr(0,6.28),d=rr(250,600);x=clamp(m.x+Math.cos(a)*d,150,M-150);y=clamp(m.y+Math.sin(a)*d,150,M-150)}else{x=rr(150,M-150);y=rr(150,M-150)}ok=S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>520)&&!inSolid(x,y,40)}
   const troll=lair?rnd()<.8:rnd()<.2;S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x,y,hx:x,hy:y,hp:troll?90:30,max:troll?90:30,atk:troll?13:6,gold:troll?22:8,xp:troll?30:12,r:troll?22:13,cd:0})}
-function spawnCrystal(){const M=C.MAP;S.crystals.push({id:S.nextId++,x:rr(200,M-200),y:rr(200,M-200)})}
+function spawnCrystal(){const M=C.MAP;let x,y;for(let k=0;k<30;k++){x=rr(200,M-200);y=rr(200,M-200);if(!inSolid(x,y,60))break}S.crystals.push({id:S.nextId++,x,y})}
+// the old giants are stone: everyone who walks is kept outside their boulders (the living giant steps over them)
+function solids(){if(S.markCols&&S.markCols.n===S.marks.length)return S.markCols;const L=S.marks.map(m=>{const cs=markBoulders(m).map(b=>({x:b.x,y:b.y,r:b.r*.85}));let R=0;for(const c of cs)R=Math.max(R,Math.hypot(c.x-m.x,c.y-m.y)+c.r);return{x:m.x,y:m.y,R,cs}});L.n=S.marks.length;S.markCols=L;return L}
+function inSolid(x,y,rad){for(const m of solids()){if(Math.hypot(x-m.x,y-m.y)>m.R+rad)continue;for(const c of m.cs)if(Math.hypot(x-c.x,y-c.y)<c.r+rad)return m}return null}
+function solidPush(o,rad){for(let it=0;it<3;it++){let moved=false;for(const m of solids()){if(Math.hypot(o.x-m.x,o.y-m.y)>m.R+rad)continue;for(const c of m.cs){const dx=o.x-c.x,dy=o.y-c.y,d=Math.hypot(dx,dy),need=c.r+rad;if(d<need){o.x=c.x+(d?dx/d:1)*need;o.y=c.y+(d?dy/d:0)*need;moved=true}}}if(!moved)return}}
+// walkers going somewhere never press into a mountain. Both outside a body's outer circle: walk the tangent round it (convex, nothing can trap).
+// Either end inside it: follow a walking grid of the body (40-unit cells, breadth-first from the goal, or from open ground past the circle),
+// so a walker in the pocket between a stone arm and the torso finds the way out instead of pressing into the rock
+const SG=40;
+function markField(m,gx,gy){if(!m.g){const n=Math.ceil((m.R+120)*2/SG),ox=m.x-n*SG/2,oy=m.y-n*SG/2,wall=new Uint8Array(n*n),out=new Uint8Array(n*n);
+    for(let j=0;j<n;j++)for(let i=0;i<n;i++){const x=ox+(i+.5)*SG,y=oy+(j+.5)*SG;for(const c of m.cs)if(Math.hypot(x-c.x,y-c.y)<c.r+14){wall[j*n+i]=1;break}if(Math.hypot(x-m.x,y-m.y)>m.R+20)out[j*n+i]=1}
+    m.g={n,ox,oy,wall,out,f:new Map()}}
+  const G=m.g,key=gx==null?'out':Math.floor((gx-G.ox)/SG)+','+Math.floor((gy-G.oy)/SG);let F=G.f.get(key);if(F)return F;
+  const n=G.n;F=new Int32Array(n*n).fill(-1);const q=[];
+  if(gx==null){for(let k=0;k<n*n;k++)if(G.out[k]&&!G.wall[k]){F[k]=0;q.push(k)}}
+  else{const i=clamp(Math.floor((gx-G.ox)/SG),0,n-1),j=clamp(Math.floor((gy-G.oy)/SG),0,n-1);F[j*n+i]=0;q.push(j*n+i)}
+  for(let h=0;h<q.length;h++){const k=q[h],i=k%n,j=(k-i)/n;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const a=i+di,b=j+dj;if(a<0||b<0||a>=n||b>=n)continue;const kk=b*n+a;if(F[kk]>=0||G.wall[kk])continue;
+    if(di&&dj&&(G.wall[j*n+a]||G.wall[b*n+i]))continue;F[kk]=F[k]+1;q.push(kk)}}
+  if(G.f.size>24)G.f.delete(G.f.keys().next().value);G.f.set(key,F);return F}
+function steerSolid(o,tx,ty,rad){const dx=tx-o.x,dy=ty-o.y,d=Math.hypot(dx,dy);if(d<1)return{x:0,y:0};const ux=dx/d,uy=dy/d;let m=null;
+  for(let k=40;k<Math.min(d,1600)&&!m;k+=40)m=inSolid(o.x+ux*k,o.y+uy*k,rad);if(!m){o.ss=0;return{x:ux,y:uy}}
+  const rx=o.x-m.x,ry=o.y-m.y,r=Math.hypot(rx,ry)||1,nx=rx/r,ny=ry/r,Rm=m.R+rad,goalIn=Math.hypot(tx-m.x,ty-m.y)<Rm;
+  if(r<=Rm+10||goalIn){const F=markField(m,goalIn?tx:null,goalIn?ty:null),G=m.g,n=G.n,i=Math.floor((o.x-G.ox)/SG),j=Math.floor((o.y-G.oy)/SG);
+    if(i>=0&&j>=0&&i<n&&j<n){let best=-1,bv=1e9;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const a=i+di,b=j+dj;if(a<0||b<0||a>=n||b>=n)continue;const v=F[b*n+a];if(v>=0&&v<bv){bv=v;best=b*n+a}}
+      if(best>=0&&bv>0){const cx=G.ox+(best%n+.5)*SG-o.x,cy=G.oy+(Math.floor(best/n)+.5)*SG-o.y,l=Math.hypot(cx,cy)||1;return{x:cx/l,y:cy/l}}
+      if(bv===0&&goalIn)return{x:ux,y:uy}}
+    if(r<=Rm+10)return{x:nx,y:ny}}
+  if(!o.ss)o.ss=(-ny*ux+nx*uy)<0?-1:1;const a=Math.atan2(-ny,-nx)-o.ss*Math.asin(Math.min(1,Rm/r));return{x:Math.cos(a),y:Math.sin(a)}}
 function aliveTowns(){return S.towns.filter(t=>t.alive)}
 function factionAlive(i){return S.towns.some(t=>t.alive&&t.i===i)}
 function liveFactions(){return[0,1,2].filter(factionAlive)}
@@ -660,8 +687,8 @@ function startRaid(town,why,from){const a=rnd()*6.28,x=from?from.x:town.x+Math.c
   const n=from?3:5+Math.floor(rnd()*3);for(let k=0;k<n;k++){const troll=from?true:k===0;S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x:x+rr(-80,80),y:y+rr(-80,80),hx:x,hy:y,hp:troll?110:36,max:troll?110:36,atk:troll?14:7,gold:troll?26:10,xp:troll?34:14,r:troll?22:13,cd:0,raid:ev})}
   S.events.push(ev);S.evc.raid++;eventSay(why)}
 // a falling star: set off by how many sky crystals people have gathered between them
-function startStar(){let x,y;for(let k=0;k<30;k++){x=rr(800,C.MAP-800);y=rr(800,C.MAP-800);if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>1200))break}
-  const ev={k:'star',x,y,t:S.t,left:10};S.events.push(ev);S.evc.star++;for(let k=0;k<10;k++){const a=rnd()*6.28,d=rr(30,180);S.crystals.push({id:S.nextId++,x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,star:ev})}
+function startStar(){let x,y;for(let k=0;k<30;k++){x=rr(800,C.MAP-800);y=rr(800,C.MAP-800);if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>1200)&&!inSolid(x,y,260))break}
+  const ev={k:'star',x,y,t:S.t,left:10};S.events.push(ev);S.evc.star++;for(let k=0;k<10;k++){const a=rnd()*6.28,d=rr(30,180);const c={id:S.nextId++,x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,star:ev};solidPush(c,40);S.crystals.push(c)}
   for(let k=0;k<2;k++)S.monsters.push({id:S.nextId++,kind:'wolf',x:x+rr(-250,250),y:y+rr(-250,250),hx:x,hy:y,hp:40,max:40,atk:7,gold:12,xp:16,r:13,cd:0});
   eventSay('A star falls from the open sky! Ten sky crystals lie in its crater.')}
 // a caravan: set off when a town is raised; it carries trade to a neighbour and pays the town's people if it arrives
@@ -677,7 +704,7 @@ function stepEvents(dt){
     if(e.k==='star'){e.left=S.crystals.filter(c=>c.star===e).length;if(!e.left){S.events.splice(k,1);continue}}
     if(e.k==='caravan'){const to=S.towns.find(t=>t.id===e.to);if(!to||!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);
       if(d<to.r){S.events.splice(k,1);for(const h of S.humans)if(h.town===e.i)h.gold+=40;eventSay('The caravan from '+TOWNS[e.i].name+' reaches '+to.name+'. Every one of its people earns 40 gold.');continue}
-      const near=S.monsters.find(m=>Math.hypot(m.x-e.x,m.y-e.y)<m.r+40);if(near){if(near.cd<=0){near.cd=1;e.hp-=near.atk}}else{e.x+=(to.x-e.x)/d*55*dt;e.y+=(to.y-e.y)/d*55*dt}
+      const near=S.monsters.find(m=>Math.hypot(m.x-e.x,m.y-e.y)<m.r+40);if(near){if(near.cd<=0){near.cd=1;e.hp-=near.atk}}else{const st=steerSolid(e,to.x,to.y,30);e.x+=st.x*55*dt;e.y+=st.y*55*dt;solidPush(e,30)}
       if(e.hp<=0){S.events.splice(k,1);eventSay('The caravan from '+TOWNS[e.i].name+' is lost on the road.')}}}}
 // a human's pack: six things at most; one crystal from the ground per trip, everything else from beasts they defeat;
 // it empties into the town's store (crystals) and market (pelts) whenever they come home
@@ -776,8 +803,8 @@ function stepHuman(h,dt,mv){
   if(h.job){stepJob(h,dt);if(h.mode==='climb'){stepClimb(h,dt,{x:0,y:0});if(!h.cl||h.cl.fall)dropJob(h)}if(h.job||h.mode==='climb')return}
   if(h.mode==='climb'){stepClimb(h,dt,mv);return}
   let vx=mv.x,vy=mv.y;
-  if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{vx=dx/d;vy=dy/d}}else if(vx||vy)h.tx=h.ty=null;
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}
+  if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered%C.STAR_EVERY===0)startStar();
     if(h.you){sfx('coin');toast('Sky crystal ('+packCount(h)+'/'+packCap(h)+' in pack)'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
@@ -827,6 +854,7 @@ function stepMonsters(dt){
     for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)&&!(h.you&&S.tut&&!S.tut.done&&S.tut.i<5)){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
     if(tgt){const sp=m.kind==='troll'?85:120;if(bd>m.r+14){m.x+=(tgt.x-m.x)/bd*sp*dt;m.y+=(tgt.y-m.y)/bd*sp*dt}else if(m.cd<=0){m.cd=1;hurtHuman(tgt,m.atk,'beast')}}
     else{const dx=m.hx-m.x,dy=m.hy-m.y,d=Math.hypot(dx,dy);if(d>30){m.x+=dx/d*40*dt;m.y+=dy/d*40*dt}else if(rnd()<.01){m.hx=clamp(m.x+rr(-200,200),100,C.MAP-100);m.hy=clamp(m.y+rr(-200,200),100,C.MAP-100)}}}
+  for(const m of S.monsters)solidPush(m,m.r);
   for(let i=S.monsters.length-1;i>=0;i--)if(S.monsters[i].hp<=0)S.monsters.splice(i,1);
   while(S.monsters.length<C.MONSTERS)spawnMonster()}
 function stepShots(dt){for(let i=S.shots.length-1;i>=0;i--){const s=S.shots[i];s.t+=dt/s.dur;s.x=s.sx+(s.tx-s.sx)*s.t;s.y=s.sy+(s.ty-s.sy)*s.t;
@@ -899,7 +927,7 @@ function botHuman(h,dt){const mv={x:0,y:0};if(h.dead)return mv;const g=S.g;h.thi
   if(G.k==='monster'){const m=S.monsters.find(m=>m.id===G.id);if(!m){h.goal=null;return mv}tx=m.x;ty=m.y;if(Math.hypot(m.x-h.x,m.y-h.y)<m.r+40){humanAct(h,'A');return mv}}
   if(G.k==='foot'){const f=g.feet[G.i];if(f.air>0){h.goal=null;return mv}tx=f.x;ty=f.y;if(nearFoot(h)>=0){mount(h,nearFoot(h));return mv}}
   if(G.k==='shop'){const t=G.town;if(!t.alive){h.goal=null;return mv}if(townAt(h)===t){botShop(h);h.goal=null;return mv}}
-  const dx=tx-h.x,dy=ty-h.y,d=Math.hypot(dx,dy);if(d>8){mv.x=dx/d;mv.y=dy/d}
+  const dx=tx-h.x,dy=ty-h.y,d=Math.hypot(dx,dy);if(d>8){const st=steerSolid(h,tx,ty,14);mv.x=st.x;mv.y=st.y}
   if(G.k==='crystal'&&d<C.PICKUP_R*.7)h.goal=null;
   if(G.k==='build'&&d<20){build(h,G.what);h.goal=null}
   if(G.k==='cache'&&d<120){const c=cacheNear(h);if(c)searchCache(h,c);h.goal=null}return mv}

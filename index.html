@@ -802,7 +802,7 @@ function reachT(h){const cl=h.cl,R=C.REACH;let b={d:R+1e-6,j:null,s:null,ch:null
 // beside a planted foot the ankle chain on that leg can be struck from the ground
 function footChain(h){const f=nearFoot(h);if(nightLock())return null;if(f<0)return null;return S.chains.find(c=>c.id===(f?'ankleR':'ankleL')&&c.hp>0)||null}
 function strikeChain(h,ch){if(h.cd>0)return false;h.cd=.5;h.swing=.2;if(chainWeak(ch))return false;ch.hp=Math.max(0,ch.hp-h.atk);if(!S.headless&&Math.random()<.3)chainClank(ch);sfx('hit',h.you);
-  if(chainWeak(ch)){S.grudge[h.town]-=30;regard(h,30);gainXp(h,25);announce('The '+ch.name+' is weakened.'+(allWeak()?' All four chains are weak: a wake horn will break them.':''))}return true}
+  if(chainWeak(ch)){S.grudge[h.town]-=30;regard(h,30);gainXp(h,25);announce('The '+ch.name+' breaks.'+(allWeak()?' All four chains are broken: a wake horn sounded at its head will wake it.':''))}return true}
 // the giant's regard for each person: fed like the grudges but credited to whoever acted; fades the same way
 function regard(h,a){if(!h||!S)return;S.reg=S.reg||{};S.reg[h.id]=(S.reg[h.id]||0)+a}
 function favoredPerson(){const sc=x=>(S.reg&&S.reg[x.id]||0)-S.grudge[x.town]*1e-4;let f=null;for(const x of S.humans)if(factionAlive(x.town)&&(!f||sc(x)>sc(f)))f=x;return f}
@@ -812,8 +812,8 @@ function humanCtx(h){
   if(h.mode==='climb'){const cl=h.cl,busy=cl.fall?'Falling':cl.move?'Moving':null;const rt=reachT(h),j=rt.j,s=rt.s;
     let A={l:'Strike',why:'No joint or site here'};
     const chH=rt.ch;
-    if(chH)A={l:chainWeak(chH)?chH.name+': weakened':'Weaken '+chH.name,why:busy||(chainWeak(chH)?'Weakened: the horn will break it':null)};
-    if(!S.g.awake&&cl.y>=C.WAKE_ROW)A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: weaken all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
+    if(chH)A={l:chainWeak(chH)?chH.name+': broken':'Strike '+chH.name,why:busy||(chainWeak(chH)?'Already broken':null)};
+    if(!S.g.awake&&cl.y>=C.WAKE_ROW)A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: break all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy||(!S.g.awake?'It sleeps as stone':null)};
     else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Upgrade '+s.build.k+(upCost(s.build.k,s.build)!=null?' ('+upCost(s.build.k,s.build)+' crystals)':''),why:busy||canUpgrade(h,s.build.k,s.build)};else{const kn=Object.keys(SITE_KITS).filter(k=>h.kits[k]).length;A={l:s.pending?'Being built':'Build at '+s.r*FT+' ft',why:busy||(s.pending?'Someone is building here':!kn?'No kits for the giant: buy them in town':null)}}}
     const siteFree=s&&!s.build;
@@ -823,7 +823,7 @@ function humanCtx(h){
     else Y={l:'Potion ('+h.potions+')',why:!h.potions?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
   const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
-  return{A:(fc=>fc?{l:'Attack the '+fc.name,why:chainWeak(fc)?'Weakened: the horn will break it':null}:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()})(m||foe?null:footChain(h)),B:foot>=0||!up?{l:'Climb',why:foot>=0?(nightLock()?'Night: the chained giant cannot be touched':null):S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
+  return{A:(fc=>fc?{l:'Attack the '+fc.name,why:chainWeak(fc)?'Already broken':null}:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()})(m||foe?null:footChain(h)),B:foot>=0||!up?{l:'Climb',why:foot>=0?(nightLock()?'Night: the chained giant cannot be touched':null):S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
     X:t?{l:'Town',why:null}:cacheNear(h)?{l:'Search ruins',why:null}:barracksNear(h)?{l:'Barracks',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
 function humanAct(h,slot,dir){if(slot==='A'&&(h.mode==='climb'?reachT(h).ch:!attackTarget(h)&&footChain(h)))h.chainHits=(h.chainHits||0)+1;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
@@ -925,7 +925,7 @@ function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.to
 // way toward the giant; the player's own soldiers instead take orders beside the barracks: defend the town, defend the giant,
 // or attack a rival town. They walk there in real time, hold 20 s, then tire and are back at the barracks at once.
 C.COST.barracks=60;BUILD_TIME.barracks=8;
-const ARMY={SOLDIER:30,TRAIN:6,CAP:3,HOLD:20,HP:{house:300,tower:420,barracks:480},SOL_HP:120,SOL_ATK:14,SOL_DEF:2,SOL_GOLD:30,WALL_FOLK:4,BUILD_MEND:2,LOOT:.6,LEASH:220,CLOSED:.5,REVENGE:400,REVENGE_CD:300};
+const ARMY={SOLDIER:30,TRAIN:6,CAP:3,HOLD:20,HP:{house:300,tower:420,barracks:480},SOL_HP:120,SOL_ATK:14,SOL_DEF:2,SOL_GOLD:30,WALL_FOLK:4,BUILD_MEND:2,LOOT:.6,LEASH:220,CLOSED:.5,REVENGE:400,REVENGE_CD:300,GUARD_REGARD:1};
 const wallsDown=t=>!!t&&t.hp<t.max*ARMY.CLOSED;
 function barracksOf(i){return S.builds.filter(b=>b.k==='barracks'&&b.town===i)}
 function barracksCap(i){let m=0;for(const t of aliveTowns())if(t.i===i)m=Math.max(m,lv(t));return m}
@@ -989,6 +989,7 @@ function soldierMove(h,dt){const b=h.sol.b,o=h.ord,mv={x:0,y:0};if(!S.builds.inc
     const bl=S.builds.find(x=>x.town===o.ti&&x.hp!==0&&Math.hypot(x.x-h.x,x.y-h.y)<80);if(bl){swing(h,()=>damageBuild(bl,h.atk,h));return mv}
     const t=P.t;if(t&&t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r+80){swing(h,()=>hurtWalls(t,h,h.atk));return mv}
     go(P.x,P.y,30);return mv}
+  if(o.k==='giant'){const own=S.humans.find(x=>x.id===b.owner);if(own){regard(own,ARMY.GUARD_REGARD*dt);S.grudge[own.town]-=ARMY.GUARD_REGARD*dt}}
   if(!fight(P.x,P.y))go(P.x,P.y,22);return mv}
 // bot towns use their barracks too: they train from the folk's gold, answer an attack on their walls, and take revenge on a feud
 function botOrders(b){const rs=readySoldiers(b);if(rs.length<2)return;const home=nearestOwn(b.town,b.x,b.y);
@@ -1010,7 +1011,7 @@ function openBarracks(b){const h=S.you;if(!h)return;const sol=soldiersOf(b),read
   const ord=(k,ti,label,sub)=>({label,sub,why:!ready.length?(sol.length?'Your soldiers are out or resting':'No soldiers yet: train some'):null,act:()=>{const n=giveOrder(b,k,ti);closeMenu();toast(n+(n>1?' soldiers march':' soldier marches')+' '+(k==='town'?'to defend '+orderTown(b.town,b).name:k==='giant'?'to defend the giant':'to attack '+TOWNS[ti].name)+'. They hold '+ARMY.HOLD+' s, then return.')}});
   const foes=[0,1,2].filter(j=>j!==b.town&&factionAlive(j)).map(j=>ord('attack',j,'Attack '+TOWNS[j].name,'Walk there, fight its people, buildings and walls for '+ARMY.HOLD+' s'));
   openMenu({title:'Barracks',body:`<p class="dim">${sol.length}/${ARMY.CAP} soldiers${tr?', '+tr+' training':''}${out?', '+out+' out':''}. ${h.gold} gold. Health ${Math.ceil(b.hp)}/${b.max}. Orders: they walk there in real time, hold ${ARMY.HOLD} s, then tire and are back here at once.</p>`,
-    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':null,act:()=>{h.gold-=ARMY.SOLDIER;b.q++;sfx('coin');openBarracks(b)}},
+    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':null,act:()=>{h.gold-=ARMY.SOLDIER;b.q++;h.trained=(h.trained||0)+1;sfx('coin');openBarracks(b)}},
       ord('town',null,'Defend town','Hold the walls of '+(orderTown(b.town,b)||{name:'your town'}).name),ord('giant',null,'Defend giant','Stand at the nearest foot and fight what threatens it'),...foes,
       {label:'Build here',sub:'House, watchtower or outpost',act:()=>openBuild()},{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
 // ---- the town folk's goals: they gather, build, and keep the town supplied
@@ -1022,7 +1023,7 @@ function pickGoalFolk(h){const g=S.g,home=homeOf(h);if(!home)return null;
    const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town);if(car&&h.id%2){const m=S.monsters.find(m=>m.ambush===car&&Math.hypot(m.x-car.x,m.y-car.y)<500);if(m)return{k:'monster',id:m.id};return{k:'go',x:car.x+30,y:car.y+30}}
    const star=S.events.find(e=>e.k==='star');if(star&&packCount(h)<packCap(h)&&dist(star,h)<4000*WS&&rnd()<.8){let b=null,bd=1e9;for(const c of S.crystals)if(c.star===star){const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'crystal',x:b.x,y:b.y}}}
   if(packCount(h)>=packCap(h)||h.crystals>=C.HORN_CRYSTALS&&!S.g.awake&&S.humans.some(s=>s.sol&&s.town===h.town&&s.role==='keeper'&&!s.horn&&s.crystals<C.HORN_CRYSTALS))return{k:'shop',town:home,x:home.x,y:home.y};
-  if(h.gold>=C.COST.barracks&&barracksOf(h.town).length<barracksCap(h.town)&&!armyCanBuild(h,'barracks')){const a=rr(0,6.28),d=home.r+rr(60,260);return{k:'build',what:'barracks',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
+  if(h.gold>=C.COST.barracks&&barracksOf(h.town).length<barracksCap(h.town)&&!armyCanBuild(h,'barracks')&&!tutHoldsBarracks(h.town)){const a=rr(0,6.28),d=home.r+rr(60,260);return{k:'build',what:'barracks',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
   if(h.town===1&&h.gold>=C.COST.outpost+20&&S.outposts[1]<3){let best=null;for(const p of S.prints){if(S.t-p.t<4)continue;const x=p.x+C.FOOT_R*1.6,y=p.y;if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>t.r+C.OUTPOST_GAP)){best={x,y};break}}
     if(best)return{k:'build',what:'outpost',x:best.x,y:best.y}}
   if(h.gold>=C.COST.house+60&&h.gloves&&barracksOf(h.town).length&&rnd()<.3){const a=rr(0,6.28),d=home.r+rr(60,C.HOME_REACH-20);return{k:'build',what:rnd()<.3?'tower':'house',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
@@ -1139,14 +1140,24 @@ const FIRST_DAY=[
   {id:'house',text:'Build a house inside the dashed ring around Ashford: stand there, press Build and choose House. It takes six seconds.',
    setup(h){if(h.gold<C.COST.house+10)h.gold=C.COST.house+10},target(h){const t=S.towns[h.town];return{x:t.x+t.r+170,y:t.y+40}},
    check(h){return S.builds.some(b=>b.owner===h.id&&b.k==='house')}},
-  {id:'upgrade',text:'Stand by your house and press Upgrade. Crystals in Ashford\u2019s store pay for it, and a raised house reaches further.',
+  {id:'upgrade',text:'Your house shows a gold arrow and Ready to raise: you hold enough crystals to upgrade it. Stand by it and press Upgrade. Crystals in Ashford\u2019s store pay for it, and a raised house reaches further.',
    setup(h){if(h.crystals<C.UP.house[0])h.crystals=C.UP.house[0]},target(h){return S.builds.find(b=>b.owner===h.id&&b.k==='house')},check(h){return S.builds.some(b=>b.owner===h.id&&lv(b)>1)}},
-  {id:'climb',text:'Now the giant. Walk to one of its feet, past the chains, and press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'chain',text:'Its ankles are chained. Press the button beside the chain marked Goal: from the ground beside the foot, or on the body within reach of it. Blows only weaken a chain; the wake horn breaks them.',
+  {id:'barracks',text:'Town folk only gather; soldiers fight for you. Build a barracks inside the ring: press Build and choose Barracks. Ashford may have one barracks for each level of the town.',
+   setup(h){if(h.gold<C.COST.barracks+ARMY.SOLDIER+10)h.gold=C.COST.barracks+ARMY.SOLDIER+10},target(h){const t=S.towns[h.town];return{x:t.x-t.r-150,y:t.y+40}},check(h){return!!tutBarracks(h)}},
+  {id:'soldier',text:'Stand beside your barracks and press Barracks, then Train a soldier. Training takes six seconds; each barracks holds three.',
+   setup(h){S.tut.base=h.trained||0;if(h.gold<ARMY.SOLDIER+10)h.gold=ARMY.SOLDIER+10},target(h){return tutBarracks(h)},check(h){const b=tutBarracks(h);return(h.trained||0)>S.tut.base&&!!b&&b.sol.length>0}},
+  {id:'order',text:'Your soldier is ready. At the barracks choose Defend giant: soldiers walk to its nearest foot, hold it for twenty seconds, then come home. The giant remembers who guards it, and thinks better of you for it.',
+   target(h){return tutBarracks(h)},check(h){return S.humans.some(x=>x.sol&&x.sol.b.owner===h.id&&x.ord&&x.ord.k==='giant')}},
+  {id:'chain',text:'Now the giant. Its ankles are chained: walk to the foot past the chains, stand beside the chain marked Goal and press Attack. Every blow wears it; worn through, it breaks, and the giant thanks whoever broke it.',
    setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
+  {id:'climb',text:'Now climb it. Beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
   {id:'knee',text:'Climb to the knee ledge, about 460 feet up. Push toward a hold to reach for it; rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21.5:9.5,46.5);return{x:a.x,y:a.y,z:a.z}},check(h){return h.cl&&h.cl.y>=46}},
-  {id:'end',text:'Twenty sky crystals forge a wake horn. When all four chains are weak, sounding it at the giant\u2019s head breaks them and wakes it, and it remembers who did. The rest of the day is yours.',target(){return null},check(){return true}}];
-// the ankle chain to teach on: the one on your leg; a press on it counts even when bots have weakened it, since
+  {id:'judged',info:true,text:'The giant judges each of you. Blows and wedges count against you; breaking its chains, guarding it, building on it and waking it count for you. The panel at the top shows where you stand. At the first dusk after it wakes, it honours the one person it regards best: be that person.',target(){return null},check(){return true}},
+  {id:'end',text:'When all four chains are broken, a wake horn forged in town from twenty sky crystals and sounded at its head wakes it. Each day ends in a short night when no one can touch the giant while it is chained. The rest of the day is yours.',target(){return null},check(){return true}}];
+function tutBarracks(h){return S.builds.find(b=>b.k==='barracks'&&b.owner===h.id&&b.town===h.town)||null}
+// while the first day runs up to its barracks step, Ashford's folk leave the town's one barracks for you to build
+function tutHoldsBarracks(i){return S.tut&&!S.tut.done&&S.you&&S.you.town===i&&FIRST_DAY.findIndex(x=>x.id==='barracks')>=S.tut.i}
+// the ankle chain to teach on: the one on your leg; a press on it counts even when bots have broken some of it, since
 // the button then says why it no longer gives, which is the lesson
 function tutChain(h){const me=h.cl?h.cl.x:h.leg?22:9,a=S.chains.slice(0,2).filter(c=>c.hp>0).sort((p,q)=>Math.abs(p.c-me)-Math.abs(q.c-me));return a[0]||null}
 function tutJob(){const t=tutStep();return t&&t.id==='board'}
@@ -1159,7 +1170,7 @@ function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPE
   S.tut.t+=dt;if(st.id==='hunt'&&S.t%2<dt)tutWolves(h);if(st.check(h)||(S.tut.t>150&&!st.hold)){if(S.tut.t>150&&!st.check(h))toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;
     if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist()}}}
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
-  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':'Show me',sub:last?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
@@ -1623,7 +1634,10 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Building the world.</b> Your build area is the dashed ring around your homes. Houses grow your town and push the ring outward wherever you put them, so a line of houses reaches across the land; watchtowers that shoot beasts can stand anywhere inside it; and or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Twenty-one build spots lie across its shoulders, crown, chest, hips, forearms, wrists and thighs. A ladder fixes firm holds for three hundred feet below its spot, for anyone; a platform is a resting place that catches your people when they fall; cannons and braces as before. Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
 <p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. At dusk the giant lies down as a mountain beside the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
-<p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Attacks can only weaken the chains; once all four are weak, a wake horn, forged in town from twenty sky crystals and sounded at its head for ten seconds, shatters them and wakes it, and the town that wakes it earns its favour; and only then can it move. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
+<p><b>Barracks and soldiers.</b> Town folk only gather; soldiers fight. A barracks trains up to three soldiers, and your town may have one barracks for each of its levels. Beside your barracks you choose Defend town, Defend giant or Attack a rival town: soldiers walk there, hold twenty seconds, then tire and are home at once.</p>
+<p><b>The giant judges you.</b> Beside each town's grudge it keeps a regard for every person. Blows and wedges lower yours; breaking its chains, pulling wedges, bracing it, mounting cannons, waking it and soldiers guarding its feet raise it. At the first dusk after it wakes it honours the one person it regards best, and you win only if that is you. The panel at the top shows where you stand.</p>
+<p><b>Days and nights.</b> Each day ends at dusk in a short night. While it is chained, no one can touch the giant at night, and the dusk storm grows as its chains wear.</p>
+<p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Every blow wears a chain, and worn through it breaks; once all four are broken, a wake horn, forged in town from twenty sky crystals and sounded at its head for ten seconds, wakes it, and the town that wakes it earns its favour; and only then can it move. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
 <p><b>Playing the giant.</b> You win by surviving until dusk with your Heart-stone whole and completing three of five tasks: be Freed (all four chains broken), be Braced (three braces), be Avenged (a town that angered you brought below half its walls), be Befriended (a town friendly to you), and be a Wanderer (six thousand paces walked). The HUD shows each. You cannot build: court the towns that brace you and leave the hunters to rue it. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
@@ -2435,11 +2449,13 @@ const hud1=document.getElementById('hud1'),hud2=document.getElementById('hud2');
 function clock(){if(S.night)return'Night';const s=Math.max(0,C.DUSK-phase());return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function mood(i){const v=S.grudge[i];return v>=C.ANGER?'ANGRY':v>=C.ANGER*.5?'wary':v<-60?'friendly':'calm'}
 const pEl={t:document.getElementById('gt'),d:document.getElementById('gd'),bar:document.getElementById('gbar'),s:document.getElementById('gs')};let pSig='';
+// where you stand among everyone the giant judges: your place in its regard, as the verdict at dusk will count it
+function standing(h){const sc=x=>(S.reg&&S.reg[x.id]||0)-S.grudge[x.town]*1e-4,all=S.humans.filter(x=>factionAlive(x.town)),me=sc(h),n=1+all.filter(x=>x!==h&&sc(x)>me+.5).length;if(all.every(x=>Math.abs(S.reg&&S.reg[x.id]||0)<.5))return'it has judged no one yet';return n===1?'it regards you most':'you stand '+n+' of '+all.length+' in its regard'}
 function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(c)?1:2,ring={0:['#666',.3],1:['#f0a050',1],2:['#e8e2d2',1]};
-  const word=pre=>{const a=cs.filter(c=>c.id.startsWith(pre)).map(st);return a.every(x=>x===0)?'broken':a.every(x=>x<2)?'weakened':'hold'};
+  const word=pre=>{const a=cs.filter(c=>c.id.startsWith(pre)).map(st);return a.every(x=>x===0)?'broken':a.some(x=>x===0)?'one broken':'hold'};
   const t=S.role==='giant'?(g.awake?'You, the giant':'You sleep, chained'):g.fallen>0?'The giant is down':g.awake?'The giant is awake':'The giant sleeps';
   const ch=cs.some(c=>c.hp>0)?'ankles '+word('ankle')+', wrists '+word('wrist'):'';
-  const sub=S.role==='giant'?TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' \u00b7 ')+(ch?' \u00b7 '+ch:''):(mood(h.town)[0].toUpperCase()+mood(h.town).slice(1)+' toward '+TOWNS[h.town].name+(ch?' \u00b7 '+ch:''));
+  const sub=S.role==='giant'?TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' \u00b7 ')+(ch?' \u00b7 '+ch:''):(mood(h.town)[0].toUpperCase()+mood(h.town).slice(1)+' toward '+TOWNS[h.town].name+' \u00b7 '+standing(h)+(ch?' \u00b7 '+ch:''));
   const pos=TOWNS.map((T,i)=>Math.round(clamp((S.grudge[i]+100)/(C.ANGER+100),0,1)*100)),sig=t+clock()+sub+pos.join()+cs.map(st).join('');if(sig===pSig)return;pSig=sig;
   pEl.t.textContent=t;pEl.d.textContent='Dusk '+clock();pEl.s.textContent=sub;
   if(pEl.bar.children.length!==TOWNS.length)pEl.bar.innerHTML=TOWNS.map(T=>`<i style="background:${T.col}" title="${T.name}"></i>`).join('');
@@ -2457,7 +2473,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none');
     const st=tutStep();const q=h.quest;b=st&&S.tut.shown?'Goal: '+st.text+(st.note?' '+st.note(h):''):(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
-      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':!allWeak()?'The giant sleeps in chains: weaken all four ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' still strong), then a wake horn breaks them':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
+      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':!allWeak()?'The giant sleeps in chains: break all four ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' still hold), then a wake horn wakes it':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.innerHTML=String(b).replace(/^([^:.]{2,24}:)/,'<span class="k">$1</span>')}}
 
 // ================= loop =================

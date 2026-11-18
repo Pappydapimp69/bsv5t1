@@ -78,7 +78,7 @@ const C={
   H_SPEED:165,
   CLIMB_SPEED:3.6,LEDGE_SPEED:6,REACH:2.3,LUNGE_REACH:3.6,MOVE_GRIP:.4,MOVE_GRIP_CELL:.5,MOSS_DRAIN:2.5,CRUMBLE:1.4,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
-  PICKUP_R:84,ANGER:600,DUSK:1500,HORN_CRYSTALS:20,CACHE_REFILL:240,WAKE_ROW:186,WAKE_FAVOR:100,WAKE_TIME:10,CHAIN_HP:900,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,HOME_REACH:320,HOUSE_REACH:300,HOUSE_GROW:12,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
+  PICKUP_R:84,UP:{town:[8,16,28],house:[3,6],tower:[5,10],cannon:[5,10],brace:[5,10]},ANGER:600,DUSK:1500,HORN_CRYSTALS:20,CACHE_REFILL:240,WAKE_ROW:186,WAKE_FAVOR:100,WAKE_TIME:10,CHAIN_HP:900,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,HOME_REACH:320,HOUSE_REACH:300,HOUSE_GROW:12,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
   GRUDGE_FADE:240,PULL_FAVOR:40,CANNON_FAVOR:60,
   COST:{brace:50,house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
 };
@@ -332,7 +332,7 @@ function fwd(g){return{x:Math.cos(g.ang),y:Math.sin(g.ang)}}
 function braces(){return S.sites.filter(s=>s.build&&s.build.k==='brace').length}
 // the giant starts all but unable to move; every brace humans bolt onto it lets it walk faster and do more
 function chained(id){const ch=S.chains.find(c=>c.id===id);return ch&&ch.hp>0}
-function giantSpeed(){if(!S.g.awake||chained('ankleL')||chained('ankleR'))return 0;let s=Math.min(C.G_SPEED+10,C.G_DORMANT+braces()*C.G_PER_BRACE);if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
+function giantSpeed(){if(!S.g.awake||chained('ankleL')||chained('ankleR'))return 0;const bl=S.sites.reduce((n,s)=>n+(s.build&&s.build.k==='brace'?lv(s.build):0),0);let s=Math.min(C.G_SPEED+25,C.G_DORMANT+bl*C.G_PER_BRACE);if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
 // momentum: it gathers speed slowly, needs room to stop, and turns wider the faster it walks
 function giantMotion(m,dt,tx,ty,vmax){let want=0,da=0;
   if(tx!=null){const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy);da=((Math.atan2(dy,dx)-m.ang+Math.PI*3)%(Math.PI*2))-Math.PI;
@@ -410,7 +410,7 @@ function stepGiant(dt){const g=S.g;if(g.dead)return;
   // cannons on the body fire at every town but their builder's
   for(const s of S.sites){const b=s.build;if(!b||b.k==='brace')continue;if(s.id==='armL'&&S.joints.elbowL.crip||s.id==='armR'&&S.joints.elbowR.crip)continue;
     b.cd-=dt;if(b.cd>0)continue;const tgt=cannonTarget(b.town);
-    if(tgt){b.cd=C.CANNON_CD;S.shots.push({sx:g.x,sy:g.y,x:g.x,y:g.y,tx:tgt.x+rr(-40,40),ty:tgt.y+rr(-40,40),t:0,dur:Math.max(.4,Math.hypot(tgt.x-g.x,tgt.y-g.y)/700),town:b.town,owner:b.owner});sfx('cannon',nearPlayer(g))}else b.cd=.6}}
+    if(tgt){b.cd=C.CANNON_CD/Math.sqrt(lv(b));S.shots.push({dmg:C.CANNON_TOWN*(1+.6*(lv(b)-1)),sx:g.x,sy:g.y,x:g.x,y:g.y,tx:tgt.x+rr(-40,40),ty:tgt.y+rr(-40,40),t:0,dur:Math.max(.4,Math.hypot(tgt.x-g.x,tgt.y-g.y)/700),town:b.town,owner:b.owner});sfx('cannon',nearPlayer(g))}else b.cd=.6}}
 function cannonTarget(town){const g=S.g;let best=null,bd=C.CANNON_RANGE;
   for(const t of aliveTowns())if(t.i!==town){const d=dist(g,t)-t.r;if(d<bd){bd=d;best=t}}
   if(best)return best;
@@ -449,7 +449,7 @@ function humanCtx(h){
     if(chH)A={l:'Break '+chH.name,why:busy};
     if(!S.g.awake&&cl.y>=C.WAKE_ROW)A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':null)};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy||(!S.g.awake?'It sleeps as stone':null)};
-    else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:s.build.k==='brace'?'Braced':'Your cannon',why:'Already built'};else A={l:'Mount cannon ('+h.kits.cannon+')',why:busy||(!h.kits.cannon?'No cannon kits':null)}}
+    else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Upgrade '+s.build.k+(upCost(s.build.k,s.build)!=null?' ('+upCost(s.build.k,s.build)+' crystals)':''),why:busy||canUpgrade(h,s.build.k,s.build)};else A={l:'Mount cannon ('+h.kits.cannon+')',why:busy||(!h.kits.cannon?'No cannon kits':null)}}
     const siteFree=s&&!s.build;
     const hasA=S.anchors.some(a=>a.r===Math.floor(cl.y)&&a.c===Math.floor(cl.x));
     const X=j&&S.joints[j].wedges.length?{l:'Pull wedge',why:busy}:{l:'Anchor ('+h.kits.anchor+')',why:busy||(!h.kits.anchor?'No anchor kits':hasA?'Anchor already here':null)};
@@ -468,6 +468,7 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
       if(ch.hp<=0){ch.hp=0;S.grudge[h.town]-=30;gainXp(h,25);announce('The '+ch.name+' snaps!');if(!S.headless)giantCall('rumble')}return true}}
     if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
       if(j){damageJoint(j,h.atk,h);gainXp(h,1);sfx('hit',h.you);questTick(h,'strike');return true}
+      if(s&&s.build&&s.build.town===h.town)return upgrade(h,s.build.k,s.build);
       if(s&&s.build&&s.build.town!==h.town){s.build.hp-=h.atk;sfx('hit',h.you);if(s.build.hp<=0){s.build=null;sayTo(h,'Cannon wrecked!');gainXp(h,20)}return true}
       if(s&&!s.build){h.kits.cannon--;s.build={k:'cannon',town:h.town,owner:h.id,hp:C.CANNON_HP,cd:1};S.grudge[h.town]-=C.CANNON_FAVOR;sfx('build',h.you);gainXp(h,20);sayTo(h,'Cannon mounted on the '+s.name+'. It fires on every town but yours.');return true}
       return false}
@@ -496,7 +497,7 @@ function canBuild(h,k){const own=aliveTowns().filter(t=>t.i===h.town);let nd=1e9
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
-function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:t.r+C.HOME_REACH});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH});return out}
+function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:t.r+C.HOME_REACH+120*(lv(t)-1)});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH});return out}
 function inTerritory(i,x,y){return territory(i).some(c=>Math.hypot(c.x-x,c.y-y)<=c.r)}
 function lakesNear(x,y,r){return S.prints.filter(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<r).length}
 function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.gold-=C.COST[k];sfx('build',h.you);
@@ -508,9 +509,20 @@ function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.
   if(k==='house'){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===h.town){const d=dist(t,h);if(d<bd){bd=d;b=t}}if(b){b.max+=C.HOUSE_HP;b.hp+=C.HOUSE_HP;b.r+=C.HOUSE_GROW;b.houses=(b.houses||0)+1}}
   gainXp(h,10);sayTo(h,k==='house'?'House built: your town grows and your build area reaches further.':'Watchtower built: it shoots beasts that come near.');return true}
 function stepBuilds(dt){
-  for(const b of S.builds)if(b.k==='tower'){b.cd-=dt;if(b.cd>0)continue;const m=S.monsters.find(m=>Math.hypot(m.x-b.x,m.y-b.y)<C.TOWER_R);if(m){b.cd=1.5;m.hp-=20;S.fx.push({k:'ring',x:m.x,y:m.y,r:30,t:0,life:.3,col:'#ffcf6a'})}else b.cd=.5}
+  for(const b of S.builds)if(b.k==='tower'){b.cd-=dt;if(b.cd>0)continue;const m=S.monsters.find(m=>Math.hypot(m.x-b.x,m.y-b.y)<C.TOWER_R*(1+.4*(lv(b)-1)));if(m){b.cd=1.5;m.hp-=20*lv(b);S.fx.push({k:'ring',x:m.x,y:m.y,r:30,t:0,life:.3,col:'#ffcf6a'})}else b.cd=.5}
+  // houses pay rent to whoever built them, more once raised
+  if(Math.floor(S.t/15)!==Math.floor((S.t-dt)/15))for(const b of S.builds)if(b.k==='house'){const o=S.humans.find(x=>x.id===b.owner);if(o)o.gold+=2*lv(b)}
   // the giant's lakes feed whoever settles beside them
   if(Math.floor(S.t/10)!==Math.floor((S.t-dt)/10))for(const t of aliveTowns()){const n=lakesNear(t.x,t.y,t.r+500);if(!n)continue;for(const h of S.humans)if(h.town===t.i)h.gold+=Math.min(3,n)*C.LAKE_GOLD/3|0||1}}
+// sky crystals buy upgrades: a level is one more step of what the thing already does
+const lv=o=>o.lvl||1;
+function upCost(kind,o){const c=C.UP[kind];return lv(o)-1<c.length?c[lv(o)-1]:null}
+function canUpgrade(h,kind,o){const c=upCost(kind,o);if(c==null)return'At its highest level';if(o.town!=null&&o.town!==h.town)return'Not yours';return h.crystals<c?'Need '+(c-h.crystals)+' more crystals':null}
+function upgrade(h,kind,o){const why=canUpgrade(h,kind,o);if(why){sayTo(h,why);return false}h.crystals-=upCost(kind,o);o.lvl=lv(o)+1;sfx('build',h.you);gainXp(h,10*o.lvl);
+  if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20}
+  if(kind==='house'){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===h.town){const d=dist(t,o);if(d<bd){bd=d;b=t}}if(b){b.max+=C.HOUSE_HP;b.hp+=C.HOUSE_HP}}
+  sayTo(h,{town:o.name+' is raised to level '+o.lvl+': stronger walls, a wider build area.',house:'House raised to level '+o.lvl+': more walls, more rent.',tower:'Watchtower raised to level '+o.lvl+': further and harder.',cannon:'Cannon raised to level '+o.lvl+': faster and heavier shot.',brace:'Brace raised to level '+o.lvl+': the giant walks faster.'}[kind]);return true}
+function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town)continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
 function cacheNear(h){return S.caches.find(c=>Math.hypot(c.x-h.x,c.y-h.y)<160)||null}
 // ruins in the old giants hold old things: gold, crystals and sometimes a kit; they fill again after a while
 function searchCache(h,c){if(S.t<c.ready){sayTo(h,'Someone has searched here lately. Come back in '+Math.ceil(c.ready-S.t)+' s.');return false}
@@ -593,7 +605,7 @@ function stepMonsters(dt){
   while(S.monsters.length<C.MONSTERS)spawnMonster()}
 function stepShots(dt){for(let i=S.shots.length-1;i>=0;i--){const s=S.shots[i];s.t+=dt/s.dur;s.x=s.sx+(s.tx-s.sx)*s.t;s.y=s.sy+(s.ty-s.sy)*s.t;
   if(s.t<1)continue;S.shots.splice(i,1);S.fx.push({k:'ring',x:s.tx,y:s.ty,r:60,t:0,life:.35,col:'#ffaa45'});
-  for(const t of S.towns)if(t.alive&&t.i!==s.town&&Math.hypot(t.x-s.tx,t.y-s.ty)<t.r+40){hurtTown(t,C.CANNON_TOWN);const o=S.humans.find(h=>h.id===s.owner);if(o)o.gold+=2}
+  for(const t of S.towns)if(t.alive&&t.i!==s.town&&Math.hypot(t.x-s.tx,t.y-s.ty)<t.r+40){hurtTown(t,s.dmg||C.CANNON_TOWN);const o=S.humans.find(h=>h.id===s.owner);if(o)o.gold+=2}
   for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town!==s.town&&Math.hypot(h.x-s.tx,h.y-s.ty)<60)hurtHuman(h,C.CANNON_HUM,'cannon')}}
 
 // ================= bots =================
@@ -684,7 +696,8 @@ function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
   let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
   return b?{k:'monster',id:b.id}:null}
 function botShop(h){if(h.role==='keeper'&&!S.g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS){h.crystals-=C.HORN_CRYSTALS;h.horn=1}
-  {const keep=h.role==='keeper'&&!S.g.awake&&!h.horn?C.HORN_CRYSTALS:0,n=h.crystals-keep;if(n>0){h.gold+=n*4;h.crystals-=n}}const want=h.role==='warden'?'wedge':h.role==='keeper'?'brace':'cannon';
+  {const t=townAt(h);if(t&&t.i===h.town&&h.role!=='keeper'&&!canUpgrade(h,'town',t))upgrade(h,'town',t)}
+  {const keep=h.role==='keeper'&&!S.g.awake&&!h.horn?C.HORN_CRYSTALS:h.role!=='keeper'?(upCost('town',homeOf(h)||{})||0):0,n=h.crystals-keep;if(n>0&&h.role==='keeper'){h.gold+=n*4;h.crystals-=n}}const want=h.role==='warden'?'wedge':h.role==='keeper'?'brace':'cannon';
   while(h.kits[want]<2&&h.gold>=C.COST[want]){h.gold-=C.COST[want];h.kits[want]++}
   if(!h.gloves&&h.gold>=C.COST.gloves){h.gold-=C.COST.gloves;h.gloves=1}
   if(h.kits.anchor<2&&h.gold>=C.COST.anchor){h.gold-=C.COST.anchor;h.kits.anchor+=3}
@@ -828,6 +841,7 @@ function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Barely able to move: be braced by the towns and leave before dusk',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
+<p><b>Sky crystals.</b> Crystals are what upgrades cost. Raise your town in its hall for thicker walls and a wider build area; stand by one of your houses or towers and Build to raise it (a house pays more rent, a tower reaches further and hits harder); on the giant, use your own cannon or brace to raise it (a cannon fires faster and heavier, a brace carries the giant faster). The wake horn is forged from them too.</p>
 <p><b>Ruins.</b> The old giants lying across the land are ruins, guarded by trolls. Search their ribs for gold, sky crystals and kits; each fills again after a few minutes.</p>
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Your build area is the dashed ring around your homes. Houses grow your town and push the ring outward wherever you put them, so a line of houses reaches across the land; watchtowers that shoot beasts can stand anywhere inside it; and or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
@@ -841,9 +855,10 @@ function openPause(){if(!S||S.over)return;openMenu({title:'Paused',items:[{label
   {label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();openPause()}},{label:'Quit to title',act:openTitle}],back:closeMenu})}
 function openEnd(){if(!S||!S.over)return;const o=S.over;openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+record(),items:[{label:'Play again',act:()=>start(S.role)},{label:'Title',act:openTitle}],back:openTitle})}
 function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub)=>({label:label+' \u2013 '+C.COST[k]+' gold',sub,why:canBuild(h,k),act:()=>{if(build(h,k))closeMenu();else openBuild()}});
-  const lk=lakesNear(h.x,h.y,500);
-  openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
-    items:[it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
+  const lk=lakesNear(h.x,h.y,500),near=buildNear(h);
+  const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?': more walls and rent':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
+  openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold, ${h.crystals} sky crystals. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
+    items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
 function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
   const buy=(k,cost,fn)=>({label:k+' – '+cost+' gold',why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
   const q=h.quest;
@@ -851,6 +866,7 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
     ...(q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+') \u2013 choose Drop to give it up',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}},
         ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
       :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))),
+    {label:'Raise '+t.name+(upCost('town',t)!=null?' \u2013 '+upCost('town',t)+' crystals':''),sub:'Level '+lv(t)+': +600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
     {label:h.horn?'You carry a wake horn':'Forge a wake horn \u2013 '+C.HORN_CRYSTALS+' sky crystals',sub:h.horn?'Sound it at the giant\u2019s head':'You carry '+h.crystals+'. The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');openTown(t)}},
     {label:'Sell sky crystals \u2013 4 gold each',sub:'You carry '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}},
     buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
@@ -986,8 +1002,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
       ctx.fillStyle='#cfc3aa';ctx.beginPath();ctx.moveTo(p.x-14*p.s,p.y);ctx.lineTo(p.x-8*p.s,top.y+10*p.s);ctx.lineTo(p.x,top.y-30*p.s);ctx.lineTo(p.x+8*p.s,top.y+10*p.s);ctx.lineTo(p.x+14*p.s,p.y);ctx.fill();
       shapePath(ctx,p.x,top.y-30*p.s-Math.max(7,16*p.s),Math.max(6,14*p.s),t.shape);ctx.fillStyle=t.col;ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=1.5;ctx.stroke()})}
   for(const b of S.builds){const p=proj(b.x,b.y,0);if(!p||p.d>8000)continue;const T=TOWNS[b.town];add(p.d,()=>{const s=p.s;ctx.globalAlpha=1-fogOf(p.d);
-    if(b.k==='house'){const q=proj(b.x,b.y,30);ctx.fillStyle='#e0d4ba';ctx.fillRect(p.x-18*s,q.y,36*s,p.y-q.y);ctx.fillStyle='#8a4e38';ctx.beginPath();ctx.moveTo(p.x-22*s,q.y);ctx.lineTo(p.x,q.y-18*s);ctx.lineTo(p.x+22*s,q.y);ctx.fill()}
-    else{const q=proj(b.x,b.y,90);ctx.fillStyle='#b9ab8e';ctx.fillRect(p.x-9*s,q.y,18*s,p.y-q.y);ctx.fillStyle='#5a4a3a';ctx.fillRect(p.x-13*s,q.y-6*s,26*s,8*s)}
+    if(b.k==='house'){const L=lv(b),q=proj(b.x,b.y,22+10*L),w=14+5*L;ctx.fillStyle='#e0d4ba';ctx.fillRect(p.x-w*s,q.y,2*w*s,p.y-q.y);ctx.fillStyle='#8a4e38';ctx.beginPath();ctx.moveTo(p.x-(w+4)*s,q.y);ctx.lineTo(p.x,q.y-(10+6*L)*s);ctx.lineTo(p.x+(w+4)*s,q.y);ctx.fill()}
+    else{const q=proj(b.x,b.y,60+35*lv(b));ctx.fillStyle='#b9ab8e';ctx.fillRect(p.x-9*s,q.y,18*s,p.y-q.y);ctx.fillStyle='#5a4a3a';ctx.fillRect(p.x-13*s,q.y-6*s,26*s,8*s)}
     shapePath(ctx,p.x,p.y-(b.k==='house'?60:110)*s,Math.max(3,7*s),T.shape);ctx.fillStyle=T.col;ctx.fill();ctx.globalAlpha=1})}
   // forests and lone trees stand up out of the ground
   for(const tr of S.trees){const p=proj(tr.x,tr.y,0);if(!p||p.d>5200||p.x<-60||p.x>W+60)continue;add(p.d,()=>{const s=p.s,h=tr.r*3.2*s;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle='#2f4528';ctx.beginPath();ctx.moveTo(p.x,p.y-h);ctx.lineTo(p.x+tr.r*s,p.y-h*.15);ctx.lineTo(p.x-tr.r*s,p.y-h*.15);ctx.closePath();ctx.fill();ctx.fillStyle='#3d5a32';ctx.beginPath();ctx.moveTo(p.x,p.y-h*.75);ctx.lineTo(p.x+tr.r*.8*s,p.y);ctx.lineTo(p.x-tr.r*.8*s,p.y);ctx.closePath();ctx.fill();ctx.globalAlpha=1})}

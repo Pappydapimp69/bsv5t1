@@ -416,10 +416,10 @@ function newGame(role,seed){
   S={role,seed,t:0,towns,g,joints,body:buildBody(seed),sites:SITES.map(s=>({...s,build:null})),anchors:[],
     humans:[],monsters:[],crystals:[],trees:[],prints:[],shots:[],fx:[],over:null,nextId:1,
     cam:{x:cx,y:cy,zoom:1,czoom:1},autoplay:false};
-  S.chains=CHAINS.map(ch=>({...ch,hp:C.CHAIN_HP,max:C.CHAIN_HP}));S.wakeT=0;S.walked=0;S.avenged=false;S.feud=[[0,0,0],[0,0,0],[0,0,0]];S.events=[];S.evc={raid:0,star:0,caravan:0};S.raided=[0,0,0];S.gathered=0;S.grudge=[0,0,0];S.wander=null;{const a=-Math.PI/2+Math.PI/3+2*Math.PI/3*Math.floor(rnd()*3);S.exit={x:cx+Math.cos(a)*4200*WS,y:cy+Math.sin(a)*4200*WS}}S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
+  S.chains=CHAINS.map(ch=>({...ch,hp:C.CHAIN_HP,max:C.CHAIN_HP}));S.wakeT=0;S.walked=0;S.avenged=false;S.feud=[[0,0,0],[0,0,0],[0,0,0]];S.events=[];S.evc={raid:0,star:0,caravan:0};S.raided=[0,0,0];S.gathered=0;S.grudge=[0,0,0];S.wander=null;{const a=-Math.PI/2+Math.PI/3+2*Math.PI/3*Math.floor(rnd()*3);S.exit={x:cx+Math.cos(a)*4200*WS,y:cy+Math.sin(a)*4200*WS}}S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];S.revT=[0,0,0];
   // the land forms in order: the fallen giants, hills, rivers to the towns, roads, forests, places (genLand), then beasts and crystals
   genLand(0);
-  for(let ti=0;ti<3;ti++)for(let k=0;k<3;k++){const you=role==='human'&&ti===0&&k===0;S.humans.push(mkHuman(ti,you,you?'you':TOWNS[ti].roles[k]))}
+  for(let ti=0;ti<3;ti++)for(let k=0;k<3;k++){const you=role==='human'&&ti===0&&k===0;S.humans.push(mkHuman(ti,you,you?'you':'folk'))}
   S.you=role==='human'?S.humans[0]:null;
   populateLand();
   if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}
@@ -676,11 +676,11 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
     for(const id in S.joints){const J=JOINTS[id],j=S.joints[id];if(inZone((J.c0+J.c1)/2,J.r0))j.wedges=j.wedges.filter(()=>rnd()>C.SWIPE_CLEAR)}
     S.fx.push({k:'swipe',side:w.side,t:0,life:.6})}}
 function hurtArea(x,y,r,dmg,tdmg,why){
-  S.builds=S.builds.filter(b=>{if(Math.hypot(b.x-x,b.y-y)<r+30){S.fx.push({k:'ring',x:b.x,y:b.y,r:50,t:0,life:.5,col:'#c9b48a'});return false}return true});
+  S.builds=S.builds.filter(b=>{if(Math.hypot(b.x-x,b.y-y)<r+30){S.fx.push({k:'ring',x:b.x,y:b.y,r:50,t:0,life:.5,col:'#c9b48a'});destroyBuild(b,true);return false}return true});
   for(const h of S.humans)if(h.mode==='ground'&&!h.dead&&Math.hypot(h.x-x,h.y-y)<r+10)hurtHuman(h,dmg,why);
   for(const m of S.monsters)if(Math.hypot(m.x-x,m.y-y)<r+m.r)m.hp-=dmg;
   for(const t of S.towns)if(t.alive&&Math.hypot(t.x-x,t.y-y)<r+t.r)hurtTown(t,tdmg)}
-function hurtTown(t,d){if(!t.alive)return;t.hp-=d;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;announce(t.name+' has been destroyed!');sfx('smash')}}
+function hurtTown(t,d){if(!t.alive)return;t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;announce(t.name+' has been destroyed!');sfx('smash')}}
 function hurtHuman(h,d,why,by){if(h.dead)return;if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
@@ -758,7 +758,7 @@ function humanCtx(h){
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
   const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
   return{A:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()},B:foot>=0||!up?{l:'Climb',why:foot>=0?null:S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
-    X:t?{l:'Town',why:null}:cacheNear(h)?{l:'Search ruins',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
+    X:t?{l:'Town',why:null}:cacheNear(h)?{l:'Search ruins',why:null}:barracksNear(h)?{l:'Barracks',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
 function humanAct(h,slot,dir){if(slot==='A'&&h.mode==='climb'&&S.chains.some(q=>q.hp>0&&q.r===Math.floor(h.cl.y)&&q.c===Math.floor(h.cl.x)))h.chainHits=(h.chainHits||0)+1;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
@@ -782,11 +782,11 @@ function humanAct(h,slot,dir){if(slot==='A'&&h.mode==='climb'&&S.chains.some(q=>
     return false}
   if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){m.hp-=h.atk;m.hitT=S.t;onBlow(h,m,h.atk,0);if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}mount(h,nearFoot(h));return true}
-  if(slot==='X'){const t=townAt(h),c=cacheNear(h);if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else openBuild()}return true}
+  if(slot==='X'){const t=townAt(h),c=cacheNear(h);if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild()}return true}
   if(slot==='Y'){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.');return true}h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
   return false}
 // what people build out in the world: houses thicken a settlement's walls, towers shoot beasts, an outpost founds a new settlement
-function canBuild(h,k){const own=aliveTowns().filter(t=>t.i===h.town);let nd=1e9;for(const t of own)nd=Math.min(nd,dist(t,h)-t.r);
+function canBuild(h,k){const ab=armyCanBuild(h,k);if(ab)return ab;const own=aliveTowns().filter(t=>t.i===h.town);let nd=1e9;for(const t of own)nd=Math.min(nd,dist(t,h)-t.r);
   const anyNear=aliveTowns().some(t=>dist(t,h)<t.r+C.OUTPOST_GAP),onLake=S.prints.some(p=>Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*1.2);
   if(h.gold<C.COST[k])return'Need '+(C.COST[k]-h.gold)+' more gold';if(onLake)return'Not in the lake';
   if(S.builds.some(b=>Math.hypot(b.x-h.x,b.y-h.y)<45)||S.humans.some(o=>o.job&&o.job.kind==='ground'&&Math.hypot(o.job.x-h.x,o.job.y-h.y)<45))return'Too close to another building';
@@ -804,6 +804,7 @@ function dropJob(h){const j=h.job;if(!j)return;h.job=null;if(j.kind==='site'&&j.
 function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.gold-=C.COST[k];startJob(h,{kind:'ground',k,x:h.x,y:h.y});return true}
 function finishBuild(h,k,x,y){sfx('build',h.you);const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,k);h.x=hx;h.y=hy;return true}
 function finishBuild0(h,k){
+  if(k==='barracks')return finishBarracks(h,h.x,h.y);
   if(k==='outpost'){S.outposts[h.town]++;const n=S.towns.length,names=[['Ashmere','Ashwell','Ashby'],['Brindle Ford','Brindlemoor','Brindlewick'],['Corvel Rest','Corvelmere','Corvel Hollow']];
     S.towns.push({i:h.town,id:n,name:names[h.town][S.outposts[h.town]-1],col:TOWNS[h.town].col,shape:TOWNS[h.town].shape,x:h.x,y:h.y,r:100,hp:1500,max:1500,alive:true,outpost:true});
     announce(TOWNS[h.town].name+' founded '+S.towns[n].name+(lakesNear(h.x,h.y,500)?' beside a footprint lake.':'.'));gainXp(h,30);return true}
@@ -853,7 +854,143 @@ function upgradeReady(){const h=S&&S.you;if(!h||h.dead||S.over||S.role!=='human'
   for(const o of out){const q=o.q;if(!q)continue;const y=q.y-14-4*pulse;ctx.save();ctx.globalAlpha=.75+.25*pulse;ctx.fillStyle='#ffd27a';ctx.strokeStyle='rgba(20,14,4,.85)';ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(q.x,y-16);ctx.lineTo(q.x+13,y);ctx.lineTo(q.x+5,y);ctx.lineTo(q.x+5,y+10);ctx.lineTo(q.x-5,y+10);ctx.lineTo(q.x-5,y);ctx.lineTo(q.x-13,y);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore();
     lbl('Ready to raise',q.x,y+24,12,'#ffd27a')}}
-function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town)continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
+function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town||q.k==='barracks')continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
+// ---- barracks and soldiers: town folk only gather; each barracks trains up to three soldiers who garrison at it, and a town
+// has as many barracks as its level. Soldiers are people like any other (they climb, carry kits and fight) but wear their town's
+// way toward the giant; the player's own soldiers instead take orders beside the barracks: defend the town, defend the giant,
+// or attack a rival town. They walk there in real time, hold 20 s, then tire and are back at the barracks at once.
+C.COST.barracks=60;BUILD_TIME.barracks=8;
+const ARMY={SOLDIER:30,TRAIN:6,CAP:3,HOLD:20,HP:{house:300,tower:420,barracks:480},SOL_HP:120,SOL_ATK:14,SOL_DEF:2,SOL_GOLD:30,WALL_FOLK:4,BUILD_MEND:2,LOOT:.6,LEASH:220,CLOSED:.5,REVENGE:400,REVENGE_CD:300};
+const wallsDown=t=>!!t&&t.hp<t.max*ARMY.CLOSED;
+function barracksOf(i){return S.builds.filter(b=>b.k==='barracks'&&b.town===i)}
+function barracksCap(i){let m=0;for(const t of aliveTowns())if(t.i===i)m=Math.max(m,lv(t));return m}
+function armyCanBuild(h,k){if(k!=='barracks')return null;const cap=barracksCap(h.town),n=barracksOf(h.town).length+S.humans.filter(o=>o!==h&&o.town===h.town&&o.job&&o.job.k==='barracks').length;
+  return n>=cap?'Your towns allow '+cap+' barracks: raise a town for more':null}
+function barracksNear(h){let b=null,bd=90;for(const q of S.builds){if(q.k!=='barracks'||q.town!==h.town)continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
+function soldiersOf(b){return b.sol.map(id=>S.humans.find(h=>h.id===id)).filter(Boolean)}
+function readySoldiers(b){return soldiersOf(b).filter(h=>!h.dead&&!h.ord&&h.mode==='ground'&&Math.hypot(h.x-b.x,h.y-b.y)<380)}
+function trainedCount(b){return b.sol.length+b.q+(b.train>0?1:0)}
+function finishBarracks(h,x,y){const cap=barracksCap(h.town);if(barracksOf(h.town).length>=cap){h.gold+=C.COST.barracks;return true}
+  S.builds.push({k:'barracks',x,y,town:h.town,owner:h.id,cd:0,sol:[],q:0,train:0,hp:ARMY.HP.barracks,max:ARMY.HP.barracks});questTick(h,'build');gainXp(h,15);
+  sayTo(h,'Barracks built: train up to three soldiers here, and give them orders when you stand beside it.');return true}
+function trainSoldier(b){const ti=b.town,j=b.sol.length,h=mkHuman(ti,false,TOWNS[ti].roles[j%3]);
+  h.sol={b};h.name=TOWNS[ti].name+' soldier';h.max=h.hp=ARMY.SOL_HP;h.atk=ARMY.SOL_ATK;h.def=ARMY.SOL_DEF;h.gold=ARMY.SOL_GOLD;h.x=b.x+rr(-30,30);h.y=b.y+rr(25,45);
+  S.humans.push(h);b.sol.push(h.id);S.fx.push({k:'ring',x:b.x,y:b.y,r:60,t:0,life:.6,col:TOWNS[ti].col});if(S.you&&ti===S.you.town&&S.role==='human')toast('A soldier has finished training at your barracks.')}
+// hit points: every house, tower and barracks has some, kept where it is first hurt; a fallen one takes its gifts with it
+function buildMax(b){return Math.round(ARMY.HP[b.k]*(1+.25*(lv(b)-1)))}
+function damageBuild(b,d,by){if(b.hp==null){b.max=buildMax(b);b.hp=b.max}if(b.hp<=0)return;b.hp-=d;b.hitT=S.t;if(by)S.feud[b.town][by.town]+=d;
+  S.fx.push({k:'ring',x:b.x,y:b.y,r:34,t:0,life:.25,col:'#ff9a80'});
+  if(b.hp<=0){b.hp=0;if(S.you&&S.role==='human'&&b.town===S.you.town)announce('Your '+b.k+' has been destroyed!')}}
+function destroyBuild(b,kept){if(!kept)S.builds=S.builds.filter(x=>x!==b);S.fx.push({k:'ring',x:b.x,y:b.y,r:80,t:0,life:.6,col:'#c9b48a'});
+  if(b.k==='house'){const t=nearestOwn(b.town,b.x,b.y);if(t){t.max=Math.max(600,t.max-C.HOUSE_HP*lv(b));t.hp=Math.min(t.hp,t.max);t.r=Math.max(100,t.r-C.HOUSE_GROW);t.houses=Math.max(0,(t.houses||0)-1)}}
+  if(b.k==='barracks')S.humans=S.humans.filter(h=>!(h.sol&&h.sol.b===b))}
+function hurtWalls(t,h,d){hurtTown(t,d);S.feud[t.i][h.town]+=d;S.fx.push({k:'ring',x:h.x,y:h.y,r:26,t:0,life:.2,col:'#ffd27a'});
+  // each blow on the walls takes a share of the crystals the town's people have banked, for the attacker's town
+  let bank=0;for(const x of S.humans)if(x.town===t.i)bank+=x.crystals;t.loot=(t.loot||0)+bank*d/t.max*ARMY.LOOT;
+  while(t.loot>=1){let r=null;for(const x of S.humans)if(x.town===t.i&&x.crystals>0&&(!r||x.crystals>r.crystals))r=x;t.loot-=1;if(!r){t.loot=0;break}
+    const own=S.humans.find(o=>o.id===h.sol.b.owner)||h;r.crystals--;own.crystals++;S.fx.push({k:'txt',x:h.x,y:h.y,z:110,text:'+1 crystal',t:0,life:.9,col:'#9be8ff'})}}
+function repairWalls(h,t){const need=Math.ceil((t.max-t.hp)/15);return{need,why:t.hp>=t.max?'The walls are whole':h.gold<need?'Need '+(need-h.gold)+' more gold':null,act:()=>{h.gold-=need;t.hp=t.max;sfx('build');openTown(t,'Hall')}}}
+function repairItems(h,t){const r=repairWalls(h,t);return[{label:'Repair the walls'+(t.hp<t.max?' – '+r.need+' gold':''),sub:wallsDown(t)?'Under half: the shop and board stay closed until repaired. Town folk also mend them while they are home.':'Town folk mend them too, slowly, while they are home',why:r.why,act:r.act}]}
+// ---- orders
+function nearestFoot(x,y){let b=null,bd=1e9;for(const f of S.g.feet){const d=Math.hypot(f.x-x,f.y-y);if(d<bd){bd=d;b=f}}return b}
+function orderTown(ti,b){return nearestOwn(ti,b.x,b.y)}
+function giveOrder(b,k,ti){const rs=readySoldiers(b);rs.forEach((h,i)=>{h.ord={k,ti,ph:'walk',t:0,i};h.goal=null;h.tx=h.ty=null});return rs.length}
+// where a soldier on this order stands, and what it is after; recomputed every step because the giant and its feet move
+function orderPost(h){const o=h.ord,b=h.sol.b,sp=(o.i-1)*55;
+  if(o.k==='giant'){const f=nearestFoot(b.x,b.y),a=Math.atan2(b.y-f.y,b.x-f.x);return{x:f.x+Math.cos(a)*(C.FOOT_R+70)-Math.sin(a)*sp,y:f.y+Math.sin(a)*(C.FOOT_R+70)+Math.cos(a)*sp}}
+  const t=orderTown(o.k==='town'?b.town:o.ti,b);if(!t)return null;const a=Math.atan2(o.k==='town'?S.g.y-t.y:b.y-t.y,o.k==='town'?S.g.x-t.x:b.x-t.x),R=t.r+(o.k==='town'?40:42);
+  if(o.k==='attack'&&o.i>0&&!o.obj)o.obj=attackObjective(h,t);
+  const ob=o.obj&&S.builds.includes(o.obj)?o.obj:null;if(ob)return{x:ob.x-Math.cos(a)*40,y:ob.y-Math.sin(a)*40,ob,t};
+  return{x:t.x+Math.cos(a)*R-Math.sin(a)*sp,y:t.y+Math.sin(a)*R+Math.cos(a)*sp,t}}
+function attackObjective(h,t){const o=h.ord,L=S.builds.filter(b=>b.town===t.i&&Math.hypot(b.x-t.x,b.y-t.y)<900&&b.hp!==0);const rank={barracks:0,tower:1,house:2};L.sort((a,b)=>rank[a.k]-rank[b.k]||Math.hypot(a.x-t.x,a.y-t.y)-Math.hypot(b.x-t.x,b.y-t.y));return L.length?L[(o.i-1)%L.length]:null}
+function hostile(h,o){return o.town!==h.town&&!o.dead&&o.mode==='ground'&&!townAt(o)&&(S.feud[h.town][o.town]>20||o.sol&&o.goal&&o.goal.k==='foot')}
+function swing(h,fn){if(h.cd>0)return false;h.cd=.5;h.swing=.2;fn();sfx('hit',nearPlayer(h));return true}
+function tire(h){const b=h.sol.b;h.ord=null;h.goal=null;h.tx=h.ty=null;h.x=b.x+rr(-30,30);h.y=b.y+rr(25,45);h.hp=Math.min(h.max,h.hp+h.max*.4);S.fx.push({k:'ring',x:h.x,y:h.y,r:30,t:0,life:.4,col:'#cfd3d8'})}
+function playerArmy(h){return !!h.sol&&!S.autoplay&&S.role==='human'&&!!S.you&&h.town===S.you.town}
+function soldierMove(h,dt){const b=h.sol.b,o=h.ord,mv={x:0,y:0};if(!S.builds.includes(b))return mv;
+  const go=(x,y,r)=>{const d=Math.hypot(x-h.x,y-h.y);if(d>r){const st=steerSolid(h,x,y,14);mv.x=st.x;mv.y=st.y}return d};
+  // fight what is near the post: beasts and hostile people within the leash
+  const fight=(px,py)=>{let tg=null,bd=ARMY.LEASH;for(const m of S.monsters){const d=Math.hypot(m.x-px,m.y-py)-m.r;if(d<bd){bd=d;tg=m}}
+    for(const x of S.humans)if(hostile(h,x)){const d=Math.hypot(x.x-px,x.y-py);if(d<bd){bd=d;tg=x}}
+    if(!tg)return false;const at=attackTarget(h);if(at){humanAct(h,'A');return true}go(tg.x,tg.y,40);return true};
+  if(!o){const a=(h.id%7)*.9,px=b.x+Math.cos(a)*40,py=b.y+Math.sin(a)*40;if(!fight(b.x,b.y))go(px,py,16);return mv}
+  if(S.g.dead&&o.k==='giant'){tire(h);return mv}
+  const P=orderPost(h);if(!P){tire(h);return mv}
+  if(o.ph==='walk'){if(go(P.x,P.y,30)<=45){o.ph='hold';o.t=0}return mv}
+  o.t+=dt;if(o.t>=ARMY.HOLD){tire(h);return mv}
+  if(o.k==='attack'){
+    const at=attackTarget(h);if(at){humanAct(h,'A');return mv}
+    if(P.ob){if(Math.hypot(P.ob.x-h.x,P.ob.y-h.y)<95)swing(h,()=>damageBuild(P.ob,h.atk,h));else go(P.x,P.y,30);return mv}
+    const bl=S.builds.find(x=>x.town===o.ti&&x.hp!==0&&Math.hypot(x.x-h.x,x.y-h.y)<80);if(bl){swing(h,()=>damageBuild(bl,h.atk,h));return mv}
+    const t=P.t;if(t&&t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r+80){swing(h,()=>hurtWalls(t,h,h.atk));return mv}
+    go(P.x,P.y,30);return mv}
+  if(!fight(P.x,P.y))go(P.x,P.y,22);return mv}
+// bot towns use their barracks too: they train from the folk's gold, answer an attack on their walls, and take revenge on a feud
+function botOrders(b){const rs=readySoldiers(b);if(rs.length<2)return;const home=nearestOwn(b.town,b.x,b.y);
+  if(home&&S.t-(home.hitT||-99)<6){giveOrder(b,'town');return}
+  if(S.t<(S.revT[b.town]||0))return;for(let j=0;j<3;j++)if(j!==b.town&&factionAlive(j)&&S.feud[b.town][j]>ARMY.REVENGE&&S.towns[j].hp>S.towns[j].max*.6){S.revT[b.town]=S.t+ARMY.REVENGE_CD;giveOrder(b,'attack',j);
+    if(S.you&&S.role==='human'&&j===S.you.town)announce(TOWNS[b.town].name+' soldiers march on '+TOWNS[j].name+'!');return}}
+function stepArmy(dt){
+  for(const b of S.builds){if(b.hp!=null&&b.hp>0&&b.hp<b.max&&S.t-(b.hitT||-99)>10)b.hp=Math.min(b.max,b.hp+ARMY.BUILD_MEND*dt);
+    if(b.k!=='barracks')continue;
+    if(b.train>0){b.train-=dt;if(b.train<=0){b.train=0;trainSoldier(b)}}else if(b.q>0&&b.sol.length<ARMY.CAP){b.q--;b.train=ARMY.TRAIN}
+    const mine=S.role==='human'&&S.you&&b.town===S.you.town&&!S.autoplay;
+    if(!mine){if(b.train<=0&&b.q<=0&&b.sol.length<ARMY.CAP){let p=null;for(const h of S.humans)if(h.town===b.town&&!h.sol&&!h.dead&&h.gold>=ARMY.SOLDIER&&(!p||h.gold>p.gold))p=h;if(p){p.gold-=ARMY.SOLDIER;b.q++}}
+      if(S.t>=(b.next||0)){b.next=S.t+4+rnd()*3;botOrders(b)}}}
+  const doomed=S.builds.filter(b=>b.hp!=null&&b.hp<=0);if(doomed.length){S.builds=S.builds.filter(b=>!doomed.includes(b));for(const b of doomed)destroyBuild(b,true)}
+  for(const h of S.humans)if(h.sol){if(h.dead){h.ord=null;h.wd=1}else if(h.wd){h.wd=0;const b=h.sol.b;h.x=b.x+rr(-30,30);h.y=b.y+rr(25,45)}}
+  for(const t of S.towns){if(!t.alive||t.hp>=t.max||S.t-(t.hitT||-99)<6)continue;let n=0;for(const h of S.humans)if(h.town===t.i&&!h.sol&&!h.dead&&h.mode==='ground'&&townAt(h)===t)n++;if(n)t.hp=Math.min(t.max,t.hp+ARMY.WALL_FOLK*n*dt)}}
+// ---- the barracks menu: train, give orders, or build beside it
+function openBarracks(b){const h=S.you;if(!h)return;const sol=soldiersOf(b),ready=readySoldiers(b),out=sol.filter(s=>s.ord).length,tr=b.q+(b.train>0?1:0);
+  const ord=(k,ti,label,sub)=>({label,sub,why:!ready.length?(sol.length?'Your soldiers are out or resting':'No soldiers yet: train some'):null,act:()=>{const n=giveOrder(b,k,ti);closeMenu();toast(n+(n>1?' soldiers march':' soldier marches')+' '+(k==='town'?'to defend '+orderTown(b.town,b).name:k==='giant'?'to defend the giant':'to attack '+TOWNS[ti].name)+'. They hold '+ARMY.HOLD+' s, then return.')}});
+  const foes=[0,1,2].filter(j=>j!==b.town&&factionAlive(j)).map(j=>ord('attack',j,'Attack '+TOWNS[j].name,'Walk there, fight its people, buildings and walls for '+ARMY.HOLD+' s'));
+  openMenu({title:'Barracks',body:`<p class="dim">${sol.length}/${ARMY.CAP} soldiers${tr?', '+tr+' training':''}${out?', '+out+' out':''}. ${h.gold} gold. Health ${Math.ceil(b.hp)}/${b.max}. Orders: they walk there in real time, hold ${ARMY.HOLD} s, then tire and are back here at once.</p>`,
+    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':null,act:()=>{h.gold-=ARMY.SOLDIER;b.q++;sfx('coin');openBarracks(b)}},
+      ord('town',null,'Defend town','Hold the walls of '+(orderTown(b.town,b)||{name:'your town'}).name),ord('giant',null,'Defend giant','Stand at the nearest foot and fight what threatens it'),...foes,
+      {label:'Build here',sub:'House, watchtower or outpost',act:()=>openBuild()},{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
+// ---- the town folk's goals: they gather, build, and keep the town supplied
+function pickGoalFolk(h){const g=S.g,home=homeOf(h);if(!home)return null;
+  if(h.quest&&(h.quest.k==='climb'||h.quest.k==='tend'))h.quest=null;
+  if(h.quest&&h.quest.done)return{k:'shop',town:home,x:home.x,y:home.y};
+  if(h.hp<h.max*.35)return{k:'shop',town:home,x:home.x,y:home.y};
+  {const raid=S.events.find(e=>e.k==='raid'&&e.i===h.town&&S.t>=e.go-15);if(raid){let b=null,bd=1e9;for(const m of S.monsters)if(m.raid===raid){const d=dist(m,h);if(d<bd){bd=d;b=m}}if(b&&bd<4000*WS)return{k:'monster',id:b.id}}
+   const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town);if(car&&h.id%2){const m=S.monsters.find(m=>m.ambush===car&&Math.hypot(m.x-car.x,m.y-car.y)<500);if(m)return{k:'monster',id:m.id};return{k:'go',x:car.x+30,y:car.y+30}}
+   const star=S.events.find(e=>e.k==='star');if(star&&packCount(h)<packCap(h)&&dist(star,h)<4000*WS&&rnd()<.8){let b=null,bd=1e9;for(const c of S.crystals)if(c.star===star){const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'crystal',x:b.x,y:b.y}}}
+  if(packCount(h)>=packCap(h)||h.crystals>=C.HORN_CRYSTALS&&!S.g.awake&&S.humans.some(s=>s.sol&&s.town===h.town&&s.role==='keeper'&&!s.horn&&s.crystals<C.HORN_CRYSTALS))return{k:'shop',town:home,x:home.x,y:home.y};
+  if(h.gold>=C.COST.barracks&&barracksOf(h.town).length<barracksCap(h.town)&&!armyCanBuild(h,'barracks')){const a=rr(0,6.28),d=home.r+rr(60,260);return{k:'build',what:'barracks',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
+  if(h.town===1&&h.gold>=C.COST.outpost+20&&S.outposts[1]<3){let best=null;for(const p of S.prints){if(S.t-p.t<4)continue;const x=p.x+C.FOOT_R*1.6,y=p.y;if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>t.r+C.OUTPOST_GAP)){best={x,y};break}}
+    if(best)return{k:'build',what:'outpost',x:best.x,y:best.y}}
+  if(h.gold>=C.COST.house+60&&h.gloves&&barracksOf(h.town).length&&rnd()<.3){const a=rr(0,6.28),d=home.r+rr(60,C.HOME_REACH-20);return{k:'build',what:rnd()<.3?'tower':'house',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
+  if(h.gold>=C.COST.gloves+60&&!h.gloves)return{k:'shop',town:home,x:home.x,y:home.y};
+  if(h.quest&&h.quest.k==='search'||h.lvl>=2&&h.quest&&rnd()<.05){let b=null,bd=1e9;for(const c of S.caches){if(S.t<c.ready)continue;const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'cache',x:b.x,y:b.y}}
+  if(h.quest&&h.quest.k==='troll'){let b=null,bd=1e9;for(const m of S.monsters)if(m.kind==='troll'){const d=dist(m,h);if(d<bd){bd=d;b=m}}if(b)return{k:'monster',id:b.id}}
+  if(h.quest&&h.quest.k==='deliver'){const to=S.towns.find(t=>t.id===h.quest.to);if(to&&to.alive)return{k:'go',x:to.x,y:to.y};h.quest=null}
+  if(h.quest&&h.quest.k==='build'&&h.gold>=C.COST[h.quest.what]){const a=rr(0,6.28),d=home.r+rr(60,300);return{k:'build',what:h.quest.what,x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
+  // gathering is what the folk are for
+  if(rnd()<.75||h.quest&&h.quest.k==='gather'){let b=null,bd=1e9;for(const c of S.crystals){if(c.tut)continue;const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b&&bd<2600*WS)return{k:'crystal',x:b.x,y:b.y}}
+  let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
+  return b?{k:'monster',id:b.id}:null}
+function botFolkShop(h){const t=townAt(h);if(!t||wallsDown(t))return;
+  if(!S.g.awake)for(const s of S.humans)if(s.sol&&s.town===h.town&&s.role==='keeper'&&!s.horn&&!s.dead&&s.crystals<C.HORN_CRYSTALS&&h.crystals>0){const n=Math.min(h.crystals,C.HORN_CRYSTALS-s.crystals);h.crystals-=n;s.crystals+=n}
+  if(t.i===h.town&&!canUpgrade(h,'town',t)&&barracksOf(h.town).length>=barracksCap(h.town))upgrade(h,'town',t);
+  {const brks=barracksOf(h.town),needy=brks.length<barracksCap(h.town)||brks.some(b=>b.sol.length+b.q<ARMY.CAP),keep=needy?0:(upCost('town',homeOf(h)||{})||0),n=h.crystals-keep;if(n>0){h.gold+=n*4;h.crystals-=n}}
+  for(const s of S.humans)if(s.sol&&s.town===h.town&&!s.dead&&s.gold<90&&h.gold>90){const n=Math.min(h.gold-90,90-s.gold);h.gold-=n;s.gold+=n}
+  if(!h.gloves&&h.gold>=C.COST.gloves+60){const it=nextGear(h,'gloves');if(it&&lv(t)>=it.t)buyGear(h,'gloves')}
+  if(!h.potions&&h.gold>=C.COST.potion){h.gold-=C.COST.potion;h.potions++}}
+// the soldiers carry the town's way toward the giant: the old roles, minus gathering
+function pickGoalSol(h){const g=S.g,home=homeOf(h),b=h.sol.b;if(!home)return null;h.quest=null;
+  if(h.hp<h.max*.35)return{k:'shop',town:home,x:home.x,y:home.y};
+  {const raid=S.events.find(e=>e.k==='raid'&&e.i===h.town&&S.t>=e.go-15);if(raid){let bb=null,bd=1e9;for(const m of S.monsters)if(m.raid===raid){const d=dist(m,h);if(d<bd){bd=d;bb=m}}if(bb&&bd<4000*WS)return{k:'monster',id:bb.id}}
+   const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town);if(car&&(h.role==='raider'||h.role==='warden'&&h.id%2)){const m=S.monsters.find(m=>m.ambush===car&&Math.hypot(m.x-car.x,m.y-car.y)<500);if(m)return{k:'monster',id:m.id};return{k:'go',x:car.x+30,y:car.y+30}}}
+  if(h.role==='keeper'&&!g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS)return{k:'shop',town:home,x:home.x,y:home.y};
+  const tgt=g.target&&g.target.alive?g.target:null;
+  const ready=(h.role==='raider'||h.role==='keeper')&&!g.awake&&S.chains.some(q=>q.hp>0&&!chainWeak(q))&&rnd()<.5?true:h.role==='keeper'?(!g.awake&&h.horn&&allWeak()||wedgedJoints().length>0||(h.kits.cannon>0||h.kits.brace>0||h.kits.ladder>0||h.kits.platform>0)&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):g.awake&&(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
+  if(!g.dead&&ready){let bi=0,bd=1e9;g.feet.forEach((f,i)=>{const d=Math.hypot(f.x-h.x,f.y-h.y);if(d<bd&&f.air<=0){bd=d;bi=i}});return{k:'foot',i:bi}}
+  const want=h.role==='warden'?'wedge':h.role==='keeper'?(braces()>=BRACES_MAX?'ladder':'brace'):'cannon';
+  if(h.gold>=C.COST[want]+(h.potions?0:C.COST.potion)&&h.kits[want]<2)return{k:'shop',town:home,x:home.x,y:home.y};
+  {let bb=null,bd=700;for(const m of S.monsters){const d=Math.hypot(m.x-b.x,m.y-b.y);if(d<bd){bd=d;bb=m}}if(bb)return{k:'monster',id:bb.id}}
+  return{k:'go',x:b.x+rr(-45,45),y:b.y+rr(-45,45)}}
+function pickGoal(h){return h.sol?pickGoalSol(h):pickGoalFolk(h)}
 // ---- world events: each is set off by something people did, and each gives bots and the player a reason to be elsewhere
 function wealth(i){let w=0;for(const t of aliveTowns())if(t.i===i)w+=3*(lv(t)-1)+(t.houses||0);for(const b of S.builds)if(b.town===i)w+=b.k==='tower'?1:0;return w}
 function nearestOwn(i,x,y){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===i){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t}}return b}
@@ -1199,6 +1336,7 @@ function botHuman(h,dt){const mv={x:0,y:0};if(h.dead)return mv;const g=S.g;h.thi
     else if(!m&&(!h.goal||h.goal.k!=='foe')){const o=rivalNear(h,h.role==='raider'?260:160);if(o&&h.hp>h.max*.5&&(h.role==='raider'&&rnd()<.4||S.feud[h.town][o.town]>40||h.lastHurtBy===o)){h.goal={k:'foe',id:o.id};h.think=2}}}
   if(g.wind&&(g.wind.k==='stomp'||g.wind.k==='smash')){const pts=g.wind.k==='stomp'?g.feet:[g.wind],rad=g.wind.k==='stomp'?C.STOMP_R:C.SMASH_R;
     for(const p of pts){const d=Math.hypot(p.x-h.x,p.y-h.y);if(d<rad+30){const dx=h.x-p.x,dy=h.y-p.y,l=Math.hypot(dx,dy)||1;return{x:dx/l,y:dy/l}}}}
+  if(h.sol&&(h.ord||playerArmy(h)))return soldierMove(h,dt);
   if(h.think<=0||!h.goal){h.think=rr(.8,1.6);h.goal=pickGoal(h)}
   const G=h.goal;if(!G)return mv;let tx=G.x,ty=G.y;
   if(G.k==='foe'){const o=S.humans.find(x=>x.id===G.id);if(!o||o.dead||o.mode!=='ground'||townAt(o)||townAt(h)||h.hp<h.max*.3){h.goal=null;return mv}tx=o.x;ty=o.y;if(Math.hypot(o.x-h.x,o.y-h.y)<55){humanAct(h,'A');return mv}}
@@ -1209,35 +1347,8 @@ function botHuman(h,dt){const mv={x:0,y:0};if(h.dead)return mv;const g=S.g;h.thi
   if(G.k==='crystal'&&d<C.PICKUP_R*.7)h.goal=null;
   if(G.k==='build'&&d<20){build(h,G.what);h.goal=null}
   if(G.k==='cache'&&d<120){const c=cacheNear(h);if(c)searchCache(h,c);h.goal=null}return mv}
-function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
-  if(h.quest&&h.quest.done)return{k:'shop',town:home,x:home.x,y:home.y};
-  if(h.hp<h.max*.35)return{k:'shop',town:home,x:home.x,y:home.y};
-  // world events first: defend your town from a raid, escort your caravan, race to a fallen star
-  {const raid=S.events.find(e=>e.k==='raid'&&e.i===h.town&&S.t>=e.go-15);if(raid){let b=null,bd=1e9;for(const m of S.monsters)if(m.raid===raid){const d=dist(m,h);if(d<bd){bd=d;b=m}}if(b&&bd<4000*WS)return{k:'monster',id:b.id}}
-   const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town);if(car&&(h.role==='raider'||h.role==='warden'&&h.id%2)){const m=S.monsters.find(m=>m.ambush===car&&Math.hypot(m.x-car.x,m.y-car.y)<500);if(m)return{k:'monster',id:m.id};return{k:'go',x:car.x+30,y:car.y+30}}
-   const star=S.events.find(e=>e.k==='star');if(star&&packCount(h)<packCap(h)&&dist(star,h)<4000*WS&&rnd()<.8){let b=null,bd=1e9;for(const c of S.crystals)if(c.star===star){const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'crystal',x:b.x,y:b.y}}}
-  if(packCount(h)>=packCap(h))return{k:'shop',town:home,x:home.x,y:home.y};
-  const dG=dist(g,h);
-  const tgt=g.target&&g.target.alive?g.target:null;
-  const ready=(h.role==='raider'||h.role==='keeper')&&!g.awake&&S.chains.some(q=>q.hp>0&&!chainWeak(q))&&rnd()<.5?true:h.role==='keeper'?(!g.awake&&h.horn&&allWeak()||wedgedJoints().length>0||(h.kits.cannon>0||h.kits.brace>0||h.kits.ladder>0||h.kits.platform>0)&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):g.awake&&(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
-  if(!g.dead&&ready&&dG<(g.fallen>0?2600:2200)*WS){let bi=0,bd=1e9;g.feet.forEach((f,i)=>{const d=Math.hypot(f.x-h.x,f.y-h.y);if(d<bd&&f.air<=0){bd=d;bi=i}});return{k:'foot',i:bi}}
-  const want=h.role==='warden'?'wedge':h.role==='keeper'?(braces()>=BRACES_MAX?'ladder':'brace'):'cannon';
-  if(h.gold>=C.COST[want]+(h.potions?0:C.COST.potion)&&h.kits[want]<2)return{k:'shop',town:home,x:home.x,y:home.y};
-  if(h.town===1&&h.gold>=C.COST.outpost+20&&S.outposts[1]<3){let best=null;for(const p of S.prints){if(S.t-p.t<4)continue;const x=p.x+C.FOOT_R*1.6,y=p.y;if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>t.r+C.OUTPOST_GAP)){best={x,y};break}}
-    if(best)return{k:'build',what:'outpost',x:best.x,y:best.y}}
-  if(h.gold>=C.COST.house+60&&h.gloves&&rnd()<.3){const a=rr(0,6.28),d=home.r+rr(60,C.HOME_REACH-20);return{k:'build',what:rnd()<.3?'tower':'house',x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
-  if(h.gold>=C.COST.gloves+C.COST[want]&&!h.gloves)return{k:'shop',town:home,x:home.x,y:home.y};
-  if(h.quest&&h.quest.k==='gather'){let b=null,bd=1e9;for(const c of S.crystals){if(c.tut)continue;const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'crystal',x:b.x,y:b.y}}
-  if(h.role==='keeper'&&!g.awake&&!h.horn){if(h.crystals>=C.HORN_CRYSTALS)return{k:'shop',town:home,x:home.x,y:home.y};if(packCount(h)<packCap(h)){let b=null,bd=1e9;for(const c of S.crystals){if(c.tut)continue;const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b&&bd<1500&&rnd()<.45)return{k:'crystal',x:b.x,y:b.y}}}
-  if(h.quest&&(h.quest.k==='search'||h.lvl>=2&&rnd()<.05)){let b=null,bd=1e9;for(const c of S.caches){if(S.t<c.ready)continue;const d=dist(c,h);if(d<bd){bd=d;b=c}}if(b)return{k:'cache',x:b.x,y:b.y}}
-  if(h.quest&&h.quest.k==='troll'){let b=null,bd=1e9;for(const m of S.monsters)if(m.kind==='troll'){const d=dist(m,h);if(d<bd){bd=d;b=m}}if(b)return{k:'monster',id:b.id}}
-  if(h.quest&&h.quest.k==='deliver'){const to=S.towns.find(t=>t.id===h.quest.to);if(to&&to.alive)return{k:'go',x:to.x,y:to.y};h.quest=null}
-  if(h.quest&&h.quest.k==='build'&&h.gold>=C.COST[h.quest.what]){const a=rr(0,6.28),d=home.r+rr(60,300);return{k:'build',what:h.quest.what,x:home.x+Math.cos(a)*d,y:home.y+Math.sin(a)*d}}
-  if(h.quest&&(h.quest.k==='climb'||h.quest.k==='tend')&&!g.dead&&dG<2500*WS){let bi=0;return{k:'foot',i:g.feet[0].air>0?1:bi}}
-  let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
-  return b?{k:'monster',id:b.id}:null}
 function botShop0(){}
-function botShop(h){if(h.role==='keeper'&&braces()>=BRACES_MAX&&h.kits.brace>0){h.kits.brace=0;h.gold+=C.COST.brace}
+function botShop(h){{const tw=townAt(h);if(tw&&wallsDown(tw))return}if(!h.sol){botFolkShop(h);return}if(h.role==='keeper'&&braces()>=BRACES_MAX&&h.kits.brace>0){h.kits.brace=0;h.gold+=C.COST.brace}
   if(h.role==='keeper'&&h.kits.ladder<1&&h.gold>=C.COST.ladder+40&&rnd()<.5){h.gold-=C.COST.ladder;h.kits.ladder++}if(h.role==='keeper'&&h.kits.platform<1&&h.gold>=C.COST.platform+60&&rnd()<.3){h.gold-=C.COST.platform;h.kits.platform++}
   if(h.role==='keeper'&&!S.g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS){h.crystals-=C.HORN_CRYSTALS;h.horn=1;if(!S.headless)announce(TOWNS[h.town].name+' has forged a wake horn.')}
   {const t=townAt(h);if(t&&t.i===h.town&&h.role!=='keeper'&&!canUpgrade(h,'town',t))upgrade(h,'town',t)}
@@ -1275,7 +1386,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
     stepHuman(h,dt,m)}
   for(const a of combatPresses(takePresses(),wm)){if(S.role==='giant'){if(!S.autoplay)giantDo({A:'stomp',B:'smash',X:'shake',Y:'swipe'}[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?{x:mv.x,y:-mv.y}:null)}
-  stepCombat(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);stepEvents(dt);
+  stepCombat(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepArmy(dt);stepCrumble(dt);stepEvents(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
 function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
@@ -1452,13 +1563,14 @@ function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub)=>({label:
   const lk=lakesNear(h.x,h.y,500),near=buildNear(h);
   const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?': more walls and rent':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
   openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold, ${h.crystals} sky crystals. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
-    items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
+    items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('barracks','Barracks','Trains up to three soldiers; one barracks per town level ('+barracksOf(h.town).length+'/'+barracksCap(h.town)+')'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
 let townTab='Board';
 function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const fi=focusI;const tb=townTab;
   const buy=(k,cost,fn,sub)=>({label:k+' – '+cost+' gold',sub,why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
   const tabs=['Board','Shop','Forge','Hall'].map(n=>({label:n,tab:true,sel:n===tb,act:()=>{openTown(t,n);setFocus(['Board','Shop','Forge','Hall'].indexOf(n))}}));
   const q=h.quest;let items=[],body='';
-  if(tb==='Board'){body=`<p class="dim">Jobs posted in ${t.name}. The board changes in ${Math.max(1,Math.ceil(60-(S.t-(t.boardT||0))))} s.</p>`;
+  if(wallsDown(t)&&(tb==='Board'||tb==='Shop')){body=`<p class="dim">${t.name}'s walls are under half (${Math.ceil(t.hp)}/${t.max}). The ${tb.toLowerCase()} is closed until they are repaired.</p>`;items=[{label:'Closed',sub:'Repair the walls in the Hall',why:'Walls under half',act:()=>{}}]}
+  else if(tb==='Board'){body=`<p class="dim">Jobs posted in ${t.name}. The board changes in ${Math.max(1,Math.ceil(60-(S.t-(t.boardT||0))))} s.</p>`;
     items=q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+')',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;h.claimed=(h.claimed||0)+1;sfx('coin')}openTown(t)}},...(q.done||q.tut?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
       :(tutJob()&&t.i===h.town?[{k:'slay',need:3,n:0,gold:42,xp:40,text:'Slay 3 beasts outside Ashford',tut:1}]:board(t)).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{if(o.tut){h.quest=o;openTown(t);return}h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
   else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
@@ -1470,7 +1582,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
     items=[{label:h.horn?'You carry a wake horn':'Forge a wake horn – '+C.HORN_CRYSTALS+' crystals',sub:h.horn?'Sound it at the giant’s head':'The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant’s head.');openTown(t)}},
       {label:'Sell sky crystals – 4 gold each',sub:'You have '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}}]}
   else{body=`<p class="dim">${t.name}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses built. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p>`;
-    items=[{label:'Raise '+t.name+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:'+600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}}]}
+    items=[{label:'Raise '+t.name+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:'+600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
 function start(role,seed,first){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
   toast(role==='giant'?'You are the giant, asleep and locked in place until someone climbs to your head and wakes you. Then braces the humans bolt on let you walk: survive until dusk and complete three of five tasks.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
@@ -1624,7 +1736,7 @@ function g3Update(){const g=S.g,t=S.t;
     L(x+sx*4*s,y+sy*4*s,zb+17*s,17*s,4.5*s,face,legA,0,'#3b3329');L(x-sx*4*s,y-sy*4*s,zb+17*s,17*s,4.5*s,face,legB,0,'#3b3329');
     L(x+sx*9*s,y+sy*9*s,zb+42*s,17*s,4*s,face,armL,0,col);L(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,4*s,face,armR,0,col);
     if(tool&&oi<120){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
-  for(const h of S.humans){if(h.dead)continue;const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,T.col,h.you,h.face||0);
+  for(const h of S.humans){if(h.dead)continue;const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=bodyWorld(h.cl.x,h.cl.y),f=fwd(g);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,Math.atan2(f.y,f.x))}}
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
@@ -1657,6 +1769,7 @@ function g3Update(){const g=S.g,t=S.t;
     if(tw.alive){B(tw.x,tw.y,z+55,10,110,10,'#cfc3aa');RF(tw.x,tw.y,z+125,10,30,'#cfc3aa');B(tw.x,tw.y,z+150,14,14,14,tw.col,t)}}
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,f=j.t/j.dur;if(j.kind==='ground'){const z=groundH(j.x,j.y),hh=(j.k==='tower'?95:j.k==='outpost'?60:34)*Math.max(.08,f);B(j.x+30,j.y,z+hh/2,j.k==='outpost'?90:40,hh,j.k==='outpost'?90:32,'#9a7a4e');B(j.x+30,j.y,z+hh+4,j.k==='outpost'?100:48,4,j.k==='outpost'?100:40,'#6b5236')}else{const a=bodyWorld(j.s.c+.5,j.s.r+.5),z=groundH(a.x,a.y)+a.z;B(a.x,a.y,z,50*f+8,10,30,'#9a7a4e',g.ang)}}
   for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
+    else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
   for(const c of S.caches){const z=groundH(c.x,c.y),ok=t>=c.ready;B(c.x,c.y,z+14,44,26,30,ok?'#d9b45a':'#6b6250');B(c.x,c.y,z+30,46,8,32,'#3a2d1c')}
   for(const e of S.events){if(e.k==='caravan'){const z=groundH(e.x,e.y);B(e.x,e.y,z+24,60,26,30,'#8a6a44');B(e.x,e.y,z+44,56,16,28,'#e6dcc4');B(e.x,e.y,z+60,8,8,8,TOWNS[e.i].col)}}
@@ -2124,8 +2237,9 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
       shapePath(ctx,p.x,top.y-30*p.s-Math.max(7,16*p.s),Math.max(6,14*p.s),t.shape);ctx.fillStyle=t.col;ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=1.5;ctx.stroke()})}
   for(const b of S.builds){const p=proj(b.x,b.y,0);if(!p||p.d>8000)continue;const T=TOWNS[b.town];add(p.d,()=>{const s=p.s;ctx.globalAlpha=1-fogOf(p.d);
     if(b.k==='house'){const L=lv(b),q=proj(b.x,b.y,22+10*L),w=14+5*L;ctx.fillStyle='#e0d4ba';ctx.fillRect(p.x-w*s,q.y,2*w*s,p.y-q.y);ctx.fillStyle='#8a4e38';ctx.beginPath();ctx.moveTo(p.x-(w+4)*s,q.y);ctx.lineTo(p.x,q.y-(10+6*L)*s);ctx.lineTo(p.x+(w+4)*s,q.y);ctx.fill()}
+    else if(b.k==='barracks'){const q=proj(b.x,b.y,34),r=proj(b.x,b.y,52),w=38*s;ctx.fillStyle='#9a8a72';ctx.fillRect(p.x-w,q.y,2*w,p.y-q.y);ctx.fillStyle='#5b4a3a';ctx.fillRect(p.x-w-3*s,q.y-5*s,2*w+6*s,8*s);ctx.fillStyle='#d6d9de';ctx.fillRect(p.x+w*.9,p.y-80*s,3*s,80*s);ctx.fillStyle=T.col;ctx.fillRect(p.x+w*.9+3*s,p.y-80*s,16*s,11*s)}
     else{const q=proj(b.x,b.y,60+35*lv(b));ctx.fillStyle='#b9ab8e';ctx.fillRect(p.x-9*s,q.y,18*s,p.y-q.y);ctx.fillStyle='#5a4a3a';ctx.fillRect(p.x-13*s,q.y-6*s,26*s,8*s)}
-    shapePath(ctx,p.x,p.y-(b.k==='house'?60:110)*s,Math.max(3,7*s),T.shape);ctx.fillStyle=T.col;ctx.fill();ctx.globalAlpha=1})}
+    shapePath(ctx,p.x,p.y-(b.k==='house'?60:b.k==='barracks'?90:110)*s,Math.max(3,7*s),T.shape);ctx.fillStyle=T.col;ctx.fill();ctx.globalAlpha=1})}
   // forests and lone trees stand up out of the ground
   for(const tr of S.trees){const p=proj(tr.x,tr.y,0);if(!p||p.d>5200||p.x<-60||p.x>W+60)continue;add(p.d,()=>{const s=p.s,h=tr.r*3.2*s;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle='#2f4528';ctx.beginPath();ctx.moveTo(p.x,p.y-h);ctx.lineTo(p.x+tr.r*s,p.y-h*.15);ctx.lineTo(p.x-tr.r*s,p.y-h*.15);ctx.closePath();ctx.fill();ctx.fillStyle='#3d5a32';ctx.beginPath();ctx.moveTo(p.x,p.y-h*.75);ctx.lineTo(p.x+tr.r*.8*s,p.y);ctx.lineTo(p.x-tr.r*.8*s,p.y);ctx.closePath();ctx.fill();ctx.globalAlpha=1})}
   // the mountains that were giants
@@ -2146,7 +2260,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const h of S.humans){if(h.dead||h.mode!=='ground')continue;const p=proj(h.x,h.y,0);if(!p||p.d>7500)continue;const T=TOWNS[h.town];
     add(p.d-.5,()=>{const hp=Math.max(h.you?22:15,(h.you?30:24)*p.s);ctx.globalAlpha=1-fogOf(p.d);
       if(h.swing>0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-hp*.5,hp*.75,-2.4,-.7);ctx.stroke()}
-      figure(p,hp,h.you?'#c0392b':T.col,T.shape,T.col,h.you);ctx.globalAlpha=1;if(h.you)pbar(p.x,p.y-hp*1.6,36,h.hp/h.max,'#9be08a')})}
+      figure(p,hp*(h.sol?1.15:1),h.you?'#c0392b':T.col,T.shape,h.sol?'#fff':T.col,h.you||!!h.sol);ctx.globalAlpha=1;if(h.you)pbar(p.x,p.y-hp*1.6,36,h.hp/h.max,'#9be08a')})}
   for(const b of giantBoulders(g)){const p=proj(b.x,b.y,b.z);if(!p)continue;const col=partStone(b.part);add(p.d,()=>{ctx.globalAlpha=(1-clamp((p.d-1200)/5000,0,.62))*(S.role==='giant'?.85:nearFade(p));stone(p.x,p.y,b.r*p.s,col,b.n);ctx.globalAlpha=1})}
   for(const ch of S.chains){if(ch.hp<=0)continue;const a=bodyWorld(ch.c,ch.r),f=fwd(g),sx=-f.y,sy=f.x,dir=ch.c<COLS/2?-1:1,bx=a.x+sx*dir*520,by=a.y+sy*dir*520;const p1=proj(a.x,a.y,a.z),p2=proj(bx,by,0);if(!p1||!p2)continue;
     add(Math.max(p1.d,p2.d),()=>{ctx.strokeStyle='#26262a';ctx.lineWidth=Math.max(2,14*Math.min(p1.s,p2.s));ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.quadraticCurveTo((p1.x+p2.x)/2,Math.max(p1.y,p2.y)+20*p2.s,p2.x,p2.y);ctx.stroke();

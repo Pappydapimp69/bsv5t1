@@ -414,16 +414,11 @@ function newGame(role,seed){
     humans:[],monsters:[],crystals:[],trees:[],prints:[],shots:[],fx:[],over:null,nextId:1,
     cam:{x:cx,y:cy,zoom:1,czoom:1},autoplay:false};
   S.chains=CHAINS.map(ch=>({...ch,hp:C.CHAIN_HP,max:C.CHAIN_HP}));S.wakeT=0;S.walked=0;S.avenged=false;S.feud=[[0,0,0],[0,0,0],[0,0,0]];S.events=[];S.evc={raid:0,star:0,caravan:0};S.raided=[0,0,0];S.gathered=0;S.grudge=[0,0,0];S.wander=null;{const a=-Math.PI/2+Math.PI/3+2*Math.PI/3*Math.floor(rnd()*3);S.exit={x:cx+Math.cos(a)*4200,y:cy+Math.sin(a)*4200}}S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
-  // giants that lay down long ago are mountains now: landmarks across the open world
-  S.caches=[];
-  for(let i=0;i<6;i++){for(let k=0;k<40;k++){const x=rr(700,M-700),y=rr(700,M-700);if(S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>1500)&&Math.hypot(x-cx,y-cy)>1500&&S.marks.every(m=>Math.hypot(m.x-x,m.y-y)>2200)){S.marks.push({x,y,ang:rr(0,6.28)});break}}}
-  for(let i=0;i<3;i++){let x=rr(0,M),y=i%2?0:M,a=i%2?Math.PI/2:-Math.PI/2;const pts=[];for(let k=0;k<60;k++){pts.push({x,y});a+=rr(-.35,.35);x+=Math.cos(a)*200;y+=Math.sin(a)*200;if(x<0||y<0||x>M||y>M)break}S.rivers.push(pts)}
+  // the land forms in order: the fallen giants, hills, rivers to the towns, roads, forests, places (genLand), then beasts and crystals
+  genLand(0);
   for(let ti=0;ti<3;ti++)for(let k=0;k<3;k++){const you=role==='human'&&ti===0&&k===0;S.humans.push(mkHuman(ti,you,you?'you':TOWNS[ti].roles[k]))}
   S.you=role==='human'?S.humans[0]:null;
-  for(let i=0;i<C.TREES;i++){const x=rr(0,M),y=rr(0,M);if(S.towns.some(t=>Math.hypot(t.x-x,t.y-y)<260))continue;S.trees.push({x,y,r:rr(14,34)})}
-  S.markCols=null;for(const m of S.marks){const a=m.ang+Math.PI/2;let d=200;while(d<1400&&inSolid(m.x+Math.cos(a)*d,m.y+Math.sin(a)*d,80))d+=30;S.caches.push({x:m.x+Math.cos(a)*d,y:m.y+Math.sin(a)*d,ready:0})}
-  for(let i=0;i<C.MONSTERS;i++)spawnMonster();
-  for(let i=0;i<C.CRYSTALS;i++)spawnCrystal();
+  populateLand();
   if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}
   return S}
 function mkHuman(ti,you,role){const t=S.towns[ti];
@@ -440,10 +435,20 @@ const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2
 const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0);
 function nextGear(h,k){const i=h.gear[k];return GEAR[k][i]||null}
 function buyGear(h,k){const it=nextGear(h,k);h.gold-=it.g;h.gear[k]++;if(k==='blade')h.atk+=it.v;if(k==='armour')h.def=(h.def||0)+it.v;if(k==='gloves')h.gloves++}
-function spawnMonster(){const M=C.MAP;let x,y,ok=false;const lair=S.marks&&S.marks.length&&rnd()<.3;
-  for(let k=0;k<30&&!ok;k++){if(lair){const m=S.marks[Math.floor(rnd()*S.marks.length)],a=rr(0,6.28),d=rr(250,600);x=clamp(m.x+Math.cos(a)*d,150,M-150);y=clamp(m.y+Math.sin(a)*d,150,M-150)}else{x=rr(150,M-150);y=rr(150,M-150)}ok=S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>520)&&!inSolid(x,y,40)}
-  const troll=lair?rnd()<.8:rnd()<.2;S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x,y,hx:x,hy:y,hp:troll?90:30,max:troll?90:30,atk:troll?13:6,gold:troll?22:8,xp:troll?30:12,r:troll?22:13,cd:0})}
-function spawnCrystal(){const M=C.MAP;let x,y;for(let k=0;k<30;k++){x=rr(200,M-200);y=rr(200,M-200);if(!inSolid(x,y,60))break}S.crystals.push({id:S.nextId++,x,y})}
+// beasts live somewhere: trolls by the ruins, wolves at their dens (both wander back there), the rest roam the open land
+function spawnMonster(){const M=C.MAP,dens=(S.places||[]).filter(p=>p.k==='den'),r=rnd(),lair=S.marks&&S.marks.length&&r<.3,den=!lair&&dens.length&&r<.62;let x,y,ok=false,home=null;
+  for(let k=0;k<30&&!ok;k++){if(lair){const m=S.marks[Math.floor(rnd()*S.marks.length)],a=rr(0,6.28),d=rr(250,600);home={x:m.x,y:m.y,r:700};x=clamp(m.x+Math.cos(a)*d,150,M-150);y=clamp(m.y+Math.sin(a)*d,150,M-150)}
+    else if(den){const p=dens[Math.floor(rnd()*dens.length)],a=rr(0,6.28),d=rr(60,360);home={x:p.x,y:p.y,r:420};x=clamp(p.x+Math.cos(a)*d,150,M-150);y=clamp(p.y+Math.sin(a)*d,150,M-150)}
+    else{x=rr(150,M-150);y=rr(150,M-150)}ok=S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>520)&&!inSolid(x,y,40)}
+  const troll=lair?rnd()<.8:den?false:rnd()<.2;S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x,y,hx:x,hy:y,home,hp:troll?90:30,max:troll?90:30,atk:troll?13:6,gold:troll?22:8,xp:troll?30:12,r:troll?22:13,cd:0})}
+// crystals: half in the three fields on the flanks between towns, half spread over the three sectors. In strict turn: a field crystal, then a sector crystal, round the three fields and sectors. Every second crystal in a field is the
+// last one mirrored across the field's line from the giant, so each field leans to neither of its two towns; sector crystals come
+// in threes, one spot copied round to each town's sector
+function spawnCrystal(){const M=C.MAP,cx=M/2,cy=M/2,F=(S.places||[]).filter(p=>p.k==='field');let x,y;const n=S.crysN=(S.crysN||0)+1,q=n>>1;
+  for(let k=0;k<30;k++){if(F.length&&n%2){const f=F[q%F.length],fa=Math.atan2(f.y-cy,f.x-cx);let a,d;if(f.last&&!k){a=2*fa-f.last.a;d=f.last.d;f.last=null}else{a=rr(0,6.28);d=f.r*Math.sqrt(rnd());f.last={a,d}}x=f.x+Math.cos(a)*d;y=f.y+Math.sin(a)*d}
+    else{const t=S.towns[q%3];if(q%3===1||!S.crysRel||k)S.crysRel={a:rr(-.95,.95),d:Math.sqrt(rr(.03,1))*3950};const a=Math.atan2(t.y-cy,t.x-cx)+S.crysRel.a,d=S.crysRel.d;x=cx+Math.cos(a)*d;y=cy+Math.sin(a)*d}
+    x=clamp(x,200,M-200);y=clamp(y,200,M-200);if(!inSolid(x,y,60)&&S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>t.r+40))break}
+  S.crystals.push({id:S.nextId++,x,y})}
 // the old giants are stone: everyone who walks is kept outside their boulders (the living giant steps over them)
 function solids(){if(S.markCols&&S.markCols.n===S.marks.length)return S.markCols;const L=S.marks.map(m=>{const cs=markBoulders(m).map(b=>({x:b.x,y:b.y,r:b.r*.85}));let R=0;for(const c of cs)R=Math.max(R,Math.hypot(c.x-m.x,c.y-m.y)+c.r);return{x:m.x,y:m.y,R,cs}});L.n=S.marks.length;S.markCols=L;return L}
 function inSolid(x,y,rad){for(const m of solids()){if(Math.hypot(x-m.x,y-m.y)>m.R+rad)continue;for(const c of m.cs)if(Math.hypot(x-c.x,y-c.y)<c.r+rad)return m}return null}
@@ -471,6 +476,135 @@ function steerSolid(o,tx,ty,rad){const dx=tx-o.x,dy=ty-o.y,d=Math.hypot(dx,dy);i
       if(bv===0&&goalIn)return{x:ux,y:uy}}
     if(r<=Rm+10)return{x:nx,y:ny}}
   if(!o.ss)o.ss=(-ny*ux+nx*uy)<0?-1:1;const a=Math.atan2(-ny,-nx)-o.ss*Math.asin(Math.min(1,Rm/r));return{x:Math.cos(a),y:Math.sin(a)}}
+// ================= the land, shaped by giants =================
+// Laid in the order a world forms (genLand): the six old giants fall on the high rim, two behind each town; triangle hills rise
+// between them (a peak hides what is behind it and offers a choice: over, slower, or round); rivers run downhill from beside
+// the bodies to a lake at each town's edge; roads are the cheapest walking lines, each branching off the roads already laid;
+// then forests, a crystal field on each flank between neighbours, a wolf den on the rim beyond it, a standing stone on each
+// town's way to the giant. Every place is set in its town's sector and copied round with jitter so no town starts worse;
+// checkLand measures that on a walking grid, and a seed that fails is laid again from its next attempt (still deterministic).
+const LAND={N:181,CS:50};
+const sstep=u=>u<=0?0:u>=1?1:u*u*(3-2*u);
+// raw height of the land (no town flattening), bilinear on the 50-unit grid
+function landRaw(x,y){const L=S&&S.land;if(!L)return 0;const N=LAND.N,u=clamp(x/LAND.CS,0,N-1.001),v=clamp(y/LAND.CS,0,N-1.001),i=u|0,j=v|0,fu=u-i,fv=v-j,k=j*N+i,H=L.h;
+  return(H[k]*(1-fu)+H[k+1]*fu)*(1-fv)+(H[k+N]*(1-fu)+H[k+N+1]*fu)*fv}
+// walking uphill is slower (down to 0.6 of full pace on a steep face); downhill and flat are full pace
+function landPace(h,vx,vy){if(!S.land)return 1;const l=Math.hypot(vx,vy)||1,s=(groundH(h.x+vx/l*30,h.y+vy/l*30)-groundH(h.x,h.y))/30;return s>0?Math.max(.6,1-1.4*s):1}
+// cheapest path on an N by N grid of 8 neighbours. cost(a,b,len) gives a step's cost (Infinity blocks); with goal it returns
+// the cells from a start to the first goal cell reached, without one the whole cost field
+function landSearch(N,cost,starts,goal){const D=new Float64Array(N*N).fill(Infinity),P=new Int32Array(N*N).fill(-1),hk=[],hv=[];
+  const push=(k,v)=>{hk.push(k);hv.push(v);let i=hk.length-1;while(i>0){const p=(i-1)>>1;if(hv[p]<=v)break;hk[i]=hk[p];hv[i]=hv[p];i=p}hk[i]=k;hv[i]=v};
+  const pop=()=>{const k=hk[0],lk=hk.pop(),lv=hv.pop(),n=hk.length;if(n){let i=0;for(;;){const l=2*i+1,r=l+1;let m=-1,mv=lv;if(l<n&&hv[l]<mv){m=l;mv=hv[l]}if(r<n&&hv[r]<mv){m=r;mv=hv[r]}if(m<0)break;hk[i]=hk[m];hv[i]=hv[m];i=m}hk[i]=lk;hv[i]=lv}return k};
+  for(const s of starts){D[s]=0;push(s,0)}
+  while(hk.length){const v=hv[0],k=pop();if(v>D[k])continue;
+    if(goal&&goal(k)){const out=[];for(let c=k;c>=0;c=P[c])out.push(c);return out.reverse()}
+    const i=k%N,j=(k-i)/N;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){if(!di&&!dj)continue;const a=i+di,b=j+dj;if(a<0||b<0||a>=N||b>=N)continue;const kk=b*N+a,c=cost(k,kk,di&&dj?1.4142:1);if(!(c<Infinity))continue;const nv=v+c;if(nv<D[kk]){D[kk]=nv;P[kk]=k;push(kk,nv)}}}
+  return goal?null:D}
+const landCell=(x,y)=>clamp(Math.round(y/LAND.CS),0,LAND.N-1)*LAND.N+clamp(Math.round(x/LAND.CS),0,LAND.N-1);
+// a grid path as a smooth line: corners cut twice (Chaikin), then points about every 90 units
+function landLine(cells){let p=cells.map(k=>({x:(k%LAND.N)*LAND.CS,y:Math.floor(k/LAND.N)*LAND.CS}));
+  for(let it=0;it<2;it++){if(p.length<3)break;const q=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];q.push({x:a.x*.75+b.x*.25,y:a.y*.75+b.y*.25},{x:a.x*.25+b.x*.75,y:a.y*.25+b.y*.75})}q.push(p[p.length-1]);p=q}
+  const out=[p[0]];let acc=0;for(let i=1;i<p.length;i++){acc+=Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);if(acc>=90||i===p.length-1){out.push(p[i]);acc=0}}return out}
+function genLand(attempt){const M=C.MAP,cx=M/2,cy=M/2,N=LAND.N,CS=LAND.CS,T=S.towns;
+  rnd=mulberry32((S.seed^Math.imul(attempt+1,0x9E3779B1))>>>0);
+  S.marks=[];S.caches=[];S.rivers=[];S.lakes=[];S.roads=[];S.trees=[];S.places=[];S.markCols=null;S.land=null;S.landTry=attempt;if(!attempt)S.landFails=[];
+  G3.seed=-1;ground=null; // a fresh land is drawn afresh, even on a replayed seed
+  const ta=T.map(t=>Math.atan2(t.y-cy,t.x-cx)),pol=(i,a,r)=>({x:cx+Math.cos(ta[i]+a)*r,y:cy+Math.sin(ta[i]+a)*r}),far=(o,p,d)=>Math.hypot(o.x-p.x,o.y-p.y)>d;
+  // 1. the old giants: two on the high ground behind each town, lying along the rim
+  for(let i=0;i<3;i++)for(const s of[-1,1]){let m=null;
+    for(let k=0;k<40;k++){const p=pol(i,s*rr(.56,.66),rr(3250,3550)),c={x:p.x,y:p.y,ang:Math.atan2(p.y-cy,p.x-cx)+Math.PI/2*(rnd()<.5?1:-1)+rr(-.45,.45)},bs=markBoulders(c);
+      m=c;if(bs.every(b=>b.x>250&&b.y>250&&b.x<M-250&&b.y<M-250&&far(b,{x:cx,y:cy},1300)&&T.every(t=>far(b,t,t.r+C.HOME_REACH+260))&&S.marks.every(o=>markBoulders(o).every(q=>far(q,b,b.r+q.r+260)))))break}
+    m.town=i;m.side=s;S.marks.push(m)}
+  S.markCols=null;
+  // each ruin's cache lies on the body's inner side, toward the towns
+  for(const m of S.marks){let best=null;for(const sg of[1,-1]){const a=m.ang+sg*Math.PI/2;let d=200;while(d<1400&&inSolid(m.x+Math.cos(a)*d,m.y+Math.sin(a)*d,80))d+=30;
+      const c={x:clamp(m.x+Math.cos(a)*(d+40),200,M-200),y:clamp(m.y+Math.sin(a)*(d+40),200,M-200),ready:0};if(!best||Math.hypot(c.x-cx,c.y-cy)<Math.hypot(best.x-cx,best.y-cy))best=c}
+    S.caches.push(best)}
+  // 2. places in clusters, one set to a town's sector: the crystal field on the flank toward the next town, a wolf den on the rim
+  // beyond it, a standing stone on the way from the town to the giant. A field sits exactly between its two towns
+  for(let i=0;i<3;i++){const f=pol(i,Math.PI/3,rr(2350,2650)),d=pol(i,Math.PI/3+rr(-.08,.08),rr(3600,3760)),st=pol(i,rr(-.14,.14),rr(1500,1700));
+    S.places.push({k:'field',x:f.x,y:f.y,r:430,i},{k:'den',x:d.x,y:d.y,r:220,i},{k:'stone',x:st.x,y:st.y,r:60,i})}
+  // 3. the height of the land: rolling ground, a rim that rises toward the bodies, a basin at each town, triangle hills between
+  // hills are laid as templates in one sector's frame and copied to all three with jitter; a copy that would crowd a town, the
+  // giant, a place or a ruin, or stand on a town's view of the giant, is left out
+  const tmpl=[];for(let k=0;k<26;k++){const big=k<12;tmpl.push({a:rr(-1.04,1.04),r:rr(1250,4250),H:big?rr(280,520):rr(150,260),A:big?rr(480,850):rr(320,500),B:big?rr(280,440):rr(200,300),o:rr(0,Math.PI)})}
+  const hills=[];for(let i=0;i<3;i++)for(const q of tmpl){const a=q.a+rr(-.07,.07),r=q.r+rr(-140,140),p=pol(i,a,r),hh={x:p.x,y:p.y,H:q.H*rr(.85,1.15),A:q.A,B:q.B,o:q.o+ta[i]+rr(-.3,.3)};
+    const t=T[i],axis=Math.abs(Math.sin(a))*r;if(r<Math.hypot(t.x-cx,t.y-cy)+200&&axis<hh.B+220)continue; // each town's view of the giant stays open
+    if(!T.every(o=>far(hh,o,o.r+C.HOME_REACH+hh.A*.6+80))||!far(hh,{x:cx,y:cy},900+hh.A*.6))continue;
+    if(!S.places.every(pl=>far(hh,pl,pl.r+hh.A*(pl.k==='den'?.35:.6)+60))||!S.caches.every(c=>far(hh,c,hh.A*.5+150))||!S.marks.every(m=>far(hh,m,hh.A*.5+650)))continue;
+    if(!hills.every(o=>far(hh,o,.55*Math.max(o.A,hh.A))))continue;hills.push(hh)}
+  // a coarse noise field, so rivers and roads wind instead of running ruler-straight
+  const NZ=new Float32Array(20*20);for(let k=0;k<400;k++)NZ[k]=rnd();const noise=(x,y)=>{const u=clamp(x/M*19,0,18.999),v=clamp(y/M*19,0,18.999),i=u|0,j=v|0,fu=u-i,fv=v-j,k=j*20+i;return(NZ[k]*(1-fu)+NZ[k+1]*fu)*(1-fv)+(NZ[k+20]*(1-fu)+NZ[k+21]*fu)*fv};
+  const H=new Float32Array(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const x=i*CS,y=j*CS,rc=Math.hypot(x-cx,y-cy);
+    let h=(14*(Math.sin(x*.0011)+Math.sin(y*.0013+1.3))+8*Math.sin((x+y)*.0023))*clamp((rc-450)/900,0,1)+150*sstep((rc-2700)/1700);
+    for(const t of T){const d=Math.hypot(x-t.x,y-t.y);h-=80*Math.exp(-d*d/1.44e6)}
+    for(const m of S.marks){const d=Math.hypot(x-m.x,y-m.y);h+=110*Math.exp(-d*d/1.96e6)}
+    for(const q of hills){const dx=x-q.x,dy=y-q.y;if(Math.abs(dx)>q.A||Math.abs(dy)>q.A)continue;const c=Math.cos(q.o),s=Math.sin(q.o),u=(dx*c+dy*s)/q.A,v=(-dx*s+dy*c)/q.B,e=1-Math.sqrt(u*u+v*v);if(e>0)h+=q.H*e}
+    H[j*N+i]=h}
+  const blk=new Uint8Array(N*N);for(let j=0;j<N;j++)for(let i=0;i<N;i++)if(inSolid(i*CS,j*CS,20))blk[j*N+i]=1;
+  const X=k=>(k%N)*CS,Y=k=>Math.floor(k/N)*CS,wet=new Uint8Array(N*N),road=new Uint8Array(N*N);
+  const carve=(cells,bed,slope)=>{let lvl=Infinity;for(const k of cells){lvl=Math.min(lvl,H[k]);const i0=k%N,j0=(k-i0)/N;
+      for(let dj=-3;dj<=3;dj++)for(let di=-3;di<=3;di++){const a=i0+di,b=j0+dj;if(a<0||b<0||a>=N||b>=N)continue;const d=Math.hypot(di,dj)*CS;H[b*N+a]=Math.min(H[b*N+a],lvl-bed+Math.max(0,d-40)*slope)}lvl-=.4}};
+  // 4. rivers: from a spring beside each body, downhill. The first of each town's pair runs to a lake at its town's edge (away
+  // from the first day's house spot); the second joins whatever water it reaches first
+  const riverCost=(a,b,L)=>{if(blk[b])return Infinity;const x=X(b),y=Y(b);let c=L*CS*(1+Math.max(0,H[b]+100)/200)*(.55+1.1*noise(x,y))+Math.max(0,H[b]-H[a])*3;
+    if(Math.hypot(x-cx,y-cy)<1000)c*=4;for(const t of T){if(Math.hypot(x-t.x,y-t.y)<t.r+150)c+=L*CS*40;if(Math.hypot(x-t.x-t.r-170,y-t.y-40)<240)return Infinity}return c}; // the first day's house spot stays dry
+  const spring=m=>{const a=Math.atan2(cy-m.y,cx-m.x);let d=150;while(d<1600&&inSolid(m.x+Math.cos(a)*d,m.y+Math.sin(a)*d,70))d+=30;return landCell(m.x+Math.cos(a)*(d+60),m.y+Math.sin(a)*(d+60))};
+  for(const pass of[-1,1])for(const m of S.marks){if(m.side!==pass)continue;const t=T[m.town],hs={x:t.x+t.r+170,y:t.y+40},src=spring(m);let goal;
+    if(pass<0)goal=k=>{const x=X(k),y=Y(k),d=Math.hypot(x-t.x,y-t.y);return d>t.r+170&&d<t.r+270&&Math.hypot(x-hs.x,y-hs.y)>380};
+    else goal=k=>wet[k]&&Math.abs(k%N-src%N)+Math.abs(Math.floor(k/N)-Math.floor(src/N))>4;
+    const path=landSearch(N,riverCost,[src],goal);if(!path)continue;carve(path,10,.45);
+    const line=landLine(path);line.w=pass<0?1:.7;
+    if(pass<0){const e=line[line.length-1],a=Math.atan2(e.y-t.y,e.x-t.x),lk={x:t.x+Math.cos(a)*(t.r+250),y:t.y+Math.sin(a)*(t.r+250),r:150,town:t.i};S.lakes.push(lk);line.push({x:lk.x,y:lk.y});
+      const lvl=Math.min(...path.slice(-3).map(k=>H[k]))-4;for(let j=0;j<N;j++)for(let i=0;i<N;i++){const d=Math.hypot(i*CS-lk.x,j*CS-lk.y);if(d<lk.r+160)H[j*N+i]=Math.min(H[j*N+i],lvl+Math.max(0,d-lk.r)*.4);if(d<lk.r+30)wet[j*N+i]=2}}
+    for(const p of line)for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const k=landCell(p.x+di*CS,p.y+dj*CS);if(!wet[k])wet[k]=1}
+    S.rivers.push(line)}
+  for(const t of T)t.z=null;
+  // 5. roads: the cheapest walking line from Ashford to Brindle, then each new road from its place to the nearest road already
+  // laid (a road reused costs a third), so the network branches: Corvel, the giant's feet, then tracks to each ruin and field
+  const roadCost=(a,b,L)=>{if(blk[b]||wet[b]===2)return Infinity;const x=X(b),y=Y(b);let c=L*CS*(.75+.5*noise(y,x))+Math.abs(H[b]-H[a])*7+(wet[b]?260:0);if(road[b])c*=.33;
+    for(const p of S.places)if(p.k==='den'&&Math.hypot(x-p.x,y-p.y)<700)c+=L*CS*3;if(Math.hypot(x-cx,y-cy)<380)c+=L*CS*20;return c};
+  const lay=(starts,goal,w)=>{const path=landSearch(N,roadCost,starts,goal);if(!path)return;for(const k of path)road[k]=1;const line=landLine(path);line.w=w;S.roads.push(line)};
+  lay([landCell(T[0].x,T[0].y)],k=>k===landCell(T[1].x,T[1].y),1);
+  lay([landCell(T[2].x,T[2].y)],k=>road[k],1);
+  {const ring=[];for(let a=0;a<36;a++)ring.push(landCell(cx+Math.cos(a/36*6.283)*420,cy+Math.sin(a/36*6.283)*420));lay(ring,k=>road[k],.9)}
+  for(const c of S.caches)lay([landCell(c.x,c.y)],k=>road[k],.55);
+  for(const p of S.places)if(p.k==='field')lay([landCell(p.x,p.y)],k=>road[k],.55);
+  // 6. forests: stands, many on the flanks of the hills, then lone trees; never in towns, on water or roads, in stone or round the giant
+  const nearMask=(mask,x,y)=>{const i=Math.round(x/CS),j=Math.round(y/CS);for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const a=i+di,b=j+dj;if(a>=0&&b>=0&&a<N&&b<N&&mask[b*N+a])return true}return false};
+  const open=(x,y)=>x>40&&y>40&&x<M-40&&y<M-40&&T.every(t=>far({x,y},t,t.r+260))&&far({x,y},{x:cx,y:cy},650)&&S.places.every(p=>far({x,y},p,p.k==='field'?p.r*.55:p.r+140))&&S.caches.every(c=>far({x,y},c,200))&&!nearMask(wet,x,y)&&!nearMask(road,x,y)&&!inSolid(x,y,30);
+  for(let b=0;b<30&&S.trees.length<C.TREES-150;b++){let ox,oy;if(hills.length&&rnd()<.45){const q=hills[Math.floor(rnd()*hills.length)],a=rr(0,6.28);ox=q.x+Math.cos(a)*q.B*.7;oy=q.y+Math.sin(a)*q.B*.7}else{ox=rr(300,M-300);oy=rr(300,M-300)}
+    const R=rr(260,620),n=Math.round(R/8);for(let k=0;k<n;k++){const a=rr(0,6.28),d=R*Math.sqrt(rnd()),x=ox+Math.cos(a)*d,y=oy+Math.sin(a)*d;if(open(x,y))S.trees.push({x,y,r:rr(14,34)})}}
+  for(let k=0;k<4000&&S.trees.length<C.TREES;k++){const x=rr(0,M),y=rr(0,M);if(open(x,y))S.trees.push({x,y,r:rr(14,30)})}
+  S.land={h:H,wet,road,hills}}
+// beasts that wander keep near their den or ruin, so they come back to it
+function leashBeasts(){for(const m of S.monsters){const o=m.home;if(!o||m.raid)continue;if(Math.hypot(m.hx-o.x,m.hy-o.y)>o.r){m.hx=o.x+rr(-o.r,o.r)*.5;m.hy=o.y+rr(-o.r,o.r)*.5}}}
+{const step0=stepMonsters;stepMonsters=function(dt){step0(dt);leashBeasts()}}
+// beasts, crystals and the fairness check; a land that fails is laid again from its next attempt
+function populateLand(){for(let a=0;;a++){S.monsters=[];S.crystals=[];S.crysN=0;S.crysRel=null;for(let i=0;i<C.MONSTERS;i++)spawnMonster();for(let i=0;i<C.CRYSTALS;i++)spawnCrystal();
+  const ck=checkLand();S.landCheck=ck;if(ck.ok||a>=11)break;(S.landFails=S.landFails||[]).push(ck.why.join('; '));genLand(a+1)}}
+// is this land fair? Walking time on a 50-unit grid that respects the stone bodies and slows uphill, from each town to the other
+// towns, the giant's feet, its nearest ruin, field and den; each town's share of the crystals (each counted to the town that
+// reaches it first); and the first day's places: the house spot, the crystal ring at 520, the wolves' ring, the feet
+function checkLand(){const N=LAND.N,CS=LAND.CS,T=S.towns,g=S.g,why=[],blk=new Uint8Array(N*N),G=new Float32Array(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i;G[k]=groundH(i*CS,j*CS);if(inSolid(i*CS,j*CS,14))blk[k]=1}
+  const cost=(a,b,L)=>{if(blk[b])return Infinity;const s=(G[b]-G[a])/(L*CS);return L*CS/C.H_SPEED/(s>0?Math.max(.6,1-1.4*s):1)};
+  const D=T.map(t=>landSearch(N,cost,[landCell(t.x,t.y)],null)),at=(d,x,y)=>{const i=Math.round(x/CS),j=Math.round(y/CS);let b=Infinity;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const a=i+di,c=j+dj;if(a>=0&&c>=0&&a<N&&c<N)b=Math.min(b,d[c*N+a])}return b};
+  const P=k=>(S.places||[]).filter(p=>p.k===k),near=(d,L)=>Math.min(...L.map(o=>at(d,o.x,o.y)));
+  const rows=T.map((t,i)=>({town:t.name,next:Math.max(...T.filter(o=>o!==t).map(o=>at(D[i],o.x,o.y))),foot:near(D[i],g.feet),ruin:near(D[i],S.caches),field:near(D[i],P('field')),den:near(D[i],P('den')),stone:near(D[i],P('stone')),crystals:0}));
+  for(const c of S.crystals){const ts=D.map(d=>at(d,c.x,c.y)),m=Math.min(...ts);if(!(m<Infinity)){why.push('crystal out of reach');continue}const w=ts.filter(v=>v-m<1).length;ts.forEach((v,i)=>{if(v-m<1)rows[i].crystals+=1/w})}
+  for(const r of rows)for(const k of['next','foot','ruin','field','den','stone'])if(!(r[k]<Infinity))why.push(r.town+' cannot reach its '+k);
+  const spread=k=>{const v=rows.map(r=>r[k]);return Math.max(...v)/Math.max(1e-6,Math.min(...v))};
+  const sp={foot:spread('foot'),ruin:spread('ruin'),field:spread('field'),den:spread('den'),crystals:spread('crystals')};
+  if(sp.foot>1.15)why.push('feet uneven '+sp.foot.toFixed(2));if(sp.ruin>1.35)why.push('ruins uneven '+sp.ruin.toFixed(2));if(sp.field>1.3)why.push('fields uneven '+sp.field.toFixed(2));if(sp.crystals>1.45)why.push('crystals uneven '+sp.crystals.toFixed(2));
+  // the first day: the house spot open and dry, the crystal and wolf rings open, a foot reachable from Ashford
+  for(const t of T){const hs={x:t.x+t.r+170,y:t.y+40};if(inSolid(hs.x,hs.y,40)||!inTerritory(t.i,hs.x,hs.y))why.push(t.name+' house spot blocked');
+    if(S.lakes.some(l=>Math.hypot(l.x-hs.x,l.y-hs.y)<l.r+120)||S.rivers.some(rv=>rv.some(q=>Math.hypot(q.x-hs.x,q.y-hs.y)<110)))why.push(t.name+' house spot in water');
+    let open=0;for(let a=0;a<24;a++)if(!inSolid(t.x+Math.cos(a/24*6.283)*520,t.y+Math.sin(a/24*6.283)*520,60))open++;if(open<20)why.push(t.name+' crystal ring blocked');
+    let wo=0;for(let a=0;a<24;a++)if(!inSolid(t.x+Math.cos(a/24*6.283)*(t.r+490),t.y+Math.sin(a/24*6.283)*(t.r+490),40))wo++;if(wo<20)why.push(t.name+' wolf ring blocked')}
+  for(const c of S.caches)if(inSolid(c.x,c.y,30))why.push('cache in stone');for(const p of S.places||[])if(inSolid(p.x,p.y,40))why.push(p.k+' in stone');
+  return{ok:!why.length,why,attempt:S.landTry,spread:sp,towns:rows.map(r=>{const o={};for(const k in r)o[k]=typeof r[k]==='number'?Math.round(r[k]*10)/10:r[k];return o})}}
 function aliveTowns(){return S.towns.filter(t=>t.alive)}
 function factionAlive(i){return S.towns.some(t=>t.alive&&t.i===i)}
 function liveFactions(){return[0,1,2].filter(factionAlive)}
@@ -849,7 +983,7 @@ function stepHuman(h,dt,mv){
   let vx=mv.x,vy=mv.y;
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
   ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered%C.STAR_EVERY===0)startStar();
     if(h.you){sfx('coin');toast('Sky crystal ('+packCount(h)+'/'+packCap(h)+' in pack)'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
@@ -1369,8 +1503,9 @@ function g3Init(){if(G3.renderer)return true;if(!window.THREE)return false;
   try{const r=new THREE.WebGLRenderer({canvas:glCv,antialias:true,alpha:true});r.setClearColor(0x000000,0);r.outputEncoding=THREE.sRGBEncoding;
     G3.renderer=r;G3.cam=new THREE.PerspectiveCamera(60,1,6,18000);_m=new THREE.Matrix4();_q=new THREE.Quaternion();_e=new THREE.Euler();_p=new THREE.Vector3();_s=new THREE.Vector3();_c=new THREE.Color();G3.ok=true}catch(e){G3.ok=false}return G3.ok}
 const V3=()=>new THREE.Vector3();
-function groundH(x,y){let h=16*(Math.sin(x*.0011)+Math.sin(y*.0013+1.3))+9*Math.sin((x+y)*.0023);
-  if(S)for(const t of S.towns){const d=Math.hypot(t.x-x,t.y-y),r=t.r+420;if(d<r)h*=clamp((d-t.r-60)/360,0,1)}return h}
+// the ground's height: the land's height grid (rolling, a rim, basins, triangle hills, carved rivers), flattened to each town's level round it
+function groundH(x,y){let h=S&&S.land?landRaw(x,y):16*(Math.sin(x*.0011)+Math.sin(y*.0013+1.3))+9*Math.sin((x+y)*.0023);
+  if(S)for(const t of S.towns){const d=Math.hypot(t.x-x,t.y-y),r=t.r+420;if(d<r){const z=S.land?(t.z!=null?t.z:(t.z=landRaw(t.x,t.y))):0;h=z+(h-z)*clamp((d-t.r-60)/360,0,1)}}return h}
 function g3Dispose(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();if(n.material){(Array.isArray(n.material)?n.material:[n.material]).forEach(m=>{if(m.map)m.map.dispose();m.dispose()})}})}
 function inst(geo,mat,n){const m=new THREE.InstancedMesh(geo,mat,Math.max(1,n));m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.frustumCulled=false;m.count=0;return m}
 // made only once Three.js has loaded, so a page without it still runs on the 2D view
@@ -1383,10 +1518,10 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   if(!ground||groundSeed!==S.seed)buildGround();const M=C.MAP,N=150,geo=new THREE.PlaneGeometry(M,M,N,N);geo.rotateX(-Math.PI/2);geo.translate(M/2,0,M/2);
   const pos=geo.attributes.position;for(let i=0;i<pos.count;i++)pos.setY(i,groundH(pos.getX(i),pos.getZ(i)));geo.computeVertexNormals();
   const tex=new THREE.CanvasTexture(ground);tex.encoding=THREE.sRGBEncoding;tex.anisotropy=4;
-  sc.add(new THREE.Mesh(geo,new THREE.MeshLambertMaterial({map:tex})));
+  G3.groundTex=tex;sc.add(new THREE.Mesh(geo,new THREE.MeshLambertMaterial({map:tex})));
   // forests: two stacked cones a tree, all trees in two draws
   const tGeo=new THREE.ConeGeometry(1,1,7),t1=new THREE.InstancedMesh(tGeo,new THREE.MeshLambertMaterial({color:0x2f4a2a}),S.trees.length),t2=new THREE.InstancedMesh(tGeo,new THREE.MeshLambertMaterial({color:0x3d5e34}),S.trees.length);
-  S.trees.forEach((t,i)=>{const g=groundH(t.x,t.y),h=t.r*3.6;put(t1,i,t.x,t.y,g+h*.62,t.r*.9,h*.75,t.r*.9,i);put(t2,i,t.x,t.y,g+h*.3,t.r*1.15,h*.6,t.r*1.15,i*2)});sc.add(t1,t2);
+  S.trees.forEach((t,i)=>{const g=groundH(t.x,t.y),h=t.r*3.6;put(t1,i,t.x,t.y,g+h*.62,t.r*.9,h*.75,t.r*.9,i);put(t2,i,t.x,t.y,g+h*.3,t.r*1.15,h*.6,t.r*1.15,i*2)});G3.t1=t1;G3.t2=t2;sc.add(t1,t2);
   // the old giants lying as mountains
   const rock=new THREE.IcosahedronGeometry(1,1);G3.marks=[];
   // one mesh a mountain, so a mountain the camera is inside can turn see-through on its own
@@ -1720,6 +1855,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
     if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font='700 15px system-ui';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>9500)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<2600)lbl('Ruins',p.x,p.y,11,'#ffcf6a')}
+  mapLabels();
   for(const e of S.events){if(e.k==='star'){const p=p3(e.x,e.y,300);if(p&&p.d<12000)lbl('Fallen star: '+e.left+' crystals',p.x,p.y,12,'#9fe8ff')}if(e.k==='raid'&&S.t<e.go){const p=p3(e.x,e.y,150);if(p)lbl('Raiders gathering: '+Math.ceil(e.go-S.t)+' s',p.x,p.y,12,'#ff8f80')}
     if(e.k==='caravan'){const p=p3(e.x,e.y,90);if(p)pbar(p.x,p.y,40,e.hp/e.max,'#9be08a')}}
   for(const m of S.monsters)if(m.hp<m.max){const p=p3(m.x,m.y,m.kind==='troll'?90:40);if(p&&p.d<3000)pbar(p.x,p.y,26,m.hp/m.max,'#ff8f80')}
@@ -1781,12 +1917,95 @@ let ground=null,groundSeed=-1;const RES=8;
 function buildGround(){const M=C.MAP,n=M/RES,c=document.createElement('canvas');c.width=c.height=n;const g=c.getContext('2d'),r=mulberry32(S.seed+7);
   g.fillStyle='#6f7f52';g.fillRect(0,0,n,n);
   for(let i=0;i<3000;i++){const x=r()*n,y=r()*n,s=6+r()*34;g.fillStyle=['#77885a','#66754b','#827f5a','#5f7148'][i%4];g.beginPath();g.arc(x,y,s,0,7);g.fill()}
+  landTint(g,n);
   g.fillStyle='#3f5634';for(const t of S.trees){g.beginPath();g.arc(t.x/RES,t.y/RES,t.r/RES*1.6,0,7);g.fill()}
-  g.strokeStyle='#4f7f99';g.lineCap='round';g.lineJoin='round';for(const rv of S.rivers){g.lineWidth=7;g.beginPath();rv.forEach((p,i)=>i?g.lineTo(p.x/RES,p.y/RES):g.moveTo(p.x/RES,p.y/RES));g.stroke()}
+  landPlaces(g);landWater(g);
   for(let i=0;i<40;i++){const x=r()*n,y=r()*n,s=40+r()*90,gr=g.createRadialGradient(x,y,0,x,y,s);gr.addColorStop(0,'rgba(140,130,95,.35)');gr.addColorStop(1,'rgba(140,130,95,0)');g.fillStyle=gr;g.fillRect(x-s,y-s,s*2,s*2)}
-  g.strokeStyle='#b8a57c';g.lineWidth=4;g.globalAlpha=.75;
-  for(let i=0;i<3;i++){const a=S.towns[i],b=S.towns[(i+1)%3];g.beginPath();g.moveTo(a.x/RES,a.y/RES);g.quadraticCurveTo(M/2/RES+(r()-.5)*100,M/2/RES+(r()-.5)*100,b.x/RES,b.y/RES);g.stroke()}
+  landRoads(g);
   g.globalAlpha=1;ground=c;groundSeed=S.seed}
+// ---- the land in the view: high ground, places, smoke over the old giants, the forest the giant flattens, worn trails ----
+// high ground drier and stonier, steep faces rocky, low ground by the water greener: painted once from the height grid
+function landTint(g,n){const L=S.land;if(!L)return;const N=LAND.N,H=L.h,c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d'),im=x.createImageData(N,N),d=im.data;
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i,h=H[k],sx=(H[j*N+Math.min(N-1,i+1)]-H[j*N+Math.max(0,i-1)])/(2*LAND.CS),sy=(H[Math.min(N-1,j+1)*N+i]-H[Math.max(0,j-1)*N+i])/(2*LAND.CS),sl=Math.hypot(sx,sy);
+    let r=0,gg=0,b=0,a=0;const hi=clamp((h-120)/280,0,1)*.5,st=clamp((sl-.28)/.4,0,1)*.45,lo=clamp((-h-30)/60,0,1)*.3;
+    if(hi+st+lo>0){const w=hi+st+lo;r=(154*hi+128*st+86*lo)/w;gg=(146*hi+120*st+124*lo)/w;b=(104*hi+104*st+66*lo)/w;a=Math.min(.7,w)}
+    d[k*4]=r;d[k*4+1]=gg;d[k*4+2]=b;d[k*4+3]=a*255}
+  x.putImageData(im,0,0);g.imageSmoothingEnabled=true;g.drawImage(c,0,0,n,n)}
+function landPlaces(g){for(const p of S.places||[]){const x=p.x/RES,y=p.y/RES;
+  if(p.k==='field'){const R=p.r/RES*1.15,gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,'rgba(200,236,240,.42)');gr.addColorStop(.7,'rgba(170,220,230,.18)');gr.addColorStop(1,'rgba(170,220,230,0)');g.fillStyle=gr;g.fillRect(x-R,y-R,R*2,R*2)}
+  if(p.k==='den'){const R=p.r/RES*1.4,gr=g.createRadialGradient(x,y,0,x,y,R);gr.addColorStop(0,'rgba(64,46,32,.75)');gr.addColorStop(1,'rgba(64,46,32,0)');g.fillStyle=gr;g.fillRect(x-R,y-R,R*2,R*2)}
+  if(p.k==='stone'){g.fillStyle='rgba(150,140,118,.6)';g.beginPath();g.arc(x,y,14,0,7);g.fill()}}}
+function landWater(g){g.lineCap='round';g.lineJoin='round';
+  for(const rv of S.rivers){const w=rv.w||1;for(const pass of[0,1])for(let i=1;i<rv.length;i++){const u=i/rv.length,lw=(3+5*u)*w;g.strokeStyle=pass?'#4f7f99':'#56663f';g.lineWidth=pass?lw:lw+5;g.beginPath();g.moveTo(rv[i-1].x/RES,rv[i-1].y/RES);g.lineTo(rv[i].x/RES,rv[i].y/RES);g.stroke()}}
+  for(const l of S.lakes||[]){g.fillStyle='#56663f';g.beginPath();g.arc(l.x/RES,l.y/RES,l.r/RES+3,0,7);g.fill();g.fillStyle='#4f7f99';g.beginPath();g.arc(l.x/RES,l.y/RES,l.r/RES,0,7);g.fill();g.fillStyle='rgba(190,220,235,.25)';g.beginPath();g.arc(l.x/RES-3,l.y/RES-3,l.r/RES*.55,0,7);g.fill()}}
+function landRoads(g){g.lineCap='round';g.lineJoin='round';for(const pass of[0,1])for(const rd of S.roads||[]){const w=rd.w||1;g.globalAlpha=pass?.85:.45;g.strokeStyle=pass?'#bba982':'#7d6e50';g.lineWidth=(pass?4.2:6.4)*w;g.beginPath();rd.forEach((p,i)=>i?g.lineTo(p.x/RES,p.y/RES):g.moveTo(p.x/RES,p.y/RES));g.stroke()}g.globalAlpha=1}
+// the minimap: the ground with the hills shaded (light from the north-west) and the places marked
+let miniShade=null,miniShadeFor=null;
+function miniRelief(x0,y0,s){const L=S.land;if(!L)return;if(miniShadeFor!==L){miniShadeFor=L;const N=LAND.N,H=L.h,c=document.createElement('canvas');c.width=c.height=N;const x=c.getContext('2d'),im=x.createImageData(N,N),d=im.data;
+    for(let j=1;j<N-1;j++)for(let i=1;i<N-1;i++){const k=j*N+i,v=((H[k-1]-H[k+1])+(H[k-N]-H[k+N]))/(2*LAND.CS);const a=clamp(Math.abs(v)*.9,0,.38);d[k*4]=v>0?255:28;d[k*4+1]=v>0?248:36;d[k*4+2]=v>0?224:20;d[k*4+3]=a*255}
+    x.putImageData(im,0,0);miniShade=c}ctx.imageSmoothingEnabled=true;ctx.drawImage(miniShade,x0,y0,s,s)}
+function miniPlaces(x0,y0,k){for(const p of S.places||[]){const x=x0+p.x*k,y=y0+p.y*k;
+  if(p.k==='field'){ctx.fillStyle='#bff4ff';ctx.beginPath();ctx.moveTo(x,y-3.5);ctx.lineTo(x+2.5,y);ctx.lineTo(x,y+3.5);ctx.lineTo(x-2.5,y);ctx.fill()}
+  else if(p.k==='den'){ctx.fillStyle='#3a2a20';ctx.strokeStyle='#c98a6a';ctx.lineWidth=1;ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fill();ctx.stroke()}
+  else{ctx.fillStyle='#d8d0bc';ctx.fillRect(x-1,y-3,2,6)}}}
+// labels for the places, near enough to matter
+function mapLabels(){for(const p of S.places||[]){const far=p.k==='field'?3200:2400,q=p3(p.x,p.y,p.k==='stone'?250:p.k==='den'?110:60);if(q&&q.d<far)lbl(p.k==='field'?'Crystal field':p.k==='den'?'Wolf den':'Standing stone',q.x,q.y,11,p.k==='field'?'#9fe8ff':p.k==='den'?'#ffb39a':'#e8dcc4')}}
+const SMOKE_N=16,BIRD_N=7;
+function g3MapBuild(){const sc=G3.scene;if(!S.land)return;const R=mulberry32(S.seed+31);
+  // the land faceted like the stone, so each hill's faces catch the light as triangles
+  for(const o of sc.children)if(o.material&&o.material.map&&o.material.map===G3.groundTex){o.material.flatShading=true;o.material.needsUpdate=true}
+  G3.treeHash=new Map();S.trees.forEach((t,i)=>{const k=Math.floor(t.x/250)+Math.floor(t.y/250)*64;let a=G3.treeHash.get(k);if(!a)G3.treeHash.set(k,a=[]);a.push(i)});G3.falling=[];
+  G3.trail=new Uint8Array(Math.ceil(C.MAP/40)**2);G3.trailAt=new WeakMap();G3.trailT=0;G3.texAt=0;
+  // wolf dens (a horseshoe of dark rock round a hollow) and standing stones (a tall stone in a ring of short ones)
+  const dens=S.places.filter(p=>p.k==='den'),stones=S.places.filter(p=>p.k==='stone');
+  const rk=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),dens.length*10);let n=0;
+  for(const p of dens){const a0=R()*6.28;for(let i=0;i<10;i++){const a=a0+.5+i/9*5.3,d=i===9?0:95+R()*40,s=i===9?70:28+R()*34,x=p.x+Math.cos(a)*d,y=p.y+Math.sin(a)*d;if(i===9){put(rk,n,p.x+Math.cos(a0+3.1)*60,p.y+Math.sin(a0+3.1)*60,groundH(x,y)+20,s*1.4,s*.9,s,R()*3,R())}else put(rk,n,x,y,groundH(x,y)+s*.4,s,s*.8,s,R()*3,R());rk.setColorAt(n++,_c.set(['#4a4036','#3e362e','#55493c'][i%3]))}}
+  rk.count=n;sc.add(rk);
+  const sb=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),stones.length*7);n=0;
+  for(const p of stones){const z=groundH(p.x,p.y);put(sb,n,p.x,p.y,z+62,30,140,20,R()*3,(R()-.5)*.1);sb.setColorAt(n++,_c.set('#8d8676'));for(let i=0;i<6;i++){const a=i/6*6.28+R()*.3,x=p.x+Math.cos(a)*75,y=p.y+Math.sin(a)*75,h=26+R()*30;put(sb,n,x,y,groundH(x,y)+h/2-6,18,h,13,a,(R()-.5)*.25);sb.setColorAt(n++,_c.set('#6f6a5e'))}}
+  sb.count=n;sc.add(sb);
+  // smoke rising from each ruin and birds circling over it: a thin column and dark specks that read on the skyline from anywhere
+  const pts=(cnt,col,frag)=>{const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(cnt*3),3));geo.setAttribute('size',new THREE.BufferAttribute(new Float32Array(cnt),1));geo.setAttribute('alpha',new THREE.BufferAttribute(new Float32Array(cnt),1));
+    const mat=new THREE.ShaderMaterial({uniforms:{col:{value:new THREE.Color(col)},haze:{value:new THREE.Color('#cdbfa2')},scale:{value:600}},transparent:true,depthWrite:false,
+      vertexShader:'attribute float size;attribute float alpha;varying float va;varying float vf;uniform float scale;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);va=alpha;vf=clamp((-mv.z-2400.)/12000.,0.,.35);gl_PointSize=clamp(size*scale/-mv.z,1.5,180.);gl_Position=projectionMatrix*mv;}',
+      fragmentShader:'uniform vec3 col;uniform vec3 haze;varying float va;varying float vf;void main(){vec2 d=gl_PointCoord-.5;'+frag+'if(a<.01)discard;gl_FragColor=vec4(mix(col,haze,vf),a);}'});
+    const m=new THREE.Points(geo,mat);m.frustumCulled=false;sc.add(m);return m};
+  G3.smoke=pts(S.marks.length*SMOKE_N,'#57524c','float a=va*smoothstep(.5,.15,length(d));');
+  G3.birds=pts(S.marks.length*BIRD_N,'#1e1b18','float y=-d.y,x=abs(d.x);float a=va*step(x,.46)*smoothstep(.13,.04,abs(y-(.25-x*1.1*va)));');
+  G3.smokeSeed=S.marks.map(()=>({w:R()*6.28,ph:R()}));G3.wind={x:Math.cos(R()*6.28),y:0};G3.wind.y=Math.sqrt(1-G3.wind.x*G3.wind.x)}
+function g3MapUpdate(){if(!S.land||!G3.smoke)return;const t=S.t,now=performance.now();
+  const sc=H*DPR/(2*Math.tan(G3.cam.fov*Math.PI/360));G3.smoke.material.uniforms.scale.value=sc;G3.birds.material.uniforms.scale.value=sc;
+  G3.smoke.material.uniforms.haze.value.copy(G3.scene.fog.color);G3.birds.material.uniforms.haze.value.copy(G3.scene.fog.color);
+  {const P=G3.smoke.geometry.attributes,pos=P.position.array,sz=P.size.array,al=P.alpha.array;let n=0;
+    S.marks.forEach((m,mi)=>{const c=S.caches[mi]||m,z0=groundH(c.x,c.y)+30,sd=G3.smokeSeed[mi];for(let k=0;k<SMOKE_N;k++){const u=(t/46+k/SMOKE_N+sd.ph)%1,lean=u*u*520;
+      pos[n*3]=c.x+G3.wind.x*lean+Math.sin(t*.3+k+sd.w)*20*u;pos[n*3+1]=z0+u*2100;pos[n*3+2]=c.y+G3.wind.y*lean;sz[n]=60+u*320;al[n]=.62*Math.pow(Math.sin(Math.PI*Math.min(1,u*1.15)),.6)*(1-u*.4);n++}});
+    P.position.needsUpdate=P.size.needsUpdate=P.alpha.needsUpdate=true}
+  {const P=G3.birds.geometry.attributes,pos=P.position.array,sz=P.size.array,al=P.alpha.array;let n=0;
+    S.marks.forEach((m,mi)=>{const sd=G3.smokeSeed[mi],z0=groundH(m.x,m.y);for(let k=0;k<BIRD_N;k++){const w=(k%2?1:-1)*(.18+k*.013),a=t*w+k*.9+sd.w,r=260+((k*97)%7)*45;
+      pos[n*3]=m.x+Math.cos(a)*r;pos[n*3+1]=z0+650+((k*53)%5)*60+Math.sin(t*.7+k)*40;pos[n*3+2]=m.y+Math.sin(a)*r;sz[n]=34;al[n]=.55+.45*Math.abs(Math.sin(t*(5+k%3)+k));n++}});
+    P.position.needsUpdate=P.size.needsUpdate=P.alpha.needsUpdate=true}
+  // the giant's feet knock down the forest they land in or sweep through; each fallen tree leaves a scar in the ground
+  const g=S.g,gc=ground&&ground.getContext('2d');
+  for(const ft of g.feet){const lift=ft.air>0?Math.sin((1-ft.air/ft.dur)*Math.PI)*170:0;if(lift>120)continue;const hx=Math.floor(ft.x/250),hy=Math.floor(ft.y/250);
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const a=G3.treeHash.get(hx+dx+(hy+dy)*64);if(!a)continue;for(const i of a){const tr=S.trees[i];if(tr.fell!=null)continue;const d=Math.hypot(tr.x-ft.x,tr.y-ft.y);if(d>C.FOOT_R+60)continue;
+      tr.fell=t;tr.fd=Math.atan2(tr.y-ft.y,tr.x-ft.x)+(((i*37)%9)-4)*.08;G3.falling.push(i);
+      if(gc){const x=tr.x/RES,y=tr.y/RES,s=tr.r/RES;gc.fillStyle='rgba(111,127,82,.85)';gc.beginPath();gc.arc(x,y,s*1.7,0,7);gc.fill();gc.strokeStyle='rgba(92,72,48,.8)';gc.lineWidth=Math.max(1,s*.5);gc.beginPath();gc.moveTo(x,y);gc.lineTo(x+Math.cos(tr.fd)*s*3.4,y+Math.sin(tr.fd)*s*3.4);gc.stroke();G3.groundDirty=true}}}}
+  if(G3.falling.length){const ax=new THREE.Vector3(),up=new THREE.Vector3();G3.falling=G3.falling.filter(i=>{const tr=S.trees[i],u=Math.min(1,(t-tr.fell)/.9),th=1.5*u*u,dx=Math.cos(tr.fd),dz=Math.sin(tr.fd),gz=groundH(tr.x,tr.y),h=tr.r*3.6;
+      ax.set(dz,0,-dx);_q.setFromAxisAngle(ax,th);
+      for(const[mesh,c,sx,sy]of[[G3.t1,h*.62,tr.r*.9,h*.75],[G3.t2,h*.3,tr.r*1.15,h*.6]]){up.set(0,c,0).applyQuaternion(_q);_p.set(tr.x+up.x,gz+up.y+tr.r*.3*u,tr.y+up.z);_s.set(sx,sy,sx);_m.compose(_p,_q,_s);mesh.setMatrixAt(i,_m)}
+      return u<1});G3.t1.instanceMatrix.needsUpdate=G3.t2.instanceMatrix.needsUpdate=true}
+  // trails wear in where people walk often: each stretch walked darkens the ground a little, up to five times
+  if(gc&&t-G3.trailT>.4){G3.trailT=t;const Wc=Math.ceil(C.MAP/40);for(const h of S.humans){if(h.dead||h.mode!=='ground'){G3.trailAt.delete(h);continue}const p=G3.trailAt.get(h);G3.trailAt.set(h,{x:h.x,y:h.y});if(!p)continue;
+      const d=Math.hypot(h.x-p.x,h.y-p.y);if(d<8||d>400||townAt(h))continue;const st=Math.ceil(d/30);
+      for(let s=1;s<=st;s++){const x=p.x+(h.x-p.x)*s/st,y=p.y+(h.y-p.y)*s/st,k=Math.floor(y/40)*Wc+Math.floor(x/40),v=G3.trail[k]=Math.min(255,G3.trail[k]+1);
+        if(v===2||v===5||v===10||v===18||v===30){gc.fillStyle='rgba(132,108,72,.26)';gc.beginPath();gc.arc(x/RES,y/RES,3.2,0,7);gc.fill();G3.groundDirty=true}}}}
+  if(G3.groundDirty&&G3.groundTex&&now-G3.texAt>8000){G3.groundDirty=false;G3.texAt=now;G3.groundTex.needsUpdate=true}}
+// the camera never sinks into a hill, and rises over a ridge between it and you rather than lose you behind it
+function g3MapCamera(){if(!S.land||climbing3D())return;const cm=G3.cam,p=cm.position,fx=S.cam.x,fy=S.cam.y,fz=groundH(fx,fy)+60;let need=groundH(p.x,p.z)+45;
+  for(let k=1;k<=8;k++){const u=k/8,x=fx+(p.x-fx)*u,y=fy+(p.z-fy)*u,h=groundH(x,y)+25;need=Math.max(need,fz+(h-fz)/u)}
+  G3.lift=G3.lift||0;const want=Math.max(0,need-p.y);G3.lift+=(want-G3.lift)*(want>G3.lift?.35:.08);if(G3.lift<.5)return;
+  p.y+=G3.lift;const D=(S.role==='giant'?2600:760)/S.cam.czoom;cm.lookAt(fx,fz+(cam.pitch<0?-cam.pitch*D*1.6:0),fy);const F=view.F,far=new THREE.Vector3(fx+F.x*14000,0,fy+F.y*14000).project(cm);view.hz=clamp((1-far.y)/2*H,-H,H*1.2)}
+{const b0=g3Build,u0=g3Update,c0=g3Camera;g3Build=function(){b0();g3MapBuild()};g3Update=function(){u0();g3MapUpdate()};g3Camera=function(){c0();g3MapCamera()}}
 function lbl(text,x,y,size,col){ctx.font=`600 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width;ctx.fillStyle='rgba(10,12,10,.72)';ctx.fillRect(x-w/2-4,y-size*.65,w+8,size*1.3);ctx.fillStyle=col||'#eee9dd';ctx.fillText(text,x,y);ctx.textBaseline='alphabetic'}
 function pbar(x,y,w,v,col){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(x-w/2-1,y-1,w+2,6);ctx.fillStyle=col;ctx.fillRect(x-w/2,y,w*clamp(v,0,1),4)}
 function groundEllipse(x,y,r){const p=proj(x,y,0);if(!p)return null;ctx.beginPath();ctx.ellipse(p.x,p.y,r*p.s,Math.max(1,r*p.s*view.Hc/p.d),0,0,7);return p}
@@ -1924,11 +2143,12 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   drawMinimap()}
 function drawMinimap(){drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8+tg.x*k,8+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
-function drawMinimap0(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);
+function drawMinimap0(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
   for(const c of S.caches){ctx.fillStyle=S.t>=c.ready?'#d9b45a':'#6b6250';ctx.fillRect(x0+c.x*k-2,y0+c.y*k-2,4,4)}
+  miniPlaces(x0,y0,k);
   for(const e of S.events){ctx.fillStyle=e.k==='star'?'#9fe8ff':e.k==='raid'?'#ff5a4a':TOWNS[e.i].col;ctx.beginPath();ctx.arc(x0+e.x*k,y0+e.y*k,e.k==='raid'?4:3.5,0,7);ctx.fill();if(e.k!=='caravan'){ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke()}}
   ctx.fillStyle='#e8dcc4';ctx.beginPath();ctx.arc(x0+S.g.x*k,y0+S.g.y*k,5,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.stroke();
   if(S.you&&!S.you.dead){ctx.fillStyle='#c0392b';ctx.beginPath();ctx.arc(x0+S.you.x*k,y0+S.you.y*k,3,0,7);ctx.fill()}

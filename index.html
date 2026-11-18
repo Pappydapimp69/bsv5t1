@@ -774,7 +774,7 @@ function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPE
     if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist()}}}
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
   openMenu({title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':'Show me',sub:last?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
-    ...(last?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
+    ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
 function flyPress(){const f=S.fly;if(!f)return;if(f.phase==='out'){f.phase='back';f.t=f.dur*.7*(1-Math.min(1,f.t/f.dur));f.dur*=.7}else if(f.phase==='hold'){f.phase='back';f.t=0;f.dur*=.7}}

@@ -69,7 +69,7 @@ const C={
   SMASH_CD:10,SMASH_WIND:1.4,SMASH_REACH:540,SMASH_R:190,SMASH_DMG:90,SMASH_TOWN:150,
   SHAKE_CD:12,SHAKE_WIND:1.3,SHAKE_GRIP:42,SHAKE_BRACED:12,SHAKE_ANCHOR:.25,SHAKE_WEDGE:.35,
   SWIPE_CD:14,SWIPE_WIND:1.6,SWIPE_GRIP:60,SWIPE_CLEAR:.75,
-  FALL_TIME:20,REGEN:1,
+  FALL_TIME:24,REGEN:1,
   H_SPEED:165,
   CLIMB_SPEED:3.6,LEDGE_SPEED:6,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
@@ -85,12 +85,12 @@ const TOWNS=[
 const COLS=32,ROWS=200,FT=10;
 const AIR=0,SMOOTH=1,HOLD=2,LEDGE=3,JOINT=4,HEART=5,SITE=6;
 const JOINTS={
-  kneeL:{name:'Left knee',r0:42,r1:45,c0:8,c1:12,max:700},
-  kneeR:{name:'Right knee',r0:42,r1:45,c0:19,c1:23,max:700},
+  kneeL:{name:'Left knee',r0:42,r1:45,c0:8,c1:12,max:1400},
+  kneeR:{name:'Right knee',r0:42,r1:45,c0:19,c1:23,max:1400},
   elbowL:{name:'Left elbow',r0:118,r1:121,c0:2,c1:6,max:600},
   elbowR:{name:'Right elbow',r0:118,r1:121,c0:25,c1:29,max:600},
   neck:{name:'Neck',r0:167,r1:170,c0:13,c1:18,max:1000},
-  heart:{name:'Heart-stone',r0:134,r1:139,c0:14,c1:17,max:4000},
+  heart:{name:'Heart-stone',r0:134,r1:139,c0:14,c1:17,max:6000},
 };
 const SITES=[{id:'shL',name:'left shoulder',r:166,c:4},{id:'shR',name:'right shoulder',r:166,c:27},{id:'armL',name:'left forearm',r:100,c:2},{id:'armR',name:'right forearm',r:100,c:29},{id:'crown',name:'crown',r:199,c:15}];
 function region(r,c){
@@ -262,7 +262,8 @@ function stepGiant(dt){const g=S.g;if(g.dead)return;
   if(g.wind){g.wind.t-=dt;if(g.wind.t<=0)resolveWind()}
   for(const id in S.joints){const j=S.joints[id];
     if(j.wedges.length)damageJoint(id,j.wedges.length*C.WEDGE_DPS*dt,null);
-    if(g.fallen<=0&&j.hp<j.max&&!g.dead)j.hp=Math.min(j.max,j.hp+C.REGEN*dt*(id==='heart'?2:1));
+    // a wedge in a joint halves its healing
+    if(g.fallen<=0&&j.hp<j.max&&!g.dead)j.hp=Math.min(j.max,j.hp+C.REGEN*dt*(id==='heart'?2:1)*(j.wedges.length?.5:1));
     if(j.crip&&id!=='kneeL'&&id!=='kneeR'&&j.hp>=j.max*.5){j.crip=false;announce(JOINTS[id].name+' has knitted back together.')}}
   if(g.dead)return;
   if(g.fallen>0){g.v=0;g.fallen-=dt;if(g.fallen<=0){g.fallen=0;for(const k of['kneeL','kneeR']){const j=S.joints[k];j.hp=Math.max(j.hp,j.max*.5);j.crip=false}announce('The giant rises again!')}return}
@@ -291,12 +292,12 @@ function footLand(ft,i){sfx('step',nearPlayer(ft));shake(4);
   // the jolt runs up that leg
   for(const h of climbers()){const onLeg=h.cl.y<92&&((i===0&&h.cl.x<COLS/2)||(i===1&&h.cl.x>=COLS/2));h.grip-=onLeg?C.JOLT:1.5}}
 function damageJoint(id,d,by){const g=S.g,j=S.joints[id];if(g.dead||j.hp<=0&&id==='heart')return;
-  if(id==='heart'&&g.fallen>0)d*=3;
+  if(id==='heart'&&g.fallen>0)d*=2;
   j.hp-=d;if(j.hp>0)return;j.hp=0;
   if(id==='heart'){g.dead=true;announce('The Heart-stone shatters. The giant is slain!');return}
   if(!j.crip){j.crip=true;j.wedges=[];announce(JOINTS[id].name+' crippled!');
     if(S.joints.kneeL.crip&&S.joints.kneeR.crip&&g.fallen<=0){g.fallen=C.FALL_TIME;g.wind=null;g.v=0;shake(30);sfx('stomp');
-      announce('The giant falls to its knees! No grip is lost and the Heart-stone takes triple damage.')}}}
+      announce('The giant falls to its knees! No grip is lost, climbing is twice as fast and the Heart-stone takes double damage.')}}}
 
 // ================= humans =================
 function townAt(h){return S.towns.find(t=>t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r+20)||null}
@@ -378,7 +379,7 @@ function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
   if(cl.path&&!dx&&!dy){const n=cl.path[0];if(n){const tx=n[1]+.5,ty=n[0]+.5,ex=tx-cl.x,ey=ty-cl.y,d=Math.hypot(ex,ey);if(d<.12){cl.path.shift();if(!cl.path.length)cl.path=null}else{dx=ex/d;dy=ey/d}}}
   else if(dx||dy)cl.path=null;
   const here=cellT(cl.x,cl.y),onRest=restful(here);
-  if(dx||dy){h.lastMove=S.t;const sp=onRest&&Math.abs(dx)>Math.abs(dy)?C.LEDGE_SPEED:C.CLIMB_SPEED;
+  if(dx||dy){h.lastMove=S.t;const sp=(onRest&&Math.abs(dx)>Math.abs(dy)?C.LEDGE_SPEED:C.CLIMB_SPEED)*(g.fallen>0?2:1); // a kneeling giant is walked, not climbed
     if(dy<0&&cl.y+dy*sp*dt<.3&&cl.y<2){dismount(h,0);sayTo(h,'You step down onto the ground.');return}
     let nx=cl.x+dx*sp*dt,ny=cl.y+dy*sp*dt;
     if(climbable(nx,ny)){cl.x=nx;cl.y=ny}else if(Math.abs(dx)>.05&&climbable(nx,cl.y)){cl.x=nx}else if(Math.abs(dy)>.05&&climbable(cl.x,ny)){cl.y=ny}
@@ -416,7 +417,7 @@ function botGoalCells(h){const g=S.g,J=S.joints;
   const enemy=S.sites.filter(s=>s.build&&s.build.town!==h.town);
   if(enemy.length&&h.lvl>=3&&rnd()<.4)return{kind:'wreck',test:(r,c)=>enemy.some(s=>s.r===r&&s.c===c)};
   const k=J.kneeL.crip?'kneeR':J.kneeR.crip?'kneeL':(J.kneeL.hp<=J.kneeR.hp?'kneeL':'kneeR');
-  if(J.kneeL.hp+J.kneeR.hp>1250&&h.lvl>=4&&!J.neck.crip&&rnd()<.3)return{kind:'joint',id:'neck'};
+  if(J.kneeL.hp+J.kneeR.hp>2500&&h.lvl>=4&&!J.neck.crip&&rnd()<.3)return{kind:'joint',id:'neck'};
   return{kind:'joint',id:k}}
 function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.lunge)return mv;
   const r=Math.floor(cl.y),c=Math.floor(cl.x),t=cellT(cl.x,cl.y),mg=maxGrip(h);
@@ -604,7 +605,7 @@ function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Crush two towns before they cut you down',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. Grip drains while you hang on and faster while you move; stand on a ledge or rest by your own anchor to refill it. Lunge to cross bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
-<p><b>Building.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes triple damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
+<p><b>Building.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
 <p><b>The giant.</b> Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. Destroy two towns to win.</p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E zoom, C resets zoom, Esc pauses. Pad: left stick, A B X Y, triggers zoom, Start pauses. Touch: tap where to walk or which hold to climb to, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}

@@ -1107,13 +1107,15 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
 
 // ================= loop =================
 let acc=0,last=performance.now();
-function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
+// the next frame is asked for first and the work is guarded, so one thrown error never freezes the game
+function frame(now){requestAnimationFrame(frame);try{frameWork(now)}catch(e){console.error(e)}}
+function frameWork(now){const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on')}
   if(S&&!menu&&!S.over){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);
     const focus=S.role==='giant'?S.g:(S.you.mode==='climb'?S.g.feet[S.you.leg]:S.you);S.cam.x+=(focus.x-S.cam.x)*Math.min(1,dt*5);S.cam.y+=(focus.y-S.cam.y)*Math.min(1,dt*5)}
   shakeA*=Math.pow(.02,dt);if(shakeA<.3)shakeA=0;
-  seFrame();render();paintHud();paintButtons();requestAnimationFrame(frame)}
+  seFrame();render();paintHud();paintButtons()}
 // test hook: run whole matches without the screen
 window.__col={newGame:(role,seed)=>{const s=newGame(role,seed);s.headless=true;return s},start,step:n=>{for(let i=0;i<n&&S&&!S.over;i++)step(C.DT)},get S(){return S},C,JOINTS,bfs,set autoplay(v){if(S)S.autoplay=v}};
 openTitle();requestAnimationFrame(frame);

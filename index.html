@@ -73,9 +73,9 @@ const C={
   H_SPEED:165,
   CLIMB_SPEED:3.6,LEDGE_SPEED:6,REACH:2.3,LUNGE_REACH:3.6,MOVE_GRIP:.4,MOVE_GRIP_CELL:.5,MOSS_DRAIN:2.5,CRUMBLE:1.4,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
-  ANGER:600,DUSK:900,HOUSE_HP:200,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
+  ANGER:600,DUSK:900,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
   GRUDGE_FADE:240,PULL_FAVOR:40,CANNON_FAVOR:60,
-  COST:{house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
+  COST:{brace:50,house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
 };
 const TOWNS=[
   // each town's people treat the giant their own way, and the giant answers each town in kind
@@ -178,8 +178,16 @@ const reducedMotion=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce
 
 // ================= audio =================
 let actx=null,sndBudget=0;
-function unlockAudio(){if(actx||!save.sound)return;try{actx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}if(actx&&actx.state==='suspended')actx.resume()}
-function tone(f,dur,type,vol,slide){if(!actx||!save.sound)return;const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);g.gain.setValueAtTime(vol||.2,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g).connect(actx.destination);o.start(t);o.stop(t+dur+.02)}
+let master=null;
+function unlockAudio(){if(actx||!save.sound)return;try{actx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'balanced'});master=actx.createDynamicsCompressor();master.connect(actx.destination)}catch(e){}if(actx&&actx.state==='suspended')actx.resume().catch(()=>{})}
+document.addEventListener('visibilitychange',()=>{if(!actx)return;if(document.hidden)actx.suspend().catch(()=>{});else actx.resume().catch(()=>{})});
+// the giant's groan as it moves: detuned low saws beating against each other, a swept resonance like strained metal, and
+// inharmonic ringing partials bending down. Upper partials carry it on phone speakers. Heard from far away, never loud.
+function groan(vol){if(!actx||!save.sound||vol<.02)return;const t=actx.currentTime,out=actx.createGain();out.gain.setValueAtTime(.0001,t);out.gain.exponentialRampToValueAtTime(vol,t+.7);out.gain.exponentialRampToValueAtTime(.0001,t+3.4);out.connect(master);
+  const bp=actx.createBiquadFilter();bp.type='bandpass';bp.Q.value=9;bp.frequency.setValueAtTime(260,t);bp.frequency.exponentialRampToValueAtTime(820+Math.random()*300,t+1.3);bp.frequency.exponentialRampToValueAtTime(190,t+3.2);bp.connect(out);
+  const f0=48+Math.random()*8;for(const [m,type,g] of [[1,'sawtooth',.5],[1.013,'sawtooth',.5],[2.02,'square',.18],[3.03,'sawtooth',.25]]){const o=actx.createOscillator(),gg=actx.createGain();o.type=type;o.frequency.setValueAtTime(f0*m,t);o.frequency.linearRampToValueAtTime(f0*m*.94,t+3.2);gg.gain.value=g;o.connect(gg).connect(bp);o.start(t);o.stop(t+3.5)}
+  for(const f of [233,377,611,947]){const o=actx.createOscillator(),gg=actx.createGain();o.type='sine';const d=f*(1+(Math.random()-.5)*.02);o.frequency.setValueAtTime(d,t);o.frequency.exponentialRampToValueAtTime(d*.9,t+3);gg.gain.setValueAtTime(.0001,t);gg.gain.exponentialRampToValueAtTime(.05,t+.9);gg.gain.exponentialRampToValueAtTime(.0001,t+3.3);o.connect(gg).connect(out);o.start(t);o.stop(t+3.5)}}
+function tone(f,dur,type,vol,slide){if(!actx||!save.sound)return;const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);g.gain.setValueAtTime(vol||.2,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g).connect(master||actx.destination);o.start(t);o.stop(t+dur+.02)}
 function sfx(k,near){if(near===false||sndBudget>6)return;sndBudget++;
   ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),
     coin:()=>tone(880,.12,'sine',.12,1320),cannon:()=>tone(140,.25,'square',.12,60),warn:()=>tone(440,.3,'triangle',.16,300),build:()=>tone(600,.15,'triangle',.15,900),
@@ -197,7 +205,7 @@ function newGame(role,seed){
   S={role,seed,t:0,towns,g,joints,body:buildBody(seed),sites:SITES.map(s=>({...s,build:null})),anchors:[],
     humans:[],monsters:[],crystals:[],trees:[],prints:[],shots:[],fx:[],over:null,nextId:1,
     cam:{x:cx,y:cy,zoom:1,czoom:1},autoplay:false};
-  S.grudge=[0,0,0];S.wander=null;S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
+  S.grudge=[0,0,0];S.wander=null;{const a=-Math.PI/2+Math.PI/3+2*Math.PI/3*Math.floor(rnd()*3);S.exit={x:cx+Math.cos(a)*4200,y:cy+Math.sin(a)*4200}}S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
   // giants that lay down long ago are mountains now: landmarks across the open world
   for(let i=0;i<6;i++){for(let k=0;k<40;k++){const x=rr(700,M-700),y=rr(700,M-700);if(S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>1500)&&Math.hypot(x-cx,y-cy)>1500&&S.marks.every(m=>Math.hypot(m.x-x,m.y-y)>2200)){S.marks.push({x,y,ang:rr(0,6.28)});break}}}
   for(let i=0;i<3;i++){let x=rr(0,M),y=i%2?0:M,a=i%2?Math.PI/2:-Math.PI/2;const pts=[];for(let k=0;k<60;k++){pts.push({x,y});a+=rr(-.35,.35);x+=Math.cos(a)*200;y+=Math.sin(a)*200;if(x<0||y<0||x>M||y>M)break}S.rivers.push(pts)}
@@ -210,7 +218,7 @@ function newGame(role,seed){
   return S}
 function mkHuman(ti,you,role){const t=S.towns[ti];
   return{id:S.nextId++,town:ti,you,role,x:t.x+rr(-60,60),y:t.y+rr(-60,60),hp:100,max:100,atk:10,lvl:1,xp:0,gold:you?40:30,
-    kits:{anchor:you?3:0,wedge:0,cannon:0},potions:1,gloves:0,quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
+    kits:{anchor:you?3:0,wedge:0,cannon:0,brace:0},potions:1,gloves:0,quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
     tx:null,ty:null,goal:null,think:0,face:0,swing:0,botClimb:null,rest:false,
     name:you?'You':TOWNS[ti].name+' '+role}}
 function maxGrip(h){return C.GRIP+h.gloves*25+(h.lvl-1)*5}
@@ -231,7 +239,9 @@ function sayTo(h,s){if(h&&h.you)toast(s)}
 
 // ================= the giant on the ground =================
 function fwd(g){return{x:Math.cos(g.ang),y:Math.sin(g.ang)}}
-function giantSpeed(){let s=C.G_SPEED;if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
+function braces(){return S.sites.filter(s=>s.build&&s.build.k==='brace').length}
+// the giant starts all but unable to move; every brace humans bolt onto it lets it walk faster and do more
+function giantSpeed(){let s=Math.min(C.G_SPEED+10,C.G_DORMANT+braces()*C.G_PER_BRACE);if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
 // momentum: it gathers speed slowly, needs room to stop, and turns wider the faster it walks
 function giantMotion(m,dt,tx,ty,vmax){let want=0,da=0;
   if(tx!=null){const dx=tx-m.x,dy=ty-m.y,d=Math.hypot(dx,dy);da=((Math.atan2(dy,dx)-m.ang+Math.PI*3)%(Math.PI*2))-Math.PI;
@@ -242,6 +252,7 @@ function giantMotion(m,dt,tx,ty,vmax){let want=0,da=0;
   m.x=clamp(m.x+Math.cos(m.ang)*m.v*dt,300,C.MAP-300);m.y=clamp(m.y+Math.sin(m.ang)*m.v*dt,300,C.MAP-300)}
 function canGiant(k){const g=S.g,J=S.joints;
   if(g.dead)return'The giant is dead';if(g.fallen>0)return'Fallen';if(g.wind)return'Busy';if(g.cd[k]>0)return'Ready in '+Math.ceil(g.cd[k])+'s';
+  if(k==='stomp'&&braces()<1)return'Needs 1 brace';if(k==='smash'&&braces()<2)return'Needs 2 braces';if(k==='swipe'&&braces()<3)return'Needs 3 braces';
   if(k==='smash'&&J.elbowL.crip&&J.elbowR.crip)return'Both elbows crippled';
   if(k==='shake'&&J.neck.crip)return'Neck crippled';
   if(k==='swipe'){const side=swipeSide();if(side==null)return'No one to brush off';if((side==='L'?J.elbowR:J.elbowL).crip)return'That arm is crippled'}
@@ -303,9 +314,9 @@ function stepGiant(dt){const g=S.g;if(g.dead)return;
   if(air){air.air-=dt;const k=1-air.air/air.dur;air.x=air.sx+(air.lx-air.sx)*k;air.y=air.sy+(air.ly-air.sy)*k;if(air.air<=0){air.air=0;air.x=air.lx;air.y=air.ly;footLand(air,g.feet.indexOf(air))}}
   else{let worst=-1,wd=0;g.feet.forEach((ft,i)=>{const s=i?1:-1,ix=g.x+side.x*s*C.FOOT_SPREAD,iy=g.y+side.y*s*C.FOOT_SPREAD,d=Math.hypot(ft.x-ix,ft.y-iy);if(d>wd){wd=d;worst=i}});
     if(wd>60||(moving&&wd>20)){const ft=g.feet[worst],s=worst?1:-1,lead=moving?g.v*C.G_STEP*.9:0;
-      ft.sx=ft.x;ft.sy=ft.y;ft.lx=g.x+f.x*lead+side.x*s*C.FOOT_SPREAD;ft.ly=g.y+f.y*lead+side.y*s*C.FOOT_SPREAD;ft.dur=C.G_STEP;ft.air=C.G_STEP}}
+      ft.sx=ft.x;ft.sy=ft.y;ft.lx=g.x+f.x*lead+side.x*s*C.FOOT_SPREAD;ft.ly=g.y+f.y*lead+side.y*s*C.FOOT_SPREAD;ft.dur=C.G_STEP*(braces()?1:2.2);ft.air=ft.dur;if(!S.headless){const d=Math.hypot(g.x-S.cam.x,g.y-S.cam.y);groan(.22*clamp(1.15-d/7000,.18,1))}}}
   // cannons on the body fire at every town but their builder's
-  for(const s of S.sites){const b=s.build;if(!b)continue;if(s.id==='armL'&&S.joints.elbowL.crip||s.id==='armR'&&S.joints.elbowR.crip)continue;
+  for(const s of S.sites){const b=s.build;if(!b||b.k==='brace')continue;if(s.id==='armL'&&S.joints.elbowL.crip||s.id==='armR'&&S.joints.elbowR.crip)continue;
     b.cd-=dt;if(b.cd>0)continue;const tgt=cannonTarget(b.town);
     if(tgt){b.cd=C.CANNON_CD;S.shots.push({sx:g.x,sy:g.y,x:g.x,y:g.y,tx:tgt.x+rr(-40,40),ty:tgt.y+rr(-40,40),t:0,dur:Math.max(.4,Math.hypot(tgt.x-g.x,tgt.y-g.y)/700),town:b.town,owner:b.owner});sfx('cannon',nearPlayer(g))}else b.cd=.6}}
 function cannonTarget(town){const g=S.g;let best=null,bd=C.CANNON_RANGE;
@@ -343,10 +354,12 @@ function humanCtx(h){
   if(h.mode==='climb'){const cl=h.cl,busy=cl.fall?'Falling':cl.move?'Moving':null;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
     let A={l:'Strike',why:'No joint or site here'};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy};
-    else if(s){if(s.build&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Your cannon',why:'Already built'};else A={l:'Mount cannon ('+h.kits.cannon+')',why:busy||(!h.kits.cannon?'No cannon kits':null)}}
+    else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:s.build.k==='brace'?'Braced':'Your cannon',why:'Already built'};else A={l:'Mount cannon ('+h.kits.cannon+')',why:busy||(!h.kits.cannon?'No cannon kits':null)}}
+    const siteFree=s&&!s.build;
     const hasA=S.anchors.some(a=>a.r===Math.floor(cl.y)&&a.c===Math.floor(cl.x));
     const X=j&&S.joints[j].wedges.length?{l:'Pull wedge',why:busy}:{l:'Anchor ('+h.kits.anchor+')',why:busy||(!h.kits.anchor?'No anchor kits':hasA?'Anchor already here':null)};
     let Y;if(j){const jj=S.joints[j];Y={l:'Wedge ('+h.kits.wedge+')',why:busy||(!h.kits.wedge?'No wedges':jj.crip?'Already crippled':jj.wedges.length>=C.WEDGE_MAX?'No room for more':null)}}
+    else if(siteFree)Y={l:'Mount brace ('+h.kits.brace+')',why:busy||(!h.kits.brace?'No brace kits':null)};
     else Y={l:'Potion ('+h.potions+')',why:!h.potions?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
   const t=townAt(h),foot=nearFoot(h),m=nearMonster(h,60);
@@ -357,7 +370,7 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
     if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
       if(j){damageJoint(j,h.atk,h);gainXp(h,1);sfx('hit',h.you);questTick(h,'strike');return true}
       if(s&&s.build&&s.build.town!==h.town){s.build.hp-=h.atk;sfx('hit',h.you);if(s.build.hp<=0){s.build=null;sayTo(h,'Cannon wrecked!');gainXp(h,20)}return true}
-      if(s&&!s.build){h.kits.cannon--;s.build={town:h.town,owner:h.id,hp:C.CANNON_HP,cd:1};S.grudge[h.town]-=C.CANNON_FAVOR;sfx('build',h.you);gainXp(h,20);sayTo(h,'Cannon mounted on the '+s.name+'. It fires on every town but yours.');return true}
+      if(s&&!s.build){h.kits.cannon--;s.build={k:'cannon',town:h.town,owner:h.id,hp:C.CANNON_HP,cd:1};S.grudge[h.town]-=C.CANNON_FAVOR;sfx('build',h.you);gainXp(h,20);sayTo(h,'Cannon mounted on the '+s.name+'. It fires on every town but yours.');return true}
       return false}
     if(slot==='B'){let dx=dir?dir.x:0,dy=dir?dir.y:1;if(Math.hypot(dx,dy)<.2){dx=0;dy=1}
       const t=pickHold(cl,dx,dy,C.LUNGE_REACH,C.REACH*.8);if(!t){sayTo(h,'No hold within a lunge that way.');return false}
@@ -365,6 +378,8 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
     if(slot==='X'&&jointAt(cl.x,cl.y)&&S.joints[jointAt(cl.x,cl.y)].wedges.length){const ws=S.joints[jointAt(cl.x,cl.y)].wedges;let i=ws.findIndex(w=>w.town!==h.town);if(i<0)i=0;ws.splice(i,1);
       h.kits.wedge++;S.grudge[h.town]-=C.PULL_FAVOR;questTick(h,'tend');gainXp(h,8);sfx('build',h.you);sayTo(h,'You pull out a wedge. The giant remembers '+TOWNS[h.town].name+' kindly.');return true}
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
+    if(slot==='Y'&&siteAt(cl.x,cl.y)&&!siteAt(cl.x,cl.y).build&&!jointAt(cl.x,cl.y)){const st=siteAt(cl.x,cl.y);h.kits.brace--;st.build={k:'brace',town:h.town,owner:h.id,hp:C.CANNON_HP,cd:0};S.grudge[h.town]-=C.BRACE_FAVOR;
+      sfx('build',h.you);gainXp(h,20);sayTo(h,'Brace bolted to the '+st.name+'. The giant can move a little more.');return true}
     if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
     return false}
@@ -471,10 +486,11 @@ function wedgedJoints(){return Object.keys(S.joints).filter(id=>S.joints[id].wed
 function botGoalCells(h){const g=S.g,J=S.joints;
   if(h.quest&&h.quest.k==='tend'&&!h.quest.done&&wedgedJoints().length)return{kind:'pull',id:wedgedJoints()[0]};
   if(h.role==='keeper'){const w=wedgedJoints();if(w.length)return{kind:'pull',id:w[0]};
+    if(h.kits.brace>0){const free=S.sites.filter(s=>!s.build);if(free.length)return{kind:'brace',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
     if(h.kits.cannon>0){const free=S.sites.filter(s=>!s.build);if(free.length)return{kind:'site',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
     return{kind:'down',test:r=>r===0}}
   if(h.role==='raider'){if(h.kits.cannon>0){const free=S.sites.filter(s=>!s.build);if(free.length)return{kind:'site',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
-    const enemy=S.sites.filter(s=>s.build&&s.build.town!==h.town);if(enemy.length&&h.lvl>=2)return{kind:'wreck',test:(r,c)=>enemy.some(s=>s.r===r&&s.c===c)};
+    const enemy=S.sites.filter(s=>s.build&&s.build.k==='cannon'&&s.build.town!==h.town);if(enemy.length&&h.lvl>=2)return{kind:'wreck',test:(r,c)=>enemy.some(s=>s.r===r&&s.c===c)};
     return{kind:'down',test:r=>r===0}}
   if(g.fallen>0)return{kind:'joint',id:'heart'};
   const enemy=S.sites.filter(s=>s.build&&s.build.town!==h.town);
@@ -499,6 +515,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   if(goal.kind==='joint'&&j===goal.id){cl.path=null;if(h.kits.wedge>0&&S.joints[j].wedges.length<C.WEDGE_MAX&&!S.joints[j].crip)humanAct(h,'Y');else humanAct(h,'A');return mv}
   const s=siteAt(cl.x,cl.y);
   if(s&&goal.kind==='site'&&!s.build){humanAct(h,'A');return mv}
+  if(s&&goal.kind==='brace'&&!s.build){humanAct(h,'Y');return mv}
   if(s&&goal.kind==='wreck'&&s.build&&s.build.town!==h.town){humanAct(h,'A');return mv}
   if(goal.kind==='down'&&r<=1){dismount(h,0);return mv}
   if(goal.kind==='down'&&!cl.path&&h.kits.anchor>0&&r>40&&!S.anchors.some(a=>a.town===h.town&&a.r===r)&&rnd()<.01)humanAct(h,'X');
@@ -527,9 +544,9 @@ function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
   if(h.hp<h.max*.35)return{k:'shop',town:home,x:home.x,y:home.y};
   const dG=dist(g,h);
   const tgt=g.target&&g.target.alive?g.target:null;
-  const ready=h.role==='keeper'?(wedgedJoints().length>0||h.kits.cannon>0&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
+  const ready=h.role==='keeper'?(wedgedJoints().length>0||(h.kits.cannon>0||h.kits.brace>0)&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
   if(!g.dead&&ready&&dG<(g.fallen>0?2600:2200)){let bi=0,bd=1e9;g.feet.forEach((f,i)=>{const d=Math.hypot(f.x-h.x,f.y-h.y);if(d<bd&&f.air<=0){bd=d;bi=i}});return{k:'foot',i:bi}}
-  const want=h.role==='warden'?'wedge':'cannon';
+  const want=h.role==='warden'?'wedge':h.role==='keeper'?'brace':'cannon';
   if(h.gold>=C.COST[want]+(h.potions?0:C.COST.potion)&&h.kits[want]<2)return{k:'shop',town:home,x:home.x,y:home.y};
   if(h.town===1&&h.gold>=C.COST.outpost+20&&S.outposts[1]<3){let best=null;for(const p of S.prints){if(S.t-p.t<4)continue;const x=p.x+C.FOOT_R*1.6,y=p.y;if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>t.r+C.OUTPOST_GAP)){best={x,y};break}}
     if(best)return{k:'build',what:'outpost',x:best.x,y:best.y}}
@@ -541,7 +558,7 @@ function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
   if(h.quest&&(h.quest.k==='climb'||h.quest.k==='tend')&&!g.dead&&dG<2500){let bi=0;return{k:'foot',i:g.feet[0].air>0?1:bi}}
   let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
   return b?{k:'monster',id:b.id}:null}
-function botShop(h){const want=h.role==='warden'?'wedge':'cannon';
+function botShop(h){const want=h.role==='warden'?'wedge':h.role==='keeper'?'brace':'cannon';
   while(h.kits[want]<2&&h.gold>=C.COST[want]){h.gold-=C.COST[want];h.kits[want]++}
   if(!h.gloves&&h.gold>=C.COST.gloves){h.gold-=C.COST.gloves;h.gloves=1}
   if(h.kits.anchor<2&&h.gold>=C.COST.anchor){h.gold-=C.COST.anchor;h.kits.anchor+=3}
@@ -553,8 +570,9 @@ function botGiant(dt){const g=S.g;if(g.dead||g.fallen>0)return;g.botT-=dt;
   let angry=null;for(const t of alive)if(S.grudge[t.i]>=C.ANGER&&(!angry||S.grudge[t.i]>S.grudge[angry.i]||S.grudge[t.i]===S.grudge[angry.i]&&dist(t,g)<dist(angry,g)))angry=t;
   g.target=angry;
   if(!angry&&(!S.wander||g.botT<=0||Math.hypot(S.wander.x-g.x,S.wander.y-g.y)<200)){g.botT=40;
-    for(let k=0;k<30;k++){const x=rr(900,C.MAP-900),y=rr(900,C.MAP-900);if(alive.every(t=>Math.hypot(t.x-x,t.y-y)>1000)){S.wander={x,y};break}}}
-  if(!angry&&S.wander){g.tx=S.wander.x;g.ty=S.wander.y}
+    for(let k=0;k<30;k++){const x=rr(900,C.MAP-900),y=rr(900,C.MAP-900);if(alive.every(t=>Math.hypot(t.x-x,t.y-y)>1700)){S.wander={x,y};break}}}
+  // when it can walk, and nothing has angered it, it heads for the gap in the far hills
+  if(!angry&&braces()>=1){g.tx=S.exit.x;g.ty=S.exit.y}else if(!angry&&S.wander){g.tx=S.wander.x;g.ty=S.wander.y}
   const cl=climbers().filter(h=>h.cl.y>8);
   const t=g.target;if(t){const d=dist(g,t);if(d>t.r+200){g.tx=t.x;g.ty=t.y}else{g.tx=t.x+Math.cos(S.t*.15)*250;g.ty=t.y+Math.sin(S.t*.15)*250}if(d<C.SMASH_REACH+t.r)giantDo('smash')}
   const threat=cl.filter(h=>h.role==='warden'||h.role==='you').length;
@@ -581,11 +599,13 @@ function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
   if(S.g.dead)over={giantWon:false,text:'The Heart-stone is shattered and the giant lies still.'};
   // at dusk the giant lies down beside the town that treated it best and becomes a mountain
   else if(S.t>=C.DUSK&&alive.length){let fav=alive[0];for(const t of alive)if(S.grudge[t.i]<S.grudge[fav.i])fav=t;S.favored=fav.i;
-    over={giantWon:true,dusk:true,text:'At dusk the giant lies down beside '+TOWNS[fav.i].name+' and becomes a mountain.'}}
-  else if(alive.length<=1)over={giantWon:true,text:alive.length?'Only '+TOWNS[alive[0].i].name+' still stands.':'Every town lies in ruins.'};
+    over={giantWon:false,dusk:true,text:'At dusk the giant lies down beside '+TOWNS[fav.i].name+' and becomes a mountain.'}}
+  else if(Math.hypot(S.g.x-S.exit.x,S.g.y-S.exit.y)<C.EXIT_R&&!S.g.fallen){let fav=alive[0];for(const t of alive)if(S.grudge[t.i]<S.grudge[fav.i])fav=t;S.favored=fav&&fav.i;
+    over={giantWon:true,left:true,text:'The giant walks through the gap in the hills and is gone.'+(fav?' It remembers '+TOWNS[fav.i].name+' kindly.':'')}}
+  else if(alive.length<=1)over={giantWon:false,text:alive.length?'Only '+TOWNS[alive[0].i].name+' still stands.':'Every town lies in ruins.'};
   else if(S.role==='human'&&!factionAlive(S.you.town))over={giantWon:true,text:TOWNS[S.you.town].name+' has fallen.'};
   if(!over)return;S.over=over;
-  if(S.role==='giant')over.win=over.giantWon;else over.win=factionAlive(S.you.town)&&(!over.dusk||S.favored===S.you.town);
+  if(S.role==='giant')over.win=!!over.left;else over.win=factionAlive(S.you.town)&&(!(over.dusk||over.left)||S.favored===S.you.town);
   if(S.role==='giant'){if(over.win)save.giantWins++;else save.giantLosses++}else{if(over.win)save.humanWins++;else save.humanLosses++}persist();
   if(!S.headless)setTimeout(openEnd,900)}
 function nearPlayer(p){if(!S)return false;const c=S.cam;return Math.hypot(p.x-c.x,p.y-c.y)<1600}
@@ -679,14 +699,15 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   if(best>=0)setFocus(best)}
 function record(){return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.</p>`}
 function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
-  items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Answer each town as it treats you, and last until dusk',act:()=>start('giant')},
+  items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Barely able to move: be braced by the towns and leave before dusk',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Out in the wild, Build puts up houses that thicken your settlement's walls, watchtowers that shoot beasts, or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
-<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. At dusk the giant lies down as a mountain beside the town it favours most: be that town, or shatter its Heart-stone, or be the last town standing. The giant wins by lasting until dusk or by destroying two towns.</p>
-<p><b>The giant.</b> Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. Destroy two towns to win.</p>
+<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. When the giant leaves, or at dusk when it lies down as a mountain instead, it favours the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
+<p><b>The giant wakes slowly.</b> It begins all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it heads for the gap in the far hills; if it walks through before dusk it is gone, and remembers kindly the town that treated it best.</p>
+<p><b>Playing the giant.</b> You win by walking out through the gap before dusk. You cannot build: court the towns that brace you and leave the hunters to rue it. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
 function openPause(){if(!S||S.over)return;openMenu({title:'Paused',items:[{label:'Resume',act:closeMenu},{label:'How to play',act:()=>openHelp(openPause)},
@@ -704,12 +725,12 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
         ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
       :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1,newQuest(h));openTown(t)}}))),
     buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
-    buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++),buy('Potion',C.COST.potion,()=>h.potions++),
+    buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++),buy('Brace kit',C.COST.brace,()=>h.kits.brace++),buy('Potion',C.COST.potion,()=>h.potions++),
     buy('Sharper blade',C.COST.blade,()=>h.atk+=5),h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1),
     {label:'Leave town',act:closeMenu}];
-  openMenu({title:t.name,body:`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons. Town walls ${Math.ceil(t.hp)}/${t.max}.</p>`,items,grid:true,back:closeMenu})}
+  openMenu({title:t.name,body:`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces. Town walls ${Math.ceil(t.hp)}/${t.max}.</p>`,items,grid:true,back:closeMenu})}
 function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);farLand=null;closeMenu();lastSig='';
-  toast(role==='giant'?'You are the giant. Walk where you will; the HUD shows how each town has treated you.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
+  toast(role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
 
 // ================= camera and render =================
 const ctx=cv.getContext('2d');let W=0,H=0,DPR=1,shakeA=0;
@@ -841,6 +862,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const tr of S.trees){const p=proj(tr.x,tr.y,0);if(!p||p.d>5200||p.x<-60||p.x>W+60)continue;add(p.d,()=>{const s=p.s,h=tr.r*3.2*s;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle='#2f4528';ctx.beginPath();ctx.moveTo(p.x,p.y-h);ctx.lineTo(p.x+tr.r*s,p.y-h*.15);ctx.lineTo(p.x-tr.r*s,p.y-h*.15);ctx.closePath();ctx.fill();ctx.fillStyle='#3d5a32';ctx.beginPath();ctx.moveTo(p.x,p.y-h*.75);ctx.lineTo(p.x+tr.r*.8*s,p.y);ctx.lineTo(p.x-tr.r*.8*s,p.y);ctx.closePath();ctx.fill();ctx.globalAlpha=1})}
   // the mountains that were giants
   for(const m of S.marks){const p0=proj(m.x,m.y,0);if(!p0||p0.x<-W||p0.x>W*2)continue;for(const b of markBoulders(m)){const p=proj(b.x,b.y,b.z);if(!p)continue;add(p.d,()=>{ctx.globalAlpha=(1-fogOf(p.d)*.8)*nearFade(p);stone(p.x,p.y,b.r*p.s,['#8a8d72','#b2b394','#4e5442'],b.n);ctx.globalAlpha=1})}}
+  for(const sd of[-1,1]){const x=S.exit.x+sd*260,y=S.exit.y,p=proj(x,y,0);if(!p)continue;add(p.d,()=>{const q=proj(x,y,900);ctx.globalAlpha=1-fogOf(p.d)*.6;ctx.fillStyle='#a49e8c';ctx.beginPath();ctx.moveTo(p.x-60*p.s,p.y);ctx.lineTo(p.x-30*p.s,q.y);ctx.lineTo(p.x+30*p.s,q.y);ctx.lineTo(p.x+60*p.s,p.y);ctx.fill();ctx.globalAlpha=1})}
+  {const p=proj(S.exit.x,S.exit.y,1000);if(p&&p.d<14000)add(0,()=>lbl('The gap in the hills',p.x,p.y,12,'#ffcf6a'))}
   for(const cr of S.crystals){const p=proj(cr.x,cr.y,14+Math.sin(S.t*3+cr.id)*4);if(!p||p.d>7000)continue;add(p.d,()=>{const q=Math.max(5,12*p.s);ctx.fillStyle='#bff4ff';ctx.strokeStyle='#1a3a44';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p.x,p.y-q);ctx.lineTo(p.x+q*.6,p.y);ctx.lineTo(p.x,p.y+q);ctx.lineTo(p.x-q*.6,p.y);ctx.closePath();ctx.fill();ctx.stroke()})}
   for(const m of S.monsters){const p=proj(m.x,m.y,0);if(!p||p.d>7000||p.x<-40||p.x>W+40)continue;add(p.d,()=>{const hp=Math.max(m.kind==='troll'?16:10,(m.kind==='troll'?42:20)*p.s);ctx.globalAlpha=1-fogOf(p.d);
     ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(p.x,p.y,hp*.6,hp*.2,0,0,7);ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=1.3;
@@ -851,8 +874,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
     add(p.d-.5,()=>{const hp=Math.max(h.you?22:15,(h.you?30:24)*p.s);ctx.globalAlpha=1-fogOf(p.d);
       if(h.swing>0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-hp*.5,hp*.75,-2.4,-.7);ctx.stroke()}
       figure(p,hp,h.you?'#c0392b':T.col,T.shape,T.col,h.you);ctx.globalAlpha=1;if(h.you)pbar(p.x,p.y-hp*1.6,36,h.hp/h.max,'#9be08a')})}
-  for(const b of giantBoulders(g)){const p=proj(b.x,b.y,b.z);if(!p)continue;const col=partStone(b.part);add(p.d,()=>{ctx.globalAlpha=(1-fogOf(p.d))*(S.role==='giant'?.85:nearFade(p));stone(p.x,p.y,b.r*p.s,col,b.n);ctx.globalAlpha=1})}
-  for(const s of S.sites)if(s.build){const a=bodyWorld(s.c,s.r),p=proj(a.x,a.y,a.z+30);if(!p)continue;add(p.d-80,()=>{const k=p.s;ctx.fillStyle='#1b1b1b';ctx.fillRect(p.x-28*k,p.y-22*k,56*k,30*k);ctx.fillRect(p.x-6*k,p.y-60*k,12*k,40*k);shapePath(ctx,p.x,p.y-8*k,Math.max(4,10*k),TOWNS[s.build.town].shape);ctx.fillStyle=TOWNS[s.build.town].col;ctx.fill()})}
+  for(const b of giantBoulders(g)){const p=proj(b.x,b.y,b.z);if(!p)continue;const col=partStone(b.part);add(p.d,()=>{ctx.globalAlpha=(1-clamp((p.d-1200)/5000,0,.62))*(S.role==='giant'?.85:nearFade(p));stone(p.x,p.y,b.r*p.s,col,b.n);ctx.globalAlpha=1})}
+  for(const s of S.sites)if(s.build){const a=bodyWorld(s.c,s.r),p=proj(a.x,a.y,a.z+30);if(!p)continue;add(p.d-80,()=>{const k=p.s;if(s.build.k==='brace'){ctx.strokeStyle='#3a3a3a';ctx.lineWidth=Math.max(2,10*k);ctx.beginPath();ctx.moveTo(p.x-60*k,p.y-40*k);ctx.lineTo(p.x+60*k,p.y+20*k);ctx.moveTo(p.x-60*k,p.y+20*k);ctx.lineTo(p.x+60*k,p.y-40*k);ctx.stroke();return}ctx.fillStyle='#1b1b1b';ctx.fillRect(p.x-28*k,p.y-22*k,56*k,30*k);ctx.fillRect(p.x-6*k,p.y-60*k,12*k,40*k);shapePath(ctx,p.x,p.y-8*k,Math.max(4,10*k),TOWNS[s.build.town].shape);ctx.fillStyle=TOWNS[s.build.town].col;ctx.fill()})}
   for(const h of climbers()){const a=bodyWorld(h.cl.x,h.cl.y),p=proj(a.x,a.y,a.z);if(!p)continue;const T=TOWNS[h.town];add(p.d-90,()=>figure(p,Math.max(10,22*p.s),h.you?'#c0392b':T.col,T.shape,T.col,h.you))}
   for(const s of S.shots){const z=1300*(1-s.t)+Math.sin(s.t*Math.PI)*350,p=proj(s.x,s.y,z);if(!p)continue;add(p.d,()=>{ctx.fillStyle='#1d1d1d';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(3,12*p.s),0,7);ctx.fill()})}
   items.sort((a,b)=>b.d-a.d);for(const it of items)it.fn();
@@ -864,6 +887,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   drawMinimap()}
 function drawMinimap(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
+  ctx.strokeStyle='#ffcf6a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x0+S.exit.x*k,y0+S.exit.y*k,5,0,7);ctx.stroke();
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
   ctx.fillStyle='#e8dcc4';ctx.beginPath();ctx.arc(x0+S.g.x*k,y0+S.g.y*k,5,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.stroke();
   if(S.you&&!S.you.dead){ctx.fillStyle='#c0392b';ctx.beginPath();ctx.arc(x0+S.you.x*k,y0+S.you.y*k,3,0,7);ctx.fill()}
@@ -939,7 +963,7 @@ function mood(i){const v=S.grudge[i];return v>=C.ANGER?'ANGRY':v>=C.ANGER*.5?'wa
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b;
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
-    a=`<span>Dusk <b>${clock()}</b></span><span>Heart <b>${pc('heart')}</b></span><span>Knees <b>${pc('kneeL')}</b> / <b>${pc('kneeR')}</b></span><span>Elbows <b>${pc('elbowL')}</b> / <b>${pc('elbowR')}</b></span><span>Neck <b>${pc('neck')}</b></span><span>Climbers <b>${climbers().length}</b></span>`;
+    a=`<span>Dusk <b>${clock()}</b></span><span>Braces <b>${braces()}/5</b></span><span>Gap <b>${Math.round(Math.hypot(g.x-S.exit.x,g.y-S.exit.y)/10)*10}</b></span><span>Heart <b>${pc('heart')}</b></span><span>Knees <b>${pc('kneeL')}</b> / <b>${pc('kneeR')}</b></span><span>Elbows <b>${pc('elbowL')}</b> / <b>${pc('elbowR')}</b></span><span>Neck <b>${pc('neck')}</b></span><span>Climbers <b>${climbers().length}</b></span>`;
     b=g.fallen>0?'You are down for '+Math.ceil(g.fallen)+' s. They are at your heart.':TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' · ')}
   else{const h=S.you;
     a=`<span>Dusk <b>${clock()}</b></span><span>HP <b class="${h.hp<h.max*.3?'warn':''}">${Math.ceil(h.hp)}/${h.max}</b></span>`+(h.mode==='climb'?`<span>Grip <b class="${h.grip<maxGrip(h)*.25?'warn':''}">${Math.ceil(Math.max(0,h.grip))}</b></span><span>Height <b>${Math.round(h.cl.y*FT)} ft</b></span>`:`<span>Lv <b>${h.lvl}</b></span>`)+

@@ -192,6 +192,10 @@ let master=null;
 // giant is heard from far away and late. The plain Web Audio blips below are only a fallback where AudioWorklet is missing.
 let se=null,seSrc=null,seFailed=false;const SE_M=.12; // metres per world unit
 // a stressed sheet of metal: dense, inharmonic and damped, so each impulse is a click, not a bell
+// a wake horn sounded at the giant's head: two long rising calls, heard across the land with their echoes
+function hornCall(){if(!se||se==='starting'||!save.sound||!S)return;const g=S.g;seSrc.horn.setPosition(g.x*SE_M,-g.y*SE_M,1900*SE_M);
+  const play=(src,v)=>{src.note({patch:'brass',midi:50,duration:2.6,velocity:.9*v+.1});setTimeout(()=>{if(se)src.note({patch:'brass',midi:57,duration:3.4,velocity:.95*v+.05})},1800)};
+  play(seSrc.horn,1);reflectors().map(r=>({...r,d:Math.hypot(r.x-g.x,r.y-g.y)})).sort((a,b)=>a.d-b.d).slice(0,2).forEach((r,i)=>{const src=i?seSrc.echo2:seSrc.echo1;setTimeout(()=>{if(!se)return;src.setPosition(r.x*SE_M,-r.y*SE_M,60);play(src,.45*r.k)},r.d*SE_M/343*1000)})}
 const SHEET=[[163,1,.35],[251,.9,.28],[377,.8,.22],[529,.7,.18],[718,.6,.14],[967,.5,.11],[1283,.42,.09],[1690,.33,.07],[2214,.25,.05],[2890,.18,.04]].map(([freq,gain,t60])=>({freq,gain,t60}));
 // Steel-hull voices for the giant, as FM patches for the engine (sweep: semitones off at the start, gliding home).
 // groan: two inharmonic modulators into a carrier, heavy feedback for grit, a slow bend; shriek: a bowed high whine;
@@ -208,7 +212,7 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
   SE.SoundEngine.create({workletUrl:url,device:'stereo',zone:'coniferForest',maxVoices:24}).then(e=>{se=e;actx=e.ctx;
     seSrc={ui:e.createSource('synth',{level:78,priority:3}),groan:e.createSource('synth',{level:104,refDistance:70,priority:6}),
       metal:e.createSource('modal',{modes:METAL,level:100,refDistance:70,priority:6}),boom:e.createSource('synth',{level:100,refDistance:60,priority:5}),
-      near:e.createSource('synth',{level:82,refDistance:8,priority:2}),
+      near:e.createSource('synth',{level:82,refDistance:8,priority:2}),horn:e.createSource('synth',{level:114,refDistance:150,priority:8}),
       hull:e.createSource('synth',{level:112,refDistance:90,priority:7}),hull2:e.createSource('synth',{level:108,refDistance:90,priority:7}),
       echo1:e.createSource('synth',{level:104,refDistance:90,priority:4}),echo2:e.createSource('synth',{level:100,refDistance:90,priority:4}),sky:e.createSource('synth',{level:114,refDistance:200,priority:8}),
       // the opening orchestra: low brass, horns, high trumpets, strings, drums and a wordless choir, all in the sky
@@ -509,7 +513,7 @@ function humanCtx(h){
 function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
-    if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW){if(!h.horn)return false;h.waking=true;sayTo(h,'You call into the stone. Hold still while it stirs.');if(!S.headless)giantCall('breath');return true}
+    if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW){if(!h.horn)return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}
     {const ch=S.chains.find(q=>q.hp>0&&q.r===Math.floor(cl.y)&&q.c===Math.floor(cl.x));if(slot==='A'&&ch){if(h.cd>0)return false;h.cd=.5;h.swing=.2;ch.hp-=h.atk;sfx('hit',h.you);
       if(ch.hp<=0){ch.hp=0;S.grudge[h.town]-=30;gainXp(h,25);announce('The '+ch.name+' snaps!');if(!S.headless)giantCall('rumble')}return true}}
     if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
@@ -629,9 +633,9 @@ function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
     else if(cl.path){target=cl.path.shift();if(!cl.path.length)cl.path=null}
     if(target)startMove(h,target,false)}
   const rope=S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-Math.floor(cl.y))<=1&&Math.abs(a.c-Math.floor(cl.x))<=1);
-  if(h.waking){if(cl.move||cl.fall||g.awake||cl.y<C.WAKE_ROW){h.waking=false;if(!g.awake)S.wakeT=Math.max(0,S.wakeT-3)}
+  if(h.waking){if(cl.move||cl.fall||g.awake||cl.y<C.WAKE_ROW){h.waking=false;if(S.waker===h)S.waker=null;if(!g.awake)S.wakeT=Math.max(0,S.wakeT-3)}
     else{S.wakeT+=dt;h.grip-=1.5*dt;if(S.wakeT>=C.WAKE_TIME){g.awake=true;h.waking=false;h.horn=0;S.grudge[h.town]-=C.WAKE_FAVOR;gainXp(h,40);shake(24);
-      announce(TOWNS[h.town].name+' has woken the giant. It remembers who woke it.'+(chained('ankleL')||chained('ankleR')?' Its ankles are still chained.':''));if(!S.headless){giantCall('bellow');setTimeout(()=>giantCall('moan'),2600)}}}}
+      S.waker=null;announce((h.you?'You have':TOWNS[h.town].name+' has')+' woken the giant. It remembers who woke it.'+(chained('ankleL')||chained('ankleR')?' Its ankles are still chained.':''));if(!S.headless){giantCall('bellow');setTimeout(()=>giantCall('moan'),2600)}}}}
   const moving=!!cl.move;
   if(g.fallen>0)h.grip=Math.min(mg,h.grip+C.GRIP_LEDGE*dt);
   else if(restful(cellT(cl.x,cl.y))&&!moving)h.grip=Math.min(mg,h.grip+C.GRIP_LEDGE*dt);
@@ -741,7 +745,7 @@ function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
   if(h.quest&&(h.quest.k==='climb'||h.quest.k==='tend')&&!g.dead&&dG<2500){let bi=0;return{k:'foot',i:g.feet[0].air>0?1:bi}}
   let b=null,bd=1e9;for(const m of S.monsters){const d=dist(m,h)+(m.kind==='troll'&&h.lvl<3?600:0);if(d<bd){bd=d;b=m}}
   return b?{k:'monster',id:b.id}:null}
-function botShop(h){if(h.role==='keeper'&&!S.g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS){h.crystals-=C.HORN_CRYSTALS;h.horn=1}
+function botShop(h){if(h.role==='keeper'&&!S.g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS){h.crystals-=C.HORN_CRYSTALS;h.horn=1;if(!S.headless)announce(TOWNS[h.town].name+' has forged a wake horn.')}
   {const t=townAt(h);if(t&&t.i===h.town&&h.role!=='keeper'&&!canUpgrade(h,'town',t))upgrade(h,'town',t)}
   {const keep=h.role==='keeper'&&!S.g.awake&&!h.horn?C.HORN_CRYSTALS:h.role!=='keeper'?(upCost('town',homeOf(h)||{})||0):0,n=h.crystals-keep;if(n>0&&h.role==='keeper'){h.gold+=n*4;h.crystals-=n}}const want=h.role==='warden'?'wedge':h.role==='keeper'?'brace':'cannon';
   while(h.kits[want]<2&&h.gold>=C.COST[want]){h.gold-=C.COST[want];h.kits[want]++}
@@ -757,7 +761,7 @@ function botGiant(dt){const g=S.g;if(g.dead||g.fallen>0||!g.awake)return;g.botT-
   if(!angry&&(!S.wander||g.botT<=0||Math.hypot(S.wander.x-g.x,S.wander.y-g.y)<200)){g.botT=40;
     for(let k=0;k<30;k++){const x=rr(900,C.MAP-900),y=rr(900,C.MAP-900);if(alive.every(t=>Math.hypot(t.x-x,t.y-y)>1700)){S.wander={x,y};break}}}
   // when it can walk, and nothing has angered it, it heads for the gap in the far hills
-  if(!angry&&braces()>=1){g.tx=S.exit.x;g.ty=S.exit.y}else if(!angry&&S.wander){g.tx=S.wander.x;g.ty=S.wander.y}
+  if(!angry&&S.wander){g.tx=S.wander.x;g.ty=S.wander.y} // it never heads for the gap of its own accord
   const cl=climbers().filter(h=>h.cl.y>8);
   const t=g.target;if(t){const d=dist(g,t);if(d>t.r+200){g.tx=t.x;g.ty=t.y}else{g.tx=t.x+Math.cos(S.t*.15)*250;g.ty=t.y+Math.sin(S.t*.15)*250}if(d<C.SMASH_REACH+t.r)giantDo('smash')}
   const threat=cl.filter(h=>h.role==='warden'||h.role==='you').length;
@@ -785,7 +789,7 @@ function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
   // at dusk the giant lies down beside the town that treated it best and becomes a mountain
   else if(S.t>=C.DUSK&&alive.length){let fav=alive[0];for(const t of alive)if(S.grudge[t.i]<S.grudge[fav.i])fav=t;S.favored=fav.i;
     over={giantWon:false,dusk:true,text:'At dusk the giant lies down beside '+TOWNS[fav.i].name+' and becomes a mountain.'}}
-  else if(Math.hypot(S.g.x-S.exit.x,S.g.y-S.exit.y)<C.EXIT_R&&!S.g.fallen){let fav=alive[0];for(const t of alive)if(S.grudge[t.i]<S.grudge[fav.i])fav=t;S.favored=fav&&fav.i;
+  else if(S.role==='giant'&&Math.hypot(S.g.x-S.exit.x,S.g.y-S.exit.y)<C.EXIT_R&&!S.g.fallen){let fav=alive[0];for(const t of alive)if(S.grudge[t.i]<S.grudge[fav.i])fav=t;S.favored=fav&&fav.i;
     over={giantWon:true,left:true,text:'The giant walks through the gap in the hills and is gone.'+(fav?' It remembers '+TOWNS[fav.i].name+' kindly.':'')}}
   else if(alive.length<=1)over={giantWon:false,text:alive.length?'Only '+TOWNS[alive[0].i].name+' still stands.':'Every town lies in ruins.'};
   else if(S.role==='human'&&!factionAlive(S.you.town))over={giantWon:true,text:TOWNS[S.you.town].name+' has fallen.'};
@@ -892,8 +896,8 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Your build area is the dashed ring around your homes. Houses grow your town and push the ring outward wherever you put them, so a line of houses reaches across the land; watchtowers that shoot beasts can stand anywhere inside it; and or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
-<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. When the giant leaves, or at dusk when it lies down as a mountain instead, it favours the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
-<p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Only a wake horn, forged in town from twenty sky crystals, wakes it: sound it at its head and hold still for ten seconds while it stirs, and the town that wakes it earns its favour; then the ankle chains must be broken before it can take a step, and the wrist chains before it can smash or swipe. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it heads for the gap in the far hills; if it walks through before dusk it is gone, and remembers kindly the town that treated it best.</p>
+<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. At dusk the giant lies down as a mountain beside the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
+<p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Only a wake horn, forged in town from twenty sky crystals, wakes it: sound it at its head and hold still for ten seconds while it stirs, and the town that wakes it earns its favour; then the ankle chains must be broken before it can take a step, and the wrist chains before it can smash or swipe. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
 <p><b>Playing the giant.</b> You win by walking out through the gap before dusk. You cannot build: court the towns that brace you and leave the hunters to rue it. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
@@ -913,7 +917,7 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
         ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
       :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))),
     {label:'Raise '+t.name+(upCost('town',t)!=null?' \u2013 '+upCost('town',t)+' crystals':''),sub:'Level '+lv(t)+': +600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
-    {label:h.horn?'You carry a wake horn':'Forge a wake horn \u2013 '+C.HORN_CRYSTALS+' sky crystals',sub:h.horn?'Sound it at the giant\u2019s head':'You carry '+h.crystals+'. The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');openTown(t)}},
+    {label:h.horn?'You carry a wake horn':'Forge a wake horn \u2013 '+C.HORN_CRYSTALS+' sky crystals',sub:h.horn?'Sound it at the giant\u2019s head':'You carry '+h.crystals+'. The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant\u2019s head.');openTown(t)}},
     {label:'Sell sky crystals \u2013 4 gold each',sub:'You carry '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}},
     buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
     buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++),buy('Brace kit',C.COST.brace,()=>h.kits.brace++),buy('Potion',C.COST.potion,()=>h.potions++),
@@ -1080,7 +1084,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const sd of[-1,1]){const x=S.exit.x+sd*260,y=S.exit.y,p=proj(x,y,0);if(!p)continue;add(p.d,()=>{const q=proj(x,y,900);ctx.globalAlpha=1-fogOf(p.d)*.6;ctx.fillStyle='#a49e8c';ctx.beginPath();ctx.moveTo(p.x-60*p.s,p.y);ctx.lineTo(p.x-30*p.s,q.y);ctx.lineTo(p.x+30*p.s,q.y);ctx.lineTo(p.x+60*p.s,p.y);ctx.fill();ctx.globalAlpha=1})}
   for(const c of S.caches){const p=proj(c.x,c.y,0);if(!p||p.d>7000)continue;add(p.d,()=>{const k=p.s,ok=S.t>=c.ready;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle=ok?'#d9b45a':'#6b6250';ctx.fillRect(p.x-22*k,p.y-26*k,44*k,26*k);ctx.fillStyle='#3a2d1c';ctx.fillRect(p.x-22*k,p.y-30*k,44*k,8*k);ctx.globalAlpha=1;
     if(ok&&p.d<2600)lbl('Ruins',p.x,p.y-44*k-10,11,'#ffcf6a')})}
-  {const p=proj(S.exit.x,S.exit.y,1000);if(p&&p.d<14000)add(0,()=>lbl('The gap in the hills',p.x,p.y,12,'#ffcf6a'))}
+  if(S.role==='giant'){const p=proj(S.exit.x,S.exit.y,1000);if(p&&p.d<14000)add(0,()=>lbl('The gap in the hills',p.x,p.y,12,'#ffcf6a'))}
   for(const cr of S.crystals){const p=proj(cr.x,cr.y,14+Math.sin(S.t*3+cr.id)*4);if(!p||p.d>7000)continue;add(p.d,()=>{const q=Math.max(5,12*p.s);ctx.fillStyle='#bff4ff';ctx.strokeStyle='#1a3a44';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p.x,p.y-q);ctx.lineTo(p.x+q*.6,p.y);ctx.lineTo(p.x,p.y+q);ctx.lineTo(p.x-q*.6,p.y);ctx.closePath();ctx.fill();ctx.stroke()})}
   for(const m of S.monsters){const p=proj(m.x,m.y,0);if(!p||p.d>7000||p.x<-40||p.x>W+40)continue;add(p.d,()=>{const hp=Math.max(m.kind==='troll'?16:10,(m.kind==='troll'?42:20)*p.s);ctx.globalAlpha=1-fogOf(p.d);
     ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(p.x,p.y,hp*.6,hp*.2,0,0,7);ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=1.3;
@@ -1107,7 +1111,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   drawMinimap()}
 function drawMinimap(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(ground,x0,y0,s,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
-  ctx.strokeStyle='#ffcf6a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x0+S.exit.x*k,y0+S.exit.y*k,5,0,7);ctx.stroke();
+  if(S.role==='giant'){ctx.strokeStyle='#ffcf6a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x0+S.exit.x*k,y0+S.exit.y*k,5,0,7);ctx.stroke()}
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
   for(const c of S.caches){ctx.fillStyle=S.t>=c.ready?'#d9b45a':'#6b6250';ctx.fillRect(x0+c.x*k-2,y0+c.y*k-2,4,4)}
   ctx.fillStyle='#e8dcc4';ctx.beginPath();ctx.arc(x0+S.g.x*k,y0+S.g.y*k,5,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.stroke();
@@ -1193,7 +1197,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     a=`<span>Dusk <b>${clock()}</b></span><span>HP <b class="${h.hp<h.max*.3?'warn':''}">${Math.ceil(h.hp)}/${h.max}</b></span>`+(h.mode==='climb'?`<span>Grip <b class="${h.grip<maxGrip(h)*.25?'warn':''}">${Math.ceil(Math.max(0,h.grip))}</b></span><span>Height <b>${Math.round(h.cl.y*FT)} ft</b></span>`:`<span>Lv <b>${h.lvl}</b></span>`)+
       `<span>Gold <b>${h.gold}</b></span><span>Crystals <b>${h.crystals}</b>${h.horn?' Horn':''}</span><span>Anchors <b>${h.kits.anchor}</b> Wedges <b>${h.kits.wedge}</b> Cannons <b>${h.kits.cannon}</b></span>`;
     const q=h.quest;b=(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
-      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it':S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
+      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.textContent=b}}
 
 // ================= loop =================

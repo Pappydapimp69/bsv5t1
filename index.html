@@ -78,7 +78,7 @@ const C={
   H_SPEED:165,
   CLIMB_SPEED:3.6,LEDGE_SPEED:6,REACH:2.3,LUNGE_REACH:3.6,MOVE_GRIP:.4,MOVE_GRIP_CELL:.5,MOSS_DRAIN:2.5,CRUMBLE:1.4,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
-  ANGER:600,DUSK:1500,HORN_CRYSTALS:20,CACHE_REFILL:240,WAKE_ROW:186,WAKE_FAVOR:100,WAKE_TIME:10,CHAIN_HP:900,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,HOME_REACH:320,HOUSE_REACH:300,HOUSE_GROW:12,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
+  PICKUP_R:84,ANGER:600,DUSK:1500,HORN_CRYSTALS:20,CACHE_REFILL:240,WAKE_ROW:186,WAKE_FAVOR:100,WAKE_TIME:10,CHAIN_HP:900,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,HOME_REACH:320,HOUSE_REACH:300,HOUSE_GROW:12,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
   GRUDGE_FADE:240,PULL_FAVOR:40,CANNON_FAVOR:60,
   COST:{brace:50,house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
 };
@@ -222,7 +222,7 @@ function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!=
     if(h.mode==='ground'){const m=h.stepAt?Math.hypot(h.x-h.stepAt.x,h.y-h.stepAt.y):0;if(!h.stepAt||m>60){const wet=S.prints.some(q=>S.t-q.t>4&&Math.hypot(q.x-h.x,q.y-h.y)<C.FOOT_R*.8);
         if(h.stepAt)seSrc.feet.step({mass:80,speed:wet?.8:1.4,surface:wet?'water':'packedDirt',gain:.9});h.stepAt={x:h.x,y:h.y};if(wet&&h.stepAt)seSrc.lake.splash(12,.4)}}
     else if(h.cl){const mv=!!h.cl.move;if(h.wasMoving&&!mv)seSrc.feet.step({mass:80,speed:1,surface:'sandstone',claws:true,gain:1});h.wasMoving=mv}}
-  if(S.trumpetsDue&&S.t>.3){S.trumpetsDue=false;trumpets()}
+
   if(S.t>=(S.nextCall||8)&&!S.g.dead){const g=S.g;if(!g.awake){S.nextCall=S.t+20+Math.random()*25;giantCall('breath')}
     else{S.nextCall=S.t+(g.target?9:14)+Math.random()*(g.target?18:28);giantCall(g.target&&Math.random()<.5?'rumble':'moan')}}
   se.update()}
@@ -250,10 +250,16 @@ function creak(src,dur,r0,r1,amp){const t0=performance.now();let last=t0;
     src.strike(amp*env*(.55+Math.random()*.45),.25+Math.random()*.6);last=now;setTimeout(tick,1000/Math.max(6,rate)*(.55+Math.random()*.9))};tick()}
 // at the start of a game: long, low brass from somewhere high in the sky, clashing a semitone apart, as in the
 // recordings of 'trumpets' heard over cities; played once, far off, with the reverb opened up
-function trumpets(){if(!se||se==='starting'||!save.sound)return;const z=v=>v*SE_M,s=seSrc.sky;se.setZone('rockyGully');
-  const a=S.cam;s.setPosition(z(a.x+2500),-z(a.y-1800),400);
-  [[0,34,5.5],[1.2,35,5],[4.5,31,6.5],[5.4,32,6],[9.5,29,7],[10.1,30,7.5]].forEach(([t,m,d])=>setTimeout(()=>{if(se&&S)s.note({patch:'brass',midi:m,duration:d,velocity:.55+Math.random()*.25})},t*1000));
+const TRUMPETS=[[0,34,5.5],[1.2,35,5],[4.5,31,6.5],[5.4,32,6],[9.5,29,7],[10.1,30,7.5]];
+function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets();return}const z=v=>v*SE_M,s=seSrc.sky;se.setZone('rockyGully');
+  const a=S.cam;s.setPosition(z(a.x+900),-z(a.y-700),150);
+  TRUMPETS.forEach(([t,m,d])=>setTimeout(()=>{if(se&&S)s.note({patch:'brass',midi:m,duration:d,velocity:.8+Math.random()*.2})},t*1000));
   setTimeout(()=>{if(se&&se!=='starting')se.setZone('openPlain')},19000)}
+// the same calls without the engine: detuned saws through a slowly opening low-pass, with a long echo
+function plainTrumpets(){if(!actx)return;const out=master||actx.destination,dl=actx.createDelay(2),fb=actx.createGain(),wet=actx.createGain();dl.delayTime.value=.42;fb.gain.value=.45;wet.gain.value=.5;dl.connect(fb).connect(dl);dl.connect(wet).connect(out);
+  for(const[t0,m,d]of TRUMPETS){const t=actx.currentTime+t0,f=440*2**((m+12-69)/12),g=actx.createGain(),lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.setValueAtTime(250,t);lp.frequency.linearRampToValueAtTime(1400,t+d*.4);lp.frequency.linearRampToValueAtTime(400,t+d);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+d*.35);g.gain.exponentialRampToValueAtTime(.0001,t+d);lp.connect(g);g.connect(out);g.connect(dl);
+    for(const det of[1,1.006,.994,2.003]){const o=actx.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(f*det,t);o.frequency.linearRampToValueAtTime(f*det*.985,t+d);o.connect(lp);o.start(t);o.stop(t+d+.05)}}}
 let groanTurn=0;
 function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;const r=Math.random,turn=groanTurn++%4;
     seSrc.groan.sfx('roar',{midi:22+Math.floor(r()*5),duration:2.4+r(),velocity:.85});
@@ -526,7 +532,8 @@ function newQuest(h,kind){const lv=h.lvl,k=kind||(lv>=3&&rnd()<.3?(rnd()<.5?'cli
   if(k==='troll')return{k,need:1,n:0,gold:45+lv*14,xp:45+lv*12,text:'Kill a troll at the old giants'};
   if(k==='tend')return{k,need:1,n:0,gold:50+lv*12,xp:40+lv*10,text:'Pull a wedge from the giant'};
   const ft=Math.min(1500,300+lv*200);return{k:'climb',need:ft/FT,n:0,gold:35+lv*14,xp:35+lv*12,text:'Climb the giant to '+ft+' ft'}}
-function board(t){if(!t.board||S.t-t.boardT>60){t.boardT=S.t;t.board=[0,1,2].map(()=>newQuest(S.you||S.humans[0]))}return t.board}
+function freshQuest(h,shown){for(let k=0;k<20;k++){const q=newQuest(h);if(!shown.some(o=>o.k===q.k))return q}return newQuest(h)}
+function board(t){const h=S.you||S.humans[0];if(!t.board||S.t-t.boardT>60){t.boardT=S.t;t.board=[];for(let i=0;i<3;i++)t.board.push(freshQuest(h,t.board.concat(h.quest?[h.quest]:[])))}return t.board}
 function questTick(h,k,v){const q=h.quest;if(!q||q.done)return;
   if(q.k==='climb'&&k==='height'){if(v>=q.need){q.n=q.need}else return}else if(q.k==='deliver'&&k==='arrive'){if(v!==q.to)return;q.n=1}else if(q.k===k)q.n++;else return;
   if(q.n>=q.need){q.done=true;sayTo(h,'Quest done! Return to town for '+q.gold+' gold.')}}
@@ -538,7 +545,7 @@ function stepHuman(h,dt,mv){
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{vx=dx/d;vy=dy/d}}else if(vx||vy)h.tx=h.ty=null;
   if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
-  for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<28){S.crystals.splice(i,1);spawnCrystal();h.crystals++;h.gold+=1;questTick(h,'gather');
+  for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R){S.crystals.splice(i,1);spawnCrystal();h.crystals++;h.gold+=1;questTick(h,'gather');
     if(h.you){sfx('coin');toast('Sky crystal ('+h.crystals+' carried)!'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
   const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);questTick(h,'arrive',t.id);
     if(h.quest&&h.quest.done){h.gold+=h.quest.gold;gainXp(h,h.quest.xp);if(h.you){toast('Quest reward: '+h.quest.gold+' gold.');sfx('coin')}h.quest=null}
@@ -651,7 +658,7 @@ function botHuman(h,dt){const mv={x:0,y:0};if(h.dead)return mv;const g=S.g;h.thi
   if(G.k==='foot'){const f=g.feet[G.i];if(f.air>0){h.goal=null;return mv}tx=f.x;ty=f.y;if(nearFoot(h)>=0){mount(h,nearFoot(h));return mv}}
   if(G.k==='shop'){const t=G.town;if(!t.alive){h.goal=null;return mv}if(townAt(h)===t){botShop(h);h.goal=null;return mv}}
   const dx=tx-h.x,dy=ty-h.y,d=Math.hypot(dx,dy);if(d>8){mv.x=dx/d;mv.y=dy/d}
-  if(G.k==='crystal'&&d<20)h.goal=null;
+  if(G.k==='crystal'&&d<C.PICKUP_R*.7)h.goal=null;
   if(G.k==='build'&&d<20){build(h,G.what);h.goal=null}
   if(G.k==='cache'&&d<120){const c=cacheNear(h);if(c)searchCache(h,c);h.goal=null}return mv}
 function pickGoal(h){const g=S.g,home=homeOf(h);if(!home)return null;
@@ -843,7 +850,7 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
   const items=[
     ...(q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+') \u2013 choose Drop to give it up',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}},
         ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
-      :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1,newQuest(h));openTown(t)}}))),
+      :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))),
     {label:h.horn?'You carry a wake horn':'Forge a wake horn \u2013 '+C.HORN_CRYSTALS+' sky crystals',sub:h.horn?'Sound it at the giant\u2019s head':'You carry '+h.crystals+'. The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');openTown(t)}},
     {label:'Sell sky crystals \u2013 4 gold each',sub:'You carry '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}},
     buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
@@ -1109,7 +1116,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
 let acc=0,last=performance.now();
 // the next frame is asked for first and the work is guarded, so one thrown error never freezes the game
 function frame(now){requestAnimationFrame(frame);try{frameWork(now)}catch(e){console.error(e)}}
-function frameWork(now){const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
+function frameWork(now){if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on')}
   if(S&&!menu&&!S.over){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);

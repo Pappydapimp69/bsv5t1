@@ -287,7 +287,7 @@ function cannonTarget(town){const g=S.g;let best=null,bd=C.CANNON_RANGE;
   return best}
 function footLand(ft,i){sfx('step',nearPlayer(ft));shake(4);
   S.fx.push({k:'ring',x:ft.x,y:ft.y,r:C.FOOT_R*1.5,t:0,life:.5,col:'#c9b48a'});
-  S.prints.push({x:ft.x,y:ft.y,a:S.g.ang,t:S.t});if(S.prints.length>60)S.prints.shift();
+  if(!S.towns.some(t=>Math.hypot(t.x-ft.x,t.y-ft.y)<t.r+60)){S.prints.push({x:ft.x,y:ft.y,a:S.g.ang,t:S.t});if(S.prints.length>160)S.prints.shift()}
   hurtArea(ft.x,ft.y,C.FOOT_R,C.CRUSH,C.CRUSH_TOWN,'crush');
   // the jolt runs up that leg
   for(const h of climbers()){const onLeg=h.cl.y<92&&((i===0&&h.cl.x<COLS/2)||(i===1&&h.cl.x>=COLS/2));h.grip-=onLeg?C.JOLT:1.5}}
@@ -358,7 +358,7 @@ function stepHuman(h,dt,mv){
   if(h.mode==='climb'){stepClimb(h,dt,mv);return}
   let vx=mv.x,vy=mv.y;
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{vx=dx/d;vy=dy/d}}else if(vx||vy)h.tx=h.ty=null;
-  if(vx||vy){h.x+=vx*C.H_SPEED*dt;h.y+=vy*C.H_SPEED*dt;h.face=Math.atan2(vy,vx)}
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:1;h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<28){S.crystals.splice(i,1);spawnCrystal();h.gold+=4;questTick(h,'gather');
     if(h.you){sfx('coin');toast('Sky crystal!'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
@@ -623,7 +623,7 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
     buy('Sharper blade',C.COST.blade,()=>h.atk+=5),h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1),
     {label:'Leave town',act:closeMenu}];
   openMenu({title:t.name,body:`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons. Town walls ${Math.ceil(t.hp)}/${t.max}.</p>`,items,grid:true,back:closeMenu})}
-function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);closeMenu();lastSig='';
+function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);farLand=null;closeMenu();lastSig='';
   toast(role==='giant'?'You are the giant. Walk toward a town and smash it.':'You are a warden of Ashford. Visit town, take a quest, then climb the giant.')}
 
 // ================= camera and render =================
@@ -637,13 +637,25 @@ let climbCam={y:10,x:16,px:12};
 function screenToCell(sx,sy){const c=climbCam;return{c:Math.floor(c.x+(sx-W/2)/c.px),r:Math.floor(c.y-(sy-H*.55)/c.px)}}
 // body texture, drawn once per game at 8 px a cell
 let bodyCanvas=null,bodySeed=-1;
-function bodyTexture(){if(bodySeed===S.seed&&bodyCanvas)return bodyCanvas;bodySeed=S.seed;const P=8,cvs=document.createElement('canvas');cvs.width=COLS*P;cvs.height=ROWS*P;const b=cvs.getContext('2d'),B=S.body;
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const i=r*COLS+c,t=B.g[i];if(!t)continue;const v=B.vari[i],x=c*P,y=(ROWS-1-r)*P;
-    const base=t===SMOOTH?[118,124,136]:[92,98,84];const s=(v%24)-12;b.fillStyle=`rgb(${base[0]+s},${base[1]+s},${base[2]+s})`;b.fillRect(x,y,P,P);
-    if(t===HOLD||t===JOINT||t===HEART){b.fillStyle='rgba(40,48,30,.85)';b.fillRect(x+1+(v%3),y+2+(v>>3)%3,3,2);b.fillStyle='rgba(150,170,90,.55)';b.fillRect(x+(v>>2)%5,y+(v>>4)%5,2,2)}
-    if(t===SMOOTH){b.fillStyle='rgba(255,255,255,.10)';b.fillRect(x,y,P,1)}
-    if(t===LEDGE||t===SITE){b.fillStyle='#d8c690';b.fillRect(x,y,P,3);b.fillStyle='rgba(0,0,0,.25)';b.fillRect(x,y+3,P,1)}}
+function bodyTexture(){if(bodySeed===S.seed&&bodyCanvas)return bodyCanvas;bodySeed=S.seed;const P=10,cvs=document.createElement('canvas');cvs.width=COLS*P;cvs.height=ROWS*P;const b=cvs.getContext('2d'),B=S.body;
+  // the body is a heap of boulders: each cell a lumpy stone lit from the upper left, crevices between them are the holds
+  const at=(r,c)=>r>=0&&r<ROWS&&c>=0&&c<COLS?B.g[r*COLS+c]:0;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const t=at(r,c);if(!t)continue;const x=c*P,y=(ROWS-1-r)*P;b.fillStyle=t===SMOOTH?'#9a9488':'#5d5a50';b.fillRect(x,y,P,P)}
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const i=r*COLS+c,t=B.g[i];if(!t)continue;const v=B.vari[i],x=c*P+P/2+((v%5)-2),y=(ROWS-1-r)*P+P/2+(((v>>3)%5)-2);
+    const edge=!at(r+1,c)||!at(r-1,c)||!at(r,c+1)||!at(r,c-1);const rad=P*(t===SMOOTH?.95:.62+(v%7)*.04)*(edge?.85:1);
+    const g=b.createRadialGradient(x-rad*.4,y-rad*.45,rad*.1,x,y,rad);
+    if(t===SMOOTH){g.addColorStop(0,'#d2ccbd');g.addColorStop(1,'#a39d8f')}else{const k=(v%30)-15;g.addColorStop(0,`rgb(${178+k},${170+k},${152+k})`);g.addColorStop(1,`rgb(${104+k},${98+k},${86+k})`)}
+    b.fillStyle=g;b.beginPath();b.ellipse(x,y,rad*1.08,rad,(v%10)/10,0,7);b.fill();
+    if(t===HOLD&&v%3===0){b.fillStyle='rgba(84,110,52,.75)';b.beginPath();b.arc(x+rad*.5,y+rad*.6,1.6,0,7);b.fill()}
+    if(t===LEDGE||t===SITE){b.fillStyle='#e8dcb4';b.fillRect(c*P,(ROWS-1-r)*P,P,2.5)}}
   bodyCanvas=cvs;return cvs}
+// far landscape seen from the body: features squeeze to the horizon low down and spread out high up
+let farLand=null;
+function landscape(alt){if(!farLand){const R=mulberry32(S.seed^77);farLand=[];for(let i=0;i<70;i++){const k=R();farLand.push({d:4+R()*36,x:(R()-.5)*3,w:.4+R()*1.6,kind:k<.35?'lake':k<.8?'wood':'town'})}farLand.sort((a,b)=>b.d-a.d)}
+  const hz=H*.42,hft=alt*FT+60;const gr=ctx.createLinearGradient(0,hz,0,H);gr.addColorStop(0,'#9fb2b8');gr.addColorStop(.25,'#7d8f6a');gr.addColorStop(1,'#4f6a3c');ctx.fillStyle=gr;ctx.fillRect(0,hz,W,H-hz);
+  for(const f of farLand){const y=hz+hft*.18/f.d,sc=W/(f.d*2.2);if(y>H+20)continue;const x=W/2+f.x*sc*6,w=f.w*sc*.7,h=Math.max(1,w*Math.min(1,hft/1800)*.35);
+    const haze=Math.min(.75,f.d/40);ctx.globalAlpha=1-haze;ctx.fillStyle=f.kind==='lake'?'#6f9fc0':f.kind==='wood'?'#3d5530':'#c9bfa6';ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,7);ctx.fill();ctx.globalAlpha=1}
+  ctx.fillStyle='rgba(200,214,224,.35)';ctx.fillRect(0,hz-6,W,14)}
 function render(){fit();ctx.setTransform(DPR,0,0,DPR,0,0);
   if(!S){ctx.fillStyle='#1d2432';ctx.fillRect(0,0,W,H);return}
   const sx=shakeA?(Math.random()-.5)*shakeA:0,sy=shakeA?(Math.random()-.5)*shakeA:0;
@@ -652,11 +664,13 @@ function render(){fit();ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.restore()}
 function shapePath(c,x,y,r,shape){c.beginPath();if(shape==='circle')c.arc(x,y,r,0,7);else if(shape==='square')c.rect(x-r*.85,y-r*.85,r*1.7,r*1.7);else{c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath()}}
 function renderGround(){const k=worldScale(),cam=S.cam;
-  ctx.fillStyle='#3d5a35';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#4f6a3c';ctx.fillRect(0,0,W,H);
   ctx.save();ctx.translate(W/2,H/2);ctx.scale(k,k);ctx.translate(-cam.x,-cam.y);
   const vx0=cam.x-W/2/k-60,vx1=cam.x+W/2/k+60,vy0=cam.y-H/2/k-60,vy1=cam.y+H/2/k+60,inV=(o,m)=>o.x>vx0-m&&o.x<vx1+m&&o.y>vy0-m&&o.y<vy1+m;
   ctx.fillStyle='#2c2a24';ctx.fillRect(-400,-400,C.MAP+800,400);ctx.fillRect(-400,C.MAP,C.MAP+800,400);ctx.fillRect(-400,0,400,C.MAP);ctx.fillRect(C.MAP,0,400,C.MAP);
-  for(const p of S.prints){if(!inV(p,120))continue;const a=Math.max(0,1-(S.t-p.t)/120);ctx.fillStyle=`rgba(30,40,25,${.45*a})`;ctx.beginPath();ctx.ellipse(p.x,p.y,C.FOOT_R*1.2,C.FOOT_R*.8,p.a,0,7);ctx.fill()}
+  // every step leaves a lake: a dark print that fills with water over a few seconds
+  for(const p of S.prints){if(!inV(p,140))continue;const f=Math.min(1,(S.t-p.t)/4);ctx.fillStyle='#4a5a3a';ctx.beginPath();ctx.ellipse(p.x,p.y,C.FOOT_R*1.3,C.FOOT_R*.85,p.a,0,7);ctx.fill();
+    ctx.fillStyle='#5f93b8';ctx.beginPath();ctx.ellipse(p.x,p.y,C.FOOT_R*1.15*f,C.FOOT_R*.72*f,p.a,0,7);ctx.fill();ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(p.x-20,p.y-12,C.FOOT_R*.5*f,C.FOOT_R*.18*f,p.a,0,7);ctx.fill()}
   ctx.fillStyle='#2a4326';for(const t of S.trees)if(inV(t,40)){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,7);ctx.fill()}
   for(const t of S.towns){if(!inV(t,300))continue;
     ctx.fillStyle=t.alive?'#7a6a52':'#3b352c';ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,7);ctx.fill();
@@ -725,13 +739,13 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
   const ly=(c,r)=>{const L=r<THIGH?lift[c<COLS/2?0:1]:0;return L?L+r*(THIGH-L)/THIGH:r},Y=(c,r)=>toY(ly(c,r));
   // sky darkens with height, ground below
   const alt=clamp(climbCam.y/ROWS,0,1);const sk=ctx.createLinearGradient(0,0,0,H);sk.addColorStop(0,`rgb(${60-alt*30},${96-alt*40},${150-alt*40})`);sk.addColorStop(1,`rgb(${150-alt*50},${170-alt*50},${190-alt*40})`);ctx.fillStyle=sk;ctx.fillRect(0,0,W,H);
-  const gy=toY(0);if(gy<H){ctx.fillStyle='#3d5a35';ctx.fillRect(0,gy,W,H-gy);ctx.fillStyle='#2a4326';for(let i=0;i<30;i++){const x=((i*137+Math.floor(S.g.x))%Math.max(1,W));ctx.fillRect(x,gy+4+(i%5)*6,14,4)}}
+  landscape(climbCam.y);const gy=toY(0);if(gy<H){ctx.fillStyle='#4f6a3c';ctx.fillRect(0,gy,W,H-gy);for(const ft of g.feet){}}
   // walking sway: the body leans with each stride, more toward the top
   const sway=g.fallen>0?0:Math.sin(g.sway*Math.PI)*.035*(g.v/C.G_SPEED);
   ctx.save();ctx.translate(0,gy);ctx.transform(1,0,-sway,1,0,0);ctx.translate(0,-gy);
   // clouds drift past at half the camera's rate, so height reads as distance
   for(let i=0;i<14;i++){const cr=50+i*11,cx=((i*53+S.t*(1+i%3)*.4)%(COLS+40))-20,yy=H*.55-(cr-climbCam.y)*px*.5;if(yy<-40||yy>H+40)continue;ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(W/2+(cx-COLS/2)*px*.6,yy,px*(4+i%4),px*1.3,0,0,7);ctx.fill()}
-  ctx.imageSmoothingEnabled=false;const tex=bodyTexture(),P=tex.width/COLS;
+  ctx.imageSmoothingEnabled=false;const tex=bodyTexture(),P=tex.width/COLS;ctx.imageSmoothingEnabled=true;
   ctx.drawImage(tex,0,0,COLS*P,(ROWS-THIGH)*P,toX(0),toY(ROWS),COLS*px,(ROWS-THIGH)*px);
   for(const i of[0,1]){const c0=i?COLS/2:0;ctx.drawImage(tex,c0*P,(ROWS-THIGH)*P,COLS/2*P,THIGH*P,toX(c0),toY(THIGH),COLS/2*px,(THIGH-lift[i])*px)}
   if(g.wind&&g.wind.k==='swipe'){const left=g.wind.side==='L',p=1-g.wind.t/g.wind.dur;ctx.fillStyle=`rgba(255,60,40,${.12+.25*p})`;ctx.fillRect(left?toX(0):toX(COLS/2),toY(ROWS),COLS/2*px,(ROWS-30)*px);

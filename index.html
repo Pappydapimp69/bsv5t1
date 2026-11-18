@@ -59,6 +59,7 @@ body.titling #pad{visibility:hidden}
 .mb small{display:block;font-weight:400;font-size:12px;color:var(--dim)}
 .mb.focus{border-color:var(--accent);background:#33405a;outline:none}
 .mb.off{opacity:.6;border-style:dashed}
+.card.held .mb{opacity:.45;transition:opacity .2s}
 .mb:focus-visible{outline:2px solid var(--accent)}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
 @media (max-width:380px){.grid2{grid-template-columns:minmax(0,1fr)}}
@@ -841,6 +842,17 @@ function upgradeTarget(h){const b=buildNear(h),t=townAt(h);
 const TOWER_SPECS={sharpen:'More damage on every shot',ballista:'Long range, heavy bolts, slow',volley:'Hits up to three targets at once',watchfire:'Heals your people nearby and lights raiders early'};
 function openTowerMenu(h,b){openMenu({title:'Raise this watchtower',body:`<p class="dim">${h.crystals} crystals stored. Its first raise decides what it becomes; later raises add damage.</p>`,
   items:[...Object.keys(TOWER_SPECS).map(k=>({label:k[0].toUpperCase()+k.slice(1)+' \u2013 '+C.UP.tower[0]+' crystals',sub:TOWER_SPECS[k],why:h.crystals<C.UP.tower[0]?'Need '+(C.UP.tower[0]-h.crystals)+' more crystals':null,act:()=>{if(upgrade(h,'tower',b)){if(k!=='sharpen')b.spec=k}closeMenu()}})),{label:'Leave it',act:closeMenu}],grid:true,back:closeMenu})}
+// what you could raise right now, seen from twice the reach of the Upgrade action (the person: it should show
+// you have the material before you walk up to it): your houses and towers within 180 (the action's reach is 90),
+// your town from twice its radius, and on the giant your cannons and braces within two cells
+function readyToRaise(h,b){if(b.k==='tower'&&lv(b)===1&&!b.spec)return h.crystals>=C.UP.tower[0];return!canUpgrade(h,b.k,b)}
+function upgradeReady(){const h=S&&S.you;if(!h||h.dead||S.over||S.role!=='human')return;const pulse=.5+.5*Math.sin(S.t*5),out=[];
+  if(h.mode==='ground'){for(const b of S.builds)if(b.town===h.town&&(b.k==='house'||b.k==='tower')&&Math.hypot(b.x-h.x,b.y-h.y)<180&&readyToRaise(h,b))out.push({q:p3(b.x,b.y,b.k==='tower'?190:110)});
+    const t=S.towns[h.town];if(t&&t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r*2&&!canUpgrade(h,'town',t))out.push({q:p3(t.x,t.y,260)})}
+  else if(h.cl)for(const st of S.sites){const b=st.build;if(!b||b.town!==h.town||(b.k!=='cannon'&&b.k!=='brace'))continue;if(Math.hypot(st.c+.5-h.cl.x,st.r+.5-h.cl.y)>2.6||!readyToRaise(h,b))continue;out.push({q:cellScreen(st.c+.5,st.r+.5)})}
+  for(const o of out){const q=o.q;if(!q)continue;const y=q.y-14-4*pulse;ctx.save();ctx.globalAlpha=.75+.25*pulse;ctx.fillStyle='#ffd27a';ctx.strokeStyle='rgba(20,14,4,.85)';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(q.x,y-16);ctx.lineTo(q.x+13,y);ctx.lineTo(q.x+5,y);ctx.lineTo(q.x+5,y+10);ctx.lineTo(q.x-5,y+10);ctx.lineTo(q.x-5,y);ctx.lineTo(q.x-13,y);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore();
+    lbl('Ready to raise',q.x,y+24,12,'#ffd27a')}}
 function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town)continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
 // ---- world events: each is set off by something people did, and each gives bots and the player a reason to be elsewhere
 function wealth(i){let w=0;for(const t of aliveTowns())if(t.i===i)w+=3*(lv(t)-1)+(t.houses||0);for(const b of S.builds)if(b.town===i)w+=b.k==='tower'?1:0;return w}
@@ -945,7 +957,7 @@ function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPE
   S.tut.t+=dt;if(st.id==='hunt'&&S.t%2<dt)tutWolves(h);if(st.check(h)||(S.tut.t>150&&!st.hold)){if(S.tut.t>150&&!st.check(h))toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;
     if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist()}}}
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
-  openMenu({title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':'Show me',sub:last?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':'Show me',sub:last?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
@@ -1397,13 +1409,13 @@ function drawCombat3D(){if(!S||climbing3D())return;const you=S.you;
 window.__combat={CB,humanDodge,heavyStrike,beastFight,tokenFree,get flick(){return flick}};
 // ================= menus =================
 const ov=document.getElementById('ov'),card=document.getElementById('card');let menu=null,focusI=0;
-function openMenu(m){menu=m;latchHeld();renderMenu(0)}
+function openMenu(m){menu=m;latchHeld();renderMenu(0);if(m.holdUntil){card.classList.add('held');setTimeout(()=>{if(menu===m)card.classList.remove('held')},Math.max(0,m.holdUntil-performance.now()))}else card.classList.remove('held')}
 function renderMenu(fi){const m=menu,btn=(it,i)=>`<button class="mb${it.why?' off':''}${it.sel?' sel':''}" data-i="${i}">${it.label}${it.sub||it.why?`<small>${it.why||it.sub}</small>`:''}</button>`;
   const tabs=m.items.map((it,i)=>[it,i]).filter(([it])=>it.tab),rest=m.items.map((it,i)=>[it,i]).filter(([it])=>!it.tab);
   card.innerHTML=(m.title?`<${m.big?'h1':'h2'}>${m.title}</${m.big?'h1':'h2'}>`:'')+(tabs.length?'<div class="tabs">'+tabs.map(([it,i])=>btn(it,i)).join('')+'</div>':'')+(m.body||'')+`<div class="${m.grid?'grid2':''}">`+rest.map(([it,i])=>btn(it,i)).join('')+'</div>'+(m.foot||'');
   ov.hidden=false;card.querySelectorAll('.mb').forEach(b=>b.addEventListener('click',()=>activate(+b.dataset.i)));setFocus(Math.min(fi,m.items.length-1))}
 function setFocus(i){focusI=i;card.querySelectorAll('.mb').forEach((b,k)=>b.classList.toggle('focus',k===i));const b=card.querySelector(`.mb[data-i="${i}"]`);if(b)b.scrollIntoView({block:'nearest'})}
-function activate(i){const it=menu&&menu.items[i];if(!it)return;if(it.why){toast(it.why);return}it.act(i)}
+function activate(i){const it=menu&&menu.items[i];if(!it)return;if(menu.holdUntil&&performance.now()<menu.holdUntil)return;if(it.why){toast(it.why);return}it.act(i)}
 function closeMenu(){menu=null;ov.hidden=true;latchHeld()}
 function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')];
   if(code==='Enter'||code==='Space'||code==='KeyJ'){activate(focusI);return}
@@ -1861,6 +1873,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<2600)lbl('Ruins',p.x,p.y,11,'#ffcf6a')}
   mapLabels();
+  upgradeReady();
   for(const e of S.events){if(e.k==='star'){const p=p3(e.x,e.y,300);if(p&&p.d<20000)lbl('Fallen star: '+e.left+' crystals',p.x,p.y,12,'#9fe8ff')}if(e.k==='raid'&&S.t<e.go){const p=p3(e.x,e.y,150);if(p)lbl('Raiders gathering: '+Math.ceil(e.go-S.t)+' s',p.x,p.y,12,'#ff8f80')}
     if(e.k==='caravan'){const p=p3(e.x,e.y,90);if(p)pbar(p.x,p.y,40,e.hp/e.max,'#9be08a')}}
   for(const m of S.monsters)if(m.hp<m.max){const p=p3(m.x,m.y,m.kind==='troll'?90:40);if(p&&p.d<3000)pbar(p.x,p.y,26,m.hp/m.max,'#ff8f80')}

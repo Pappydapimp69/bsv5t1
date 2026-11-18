@@ -193,19 +193,43 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
   SE.SoundEngine.create({workletUrl:url,device:'stereo',zone:'openPlain',maxVoices:16}).then(e=>{se=e;actx=e.ctx;
     seSrc={ui:e.createSource('synth',{level:78,priority:3}),groan:e.createSource('synth',{level:104,refDistance:70,priority:6}),
       metal:e.createSource('modal',{modes:METAL,level:100,refDistance:70,priority:6}),boom:e.createSource('synth',{level:100,refDistance:60,priority:5}),
-      near:e.createSource('synth',{level:82,refDistance:8,priority:2})};if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;plainAudio()});return true}
+      near:e.createSource('synth',{level:82,refDistance:8,priority:2}),
+      // a throat the size of a hall: low, rough, wavering calls that carry for miles
+      voice:e.createSource('voice',{tract:3.2,sac:1.6,level:112,refDistance:90,priority:7}),
+      gfoot:e.createSource('footsteps',{level:108,refDistance:50,priority:5}),feet:e.createSource('footsteps',{level:70,refDistance:3,priority:2}),
+      river:e.createSource('water',{preset:'stream',level:62,refDistance:12,priority:1}),lake:e.createSource('water',{preset:'drip',level:60,refDistance:15,priority:1})};
+    seSrc.river.setWater('stream');seSrc.lake.setWater('drip');if(actx.state==='suspended')actx.resume().catch(()=>{})}).catch(()=>{se=null;seFailed=true;plainAudio()});return true}
 let seVol=-1;
 function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));
-  const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);se.update()}
+  const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
+  seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
+  // the nearest river runs where it is; the nearest filled footprint lake drips
+  let rb=null,rd=1e9;for(const rv of S.rivers)for(const q of rv){const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<rd){rd=d;rb=q}}if(rb)seSrc.river.setPosition(z(rb.x),-z(rb.y),0);
+  let lb=null,ld=1e9;for(const q of S.prints){if(S.t-q.t<4)continue;const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<ld){ld=d;lb=q}}seSrc.lake.setPosition(lb?z(lb.x):9e3,lb?-z(lb.y):9e3,0);
+  // your own feet: dirt, splashing through a lake, or fingers finding stone on the giant
+  const h=S.you;if(h&&!h.dead){seSrc.feet.setPosition(z(S.cam.x),-z(S.cam.y),0);
+    if(h.mode==='ground'){const m=h.stepAt?Math.hypot(h.x-h.stepAt.x,h.y-h.stepAt.y):0;if(!h.stepAt||m>60){const wet=S.prints.some(q=>S.t-q.t>4&&Math.hypot(q.x-h.x,q.y-h.y)<C.FOOT_R*.8);
+        if(h.stepAt)seSrc.feet.step({mass:80,speed:wet?.8:1.4,surface:wet?'water':'packedDirt',gain:.9});h.stepAt={x:h.x,y:h.y};if(wet&&h.stepAt)seSrc.lake.splash(12,.4)}}
+    else if(h.cl){const mv=!!h.cl.move;if(h.wasMoving&&!mv)seSrc.feet.step({mass:80,speed:1,surface:'sandstone',claws:true,gain:1});h.wasMoving=mv}}
+  se.update()}
+// the giant's voice: never on a beat, never the same twice
+function giantCall(kind){if(!se||se==='starting'||!save.sound||!S)return;const v=seSrc.voice,r=Math.random;
+  if(kind==='moan')v.call({mode:'open',duration:2.4+r()*2.2,f0:38+r()*10,f0End:26+r()*6,amp:.8,intensity:.55,roughness:.75,breath:.35,jitter:.55,vibrato:.25,vibratoRate:2.3+r()*2,mouth:.3+r()*.3,attack:.6});
+  else if(kind==='bellow')v.call({mode:'open',duration:1.6,f0:62,f0End:30,amp:1,intensity:1,roughness:.95,breath:.25,jitter:.7,vibrato:.1,mouth:.9,attack:.12});
+  else if(kind==='rumble')v.call({mode:'closed',duration:2.8,amp:1,intensity:.9,roughness:.6,jitter:.3,attack:.4});
+  else if(kind==='pain')v.call({mode:'open',duration:2.2,f0:80,f0End:28,amp:1,intensity:1,roughness:1,breath:.5,jitter:.9,vibrato:.6,vibratoRate:7,mouth:.8,attack:.05})}
+function seGiantStep(ft){if(!se||se==='starting'||!save.sound)return;const z=v=>v*SE_M,wet=S.prints.some(q=>Math.hypot(q.x-ft.x,q.y-ft.y)<C.FOOT_R*1.3&&S.t-q.t>4);
+  seSrc.gfoot.setPosition(z(ft.x),-z(ft.y),0);seSrc.gfoot.step({mass:250000,speed:.6,surface:wet?'water':'packedDirt',gain:1});
+  if(wet){seSrc.lake.setPosition(z(ft.x),-z(ft.y),0);seSrc.lake.splash(120,1)}}
 function unlockAudio(){if(!save.sound)return;if(!seFailed&&startEngine())return;plainAudio()}
 // fallback where the engine cannot load its AudioWorklet: plain Web Audio blips
 function plainAudio(){if(se)return;if(actx){if(actx.state==='suspended')actx.resume().catch(()=>{});return}try{actx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'balanced'});master=actx.createDynamicsCompressor();master.connect(actx.destination)}catch(e){}if(actx&&actx.state==='suspended')actx.resume().catch(()=>{})}
 document.addEventListener('visibilitychange',()=>{if(!actx||!actx.suspend)return;if(document.hidden)actx.suspend().catch(()=>{});else actx.resume().catch(()=>{})});
 // the giant's groan as it moves: detuned low saws beating against each other, a swept resonance like strained metal, and
 // inharmonic ringing partials bending down. Upper partials carry it on phone speakers. Heard from far away, never loud.
-function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;seSrc.groan.sfx('roar',{midi:26,duration:2.6,velocity:.75});seSrc.metal.strike(.8,.3+Math.random()*.2);return}
+function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;seSrc.groan.sfx('roar',{midi:24+Math.floor(Math.random()*4),duration:2.4+Math.random(),velocity:.9});seSrc.metal.strike(1,.45+Math.random()*.35);if(Math.random()<.5)setTimeout(()=>se&&seSrc.metal.strike(.7,.7),300+Math.random()*900);return}
   if(!actx||!save.sound||vol<.02)return;const t=actx.currentTime,out=actx.createGain();out.gain.setValueAtTime(.0001,t);out.gain.exponentialRampToValueAtTime(vol,t+.7);out.gain.exponentialRampToValueAtTime(.0001,t+3.4);out.connect(master);
   const bp=actx.createBiquadFilter();bp.type='bandpass';bp.Q.value=9;bp.frequency.setValueAtTime(260,t);bp.frequency.exponentialRampToValueAtTime(820+Math.random()*300,t+1.3);bp.frequency.exponentialRampToValueAtTime(190,t+3.2);bp.connect(out);
   const f0=48+Math.random()*8;for(const [m,type,g] of [[1,'sawtooth',.5],[1.013,'sawtooth',.5],[2.02,'square',.18],[3.03,'sawtooth',.25]]){const o=actx.createOscillator(),gg=actx.createGain();o.type=type;o.frequency.setValueAtTime(f0*m,t);o.frequency.linearRampToValueAtTime(f0*m*.94,t+3.2);gg.gain.value=g;o.connect(gg).connect(bp);o.start(t);o.stop(t+3.5)}
@@ -294,6 +318,7 @@ function giantDo(k){const why=canGiant(k);if(why){if(S.role==='giant'&&!S.autopl
     let a=g.ang,d=C.SMASH_REACH*.8;if(best){a=Math.atan2(best.y-g.y,best.x-g.x);d=Math.min(C.SMASH_REACH,bd)}w.x=g.x+Math.cos(a)*d;w.y=g.y+Math.sin(a)*d}
   if(k==='swipe')w.side=swipeSide();
   if(k==='shake'||k==='swipe'){for(const h of climbers())if(h.you)toast(k==='shake'?'The giant tenses! Hold still to brace.':'A hand is coming! Get to a ledge or the other side.');sfx('warn')}
+  if(!S.headless)giantCall(k==='shake'?'rumble':'bellow');
   g.wind=w;g.cd[k]=C[k.toUpperCase()+'_CD'];return true}
 function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
   if(w.k==='stomp'){sfx('stomp');shake(14);for(const f of g.feet){S.fx.push({k:'ring',x:f.x,y:f.y,r:C.STOMP_R,t:0,life:.6,col:'#ffcf6a'});hurtArea(f.x,f.y,C.STOMP_R,C.STOMP_DMG,C.STOMP_TOWN,'stomp')}}
@@ -340,7 +365,7 @@ function stepGiant(dt){const g=S.g;if(g.dead)return;
   if(air){air.air-=dt;const k=1-air.air/air.dur;air.x=air.sx+(air.lx-air.sx)*k;air.y=air.sy+(air.ly-air.sy)*k;if(air.air<=0){air.air=0;air.x=air.lx;air.y=air.ly;footLand(air,g.feet.indexOf(air))}}
   else{let worst=-1,wd=0;g.feet.forEach((ft,i)=>{const s=i?1:-1,ix=g.x+side.x*s*C.FOOT_SPREAD,iy=g.y+side.y*s*C.FOOT_SPREAD,d=Math.hypot(ft.x-ix,ft.y-iy);if(d>wd){wd=d;worst=i}});
     if(wd>60||(moving&&wd>20)){const ft=g.feet[worst],s=worst?1:-1,lead=moving?g.v*C.G_STEP*.9:0;
-      ft.sx=ft.x;ft.sy=ft.y;ft.lx=g.x+f.x*lead+side.x*s*C.FOOT_SPREAD;ft.ly=g.y+f.y*lead+side.y*s*C.FOOT_SPREAD;ft.dur=C.G_STEP*(braces()?1:2.2);ft.air=ft.dur;if(!S.headless){const d=Math.hypot(g.x-S.cam.x,g.y-S.cam.y);groan(.22*clamp(1.15-d/7000,.18,1))}}}
+      ft.sx=ft.x;ft.sy=ft.y;ft.lx=g.x+f.x*lead+side.x*s*C.FOOT_SPREAD;ft.ly=g.y+f.y*lead+side.y*s*C.FOOT_SPREAD;ft.dur=C.G_STEP*(braces()?1:2.2);ft.air=ft.dur;if(!S.headless&&Math.random()<(g.target?.6:.3))setTimeout(()=>giantCall(g.target&&Math.random()<.5?'rumble':'moan'),Math.random()*1800);if(!S.headless){const d=Math.hypot(g.x-S.cam.x,g.y-S.cam.y);groan(.22*clamp(1.15-d/7000,.18,1))}}}
   // cannons on the body fire at every town but their builder's
   for(const s of S.sites){const b=s.build;if(!b||b.k==='brace')continue;if(s.id==='armL'&&S.joints.elbowL.crip||s.id==='armR'&&S.joints.elbowR.crip)continue;
     b.cd-=dt;if(b.cd>0)continue;const tgt=cannonTarget(b.town);
@@ -350,7 +375,7 @@ function cannonTarget(town){const g=S.g;let best=null,bd=C.CANNON_RANGE;
   if(best)return best;
   for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town!==town){const d=dist(g,h);if(d<bd*.7){bd=d;best=h}}
   return best}
-function footLand(ft,i){sfx('step',nearPlayer(ft));shake(4);
+function footLand(ft,i){sfx('step',nearPlayer(ft));seGiantStep(ft);shake(4);
   S.fx.push({k:'ring',x:ft.x,y:ft.y,r:C.FOOT_R*1.5,t:0,life:.5,col:'#c9b48a'});
   if(!S.towns.some(t=>Math.hypot(t.x-ft.x,t.y-ft.y)<t.r+60)){S.prints.push({x:ft.x,y:ft.y,a:S.g.ang,t:S.t});if(S.prints.length>160)S.prints.shift()}
   hurtArea(ft.x,ft.y,C.FOOT_R,C.CRUSH,C.CRUSH_TOWN,'crush');
@@ -361,7 +386,7 @@ function damageJoint(id,d,by){const g=S.g,j=S.joints[id];if(g.dead||j.hp<=0&&id=
   if(by&&by.town!=null)S.grudge[by.town]+=d; // the giant remembers whose people hurt it
   j.hp-=d;if(j.hp>0)return;j.hp=0;
   if(id==='heart'){g.dead=true;announce('The Heart-stone shatters. The giant is slain!');return}
-  if(!j.crip){j.crip=true;j.wedges=[];announce(JOINTS[id].name+' crippled!');
+  if(!j.crip){j.crip=true;j.wedges=[];announce(JOINTS[id].name+' crippled!');if(!S.headless)giantCall('pain');
     if(S.joints.kneeL.crip&&S.joints.kneeR.crip&&g.fallen<=0){g.fallen=C.FALL_TIME;g.wind=null;g.v=0;shake(30);sfx('stomp');
       announce('The giant falls to its knees! No grip is lost, climbing is twice as fast and the Heart-stone takes double damage.')}}}
 
@@ -406,7 +431,7 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
     if(slot==='Y'&&siteAt(cl.x,cl.y)&&!siteAt(cl.x,cl.y).build&&!jointAt(cl.x,cl.y)){const st=siteAt(cl.x,cl.y);h.kits.brace--;st.build={k:'brace',town:h.town,owner:h.id,hp:C.CANNON_HP,cd:0};S.grudge[h.town]-=C.BRACE_FAVOR;
       sfx('build',h.you);gainXp(h,20);sayTo(h,'Brace bolted to the '+st.name+'. The giant can move a little more.');return true}
-    if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
+    if(slot==='Y'){const j=jointAt(cl.x,cl.y);if(j){h.kits.wedge--;S.joints[j].wedges.push({town:h.town});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.');return true}
     return false}
   if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const m=nearMonster(h,60);if(m){m.hp-=h.atk;sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}return false}

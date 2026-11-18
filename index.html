@@ -16,6 +16,26 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1
 #hud .l2{color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 #stage{grid-area:stage;position:relative;min-height:0;overflow:hidden;touch-action:none}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+/* status strip: chips with bars, the dusk meter on the right, one line of what to do next */
+#hud .l1{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.chip{position:relative;display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:2px 8px;border-radius:7px;background:#232a36;border:1px solid var(--line);font-size:13px;white-space:nowrap;overflow:hidden}
+.chip b{color:var(--accent)}.chip .warn{color:var(--bad)}
+.chip .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--good)}.chip .bar.low{background:var(--bad)}.chip .bar.mid{background:var(--accent)}
+.chip.dusk{margin-left:auto;background:#2b2433}.chip.dusk .bar{background:#e08a4a}
+.chip.goal{background:#2e3524;border-color:#55623f}
+#hud .l2{color:var(--ink);font-size:13px;margin-top:4px;white-space:normal;line-height:1.25}
+#hud .l2 .k{color:var(--accent);font-weight:600}
+/* message feed: newest at the bottom, repeats folded, each held long enough to read */
+#feed{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;align-items:center;pointer-events:none;width:min(92%,560px);z-index:5}
+#feed div{background:rgba(10,8,12,.86);border:1px solid #3a3346;color:var(--ink);padding:5px 12px;border-radius:8px;font-size:14px;text-align:center;transition:opacity .4s}
+#feed div b{color:var(--accent)}
+.ov.title{background:linear-gradient(90deg,rgba(6,6,10,.82),rgba(6,6,10,.35) 55%,rgba(6,6,10,0));justify-content:flex-start}
+body.titling #pad{visibility:hidden}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:6px}
+.tabs .mb{text-align:center;min-height:44px;padding:6px 4px;font-size:14px}
+.tabs .mb.sel{border-color:var(--accent);background:#3a3524;color:var(--accent)}
+.card .meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin:4px 0 8px}
+@media (min-width:900px){body:not(.touch) #pad{grid-template-columns:repeat(4,minmax(0,170px));justify-content:center}}
 #toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(8,10,14,.85);color:var(--ink);padding:6px 12px;border-radius:8px;font-size:14px;pointer-events:none;max-width:92%;text-align:center;opacity:0;transition:opacity .2s}
 #toast.on{opacity:1}
 #pad{grid-area:pad;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;background:var(--panel);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));touch-action:none}
@@ -47,7 +67,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
   <div id="hud"><div class="l1" id="hud1">Colossus</div><div class="l2" id="hud2"></div></div>
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div id="toast"></div>
+    <div id="toast"></div><div id="feed"></div>
     <div class="ov" id="ov"><div class="card" id="card"></div></div>
   </div>
   <div id="pad"></div>
@@ -373,7 +393,10 @@ function homeOf(h){let b=null,bd=1e9;const own=aliveTowns().filter(o=>o.i===h.to
 
 // ================= messages =================
 let toastT=0;const toastEl=document.getElementById('toast');
-function toast(s){toastEl.textContent=s;toastEl.classList.add('on');toastT=2.6}
+const feedEl=document.getElementById('feed');let feed=[];
+// messages queue instead of overwriting each other; a repeat folds into the one already showing
+function toast(s){const last=feed[feed.length-1];if(last&&last.text===s){last.n++;last.t=Math.max(last.t,3);return}feed.push({text:s,n:1,t:Math.min(6,2.6+s.length/40)});if(feed.length>3)feed.shift()}
+function paintFeed(dt){for(const f of feed)f.t-=dt;feed=feed.filter(f=>f.t>0);const html=feed.map(f=>`<div style="opacity:${Math.min(1,f.t/.5)}">${f.text}${f.n>1?' <b>x'+f.n+'</b>':''}</div>`).join('');if(html!==feedEl._h){feedEl._h=html;feedEl.innerHTML=html}}
 function announce(s){toast(s)}
 function sayTo(h,s){if(h&&h.you)toast(s)}
 
@@ -926,7 +949,9 @@ function paintButtons(){const info=slotInfo();if(!info)return;const kn=KEYNAMES[
 // ================= menus =================
 const ov=document.getElementById('ov'),card=document.getElementById('card');let menu=null,focusI=0;
 function openMenu(m){menu=m;latchHeld();renderMenu(0)}
-function renderMenu(fi){const m=menu;card.innerHTML=(m.title?`<${m.big?'h1':'h2'}>${m.title}</${m.big?'h1':'h2'}>`:'')+(m.body||'')+`<div class="${m.grid?'grid2':''}">`+m.items.map((it,i)=>`<button class="mb${it.why?' off':''}" data-i="${i}">${it.label}${it.sub||it.why?`<small>${it.why||it.sub}</small>`:''}</button>`).join('')+'</div>'+(m.foot||'');
+function renderMenu(fi){const m=menu,btn=(it,i)=>`<button class="mb${it.why?' off':''}${it.sel?' sel':''}" data-i="${i}">${it.label}${it.sub||it.why?`<small>${it.why||it.sub}</small>`:''}</button>`;
+  const tabs=m.items.map((it,i)=>[it,i]).filter(([it])=>it.tab),rest=m.items.map((it,i)=>[it,i]).filter(([it])=>!it.tab);
+  card.innerHTML=(m.title?`<${m.big?'h1':'h2'}>${m.title}</${m.big?'h1':'h2'}>`:'')+(tabs.length?'<div class="tabs">'+tabs.map(([it,i])=>btn(it,i)).join('')+'</div>':'')+(m.body||'')+`<div class="${m.grid?'grid2':''}">`+rest.map(([it,i])=>btn(it,i)).join('')+'</div>'+(m.foot||'');
   ov.hidden=false;card.querySelectorAll('.mb').forEach(b=>b.addEventListener('click',()=>activate(+b.dataset.i)));setFocus(Math.min(fi,m.items.length-1))}
 function setFocus(i){focusI=i;card.querySelectorAll('.mb').forEach((b,k)=>b.classList.toggle('focus',k===i));const b=card.querySelector(`.mb[data-i="${i}"]`);if(b)b.scrollIntoView({block:'nearest'})}
 function activate(i){const it=menu&&menu.items[i];if(!it)return;if(it.why){toast(it.why);return}it.act(i)}
@@ -939,7 +964,7 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   bs.forEach((b,i)=>{if(i===focusI)return;const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,dx=x-cx,dy=y-cy;const along=dx*d[0]+dy*d[1];if(along<=4)return;const off=Math.abs(dx*d[1])+Math.abs(dy*d[0]);const s=along+off*2.5;if(s<bd){bd=s;best=i}});
   if(best>=0)setFocus(best)}
 function record(){return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.</p>`}
-function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
+function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
@@ -963,22 +988,25 @@ function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub)=>({label:
   const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?': more walls and rent':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
   openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold, ${h.crystals} sky crystals. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
     items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
-function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
-  const buy=(k,cost,fn)=>({label:k+' – '+cost+' gold',why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
-  const q=h.quest;
-  const items=[
-    ...(q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+') \u2013 choose Drop to give it up',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}},
-        ...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
-      :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold \u00b7 board changes in '+Math.max(1,Math.ceil(60-(S.t-t.boardT)))+' s',act:()=>{h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))),
-    {label:'Raise '+t.name+(upCost('town',t)!=null?' \u2013 '+upCost('town',t)+' crystals':''),sub:'Level '+lv(t)+': +600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
-    {label:h.horn?'You carry a wake horn':'Forge a wake horn \u2013 '+C.HORN_CRYSTALS+' sky crystals',sub:h.horn?'Sound it at the giant\u2019s head':'You carry '+h.crystals+'. The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant\u2019s head.');openTown(t)}},
-    {label:'Sell sky crystals \u2013 4 gold each',sub:'You carry '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}},
-    buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3),buy('Wedge',C.COST.wedge,()=>h.kits.wedge++),
-    buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++),buy('Brace kit',C.COST.brace,()=>h.kits.brace++),buy('Potion',C.COST.potion,()=>h.potions++),
-    buy('Sharper blade',C.COST.blade,()=>h.atk+=5),h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1),
-    {label:'Leave town',act:closeMenu}];
-  openMenu({title:t.name,body:`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces. Town walls ${Math.ceil(t.hp)}/${t.max}.</p>`,items,grid:true,back:closeMenu})}
-function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;farLand=null;closeMenu();lastSig='';
+let townTab='Board';
+function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const fi=focusI;const tb=townTab;
+  const buy=(k,cost,fn,sub)=>({label:k+' – '+cost+' gold',sub,why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
+  const tabs=['Board','Shop','Forge','Hall'].map(n=>({label:n,tab:true,sel:n===tb,act:()=>{openTown(t,n);setFocus(['Board','Shop','Forge','Hall'].indexOf(n))}}));
+  const q=h.quest;let items=[],body='';
+  if(tb==='Board'){body=`<p class="dim">Jobs posted in ${t.name}. The board changes in ${Math.max(1,Math.ceil(60-(S.t-(t.boardT||0))))} s.</p>`;
+    items=q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+')',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;sfx('coin')}openTown(t)}},...(q.done?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
+      :board(t).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
+  else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
+    items=[buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3,'Catches your people when they fall'),buy('Potion',C.COST.potion,()=>h.potions++,'Restores 60 health'),buy('Sharper blade',C.COST.blade,()=>h.atk+=5,'Hits 5 harder'),
+      h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1,'25 more grip'),
+      ...(S.g.awake?[buy('Wedge',C.COST.wedge,()=>h.kits.wedge++,'Bleeds a joint'),buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++,'Fires on rival towns'),buy('Brace kit',C.COST.brace,()=>h.kits.brace++,'Lets the giant walk')]:[{label:'Giant’s kits',why:'Sold once the giant wakes',act:()=>{}}])]}
+  else if(tb==='Forge'){body=`<p class="dim">${h.crystals} sky crystals in your store.</p>`;
+    items=[{label:h.horn?'You carry a wake horn':'Forge a wake horn – '+C.HORN_CRYSTALS+' crystals',sub:h.horn?'Sound it at the giant’s head':'The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant’s head.');openTown(t)}},
+      {label:'Sell sky crystals – 4 gold each',sub:'You have '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}}]}
+  else{body=`<p class="dim">${t.name}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses built. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p>`;
+    items=[{label:'Raise '+t.name+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:'+600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}}]}
+  openMenu({title:t.name,body,items:[...tabs,...items,{label:'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
+function start(role,seed){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;farLand=null;closeMenu();lastSig='';
   toast(role==='giant'?'You are the giant, asleep and locked in place until someone climbs to your head and wakes you. Then braces the humans bolt on let you walk: survive until dusk and complete three of five tasks.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
 
 // ================= camera and render =================
@@ -1009,12 +1037,22 @@ function landscape(alt){if(!farLand){const R=mulberry32(S.seed^77);farLand=[];fo
     const haze=Math.min(.75,f.d/40);ctx.globalAlpha=1-haze;ctx.fillStyle=f.kind==='lake'?'#6f9fc0':f.kind==='wood'?'#3d5530':'#c9bfa6';ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,7);ctx.fill();ctx.globalAlpha=1}
   ctx.fillStyle='rgba(200,214,224,.35)';ctx.fillRect(0,hz-6,W,14)}
 function render(){fit();ctx.setTransform(DPR,0,0,DPR,0,0);
-  if(!S){ctx.fillStyle='#1d2432';ctx.fillRect(0,0,W,H);return}
+  if(!S){drawTitleScene();return}
   const sx=shakeA?(Math.random()-.5)*shakeA:0,sy=shakeA?(Math.random()-.5)*shakeA:0;
   ctx.save();ctx.translate(sx,sy);
   if(S.you&&S.you.mode==='climb'&&!S.you.dead)renderClimb();else{renderGround();if(S.role==='giant')renderBodyPanel()}
   if(!(S.you&&S.you.mode==='climb'))drawStarfall();drawCaption();
   ctx.restore()}
+let titleStones=null;
+function drawTitleScene(){const t=performance.now()/1000,g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1c1622');g.addColorStop(.55,'#5a2c2a');g.addColorStop(.8,'#b0603a');g.addColorStop(1,'#2a2a22');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const hz=H*.78;ctx.fillStyle='#3a2a2c';ctx.beginPath();ctx.moveTo(0,hz);for(let x=0;x<=W;x+=8)ctx.lineTo(x,hz-10-12*(Math.sin(x*.011)+.6*Math.sin(x*.027)+1.5));ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.fill();
+  ctx.fillStyle='rgba(30,20,26,.55)';for(let i=0;i<7;i++){const x=((i*W*.31+t*6)%(W*1.4))-W*.2,y=H*(.08+.05*(i%3));ctx.beginPath();ctx.ellipse(x,y,W*.18,H*.035,0,0,7);ctx.fill()}
+  if(!titleStones){const R2=mulberry32(5);titleStones=[];const put=(x,y,r)=>titleStones.push({x,y,r:r*(.85+R2()*.3),n:titleStones.length});
+    for(const s of[-1,1])for(let j=0;j<8;j++)put(s*.06+s*.01*j*.2,.98-j*.06,.045);for(let j=0;j<5;j++)for(let k=0;k<4;k++)put(-.1+k*.066,.5-j*.045,.05);
+    for(const s of[-1,1])for(let j=0;j<6;j++)put(s*(.16+j*.006),.32+j*.055,.035);put(0,.25,.055);put(.02,.2,.035)}
+  const cx=W*.68,sc=H*.9;for(const b of titleStones)stone(cx+b.x*sc,H*.06+b.y*sc*.86,b.r*sc,['#5e5852','#7d756b','#2f2b27'],b.n);
+  ctx.strokeStyle='#17141a';ctx.lineWidth=Math.max(2,H*.006);for(const[s,y]of[[-1,.95],[1,.95],[-1,.62],[1,.62]]){ctx.beginPath();ctx.moveTo(cx+s*sc*(y>.9?.07:.19),H*.06+y*sc*.86);ctx.quadraticCurveTo(cx+s*sc*.32,H*.86,cx+s*sc*.45,H*.92);ctx.stroke()}
+  for(let i=0;i<14;i++){const x=W*(.06+i*.025),y=H*.88+(i%3)*4;ctx.fillStyle=`rgba(255,${190+(i%4)*12},120,${.5+.4*Math.sin(t*2+i)})`;ctx.fillRect(x,y,3,3)}}
 function shapePath(c,x,y,r,shape){c.beginPath();if(shape==='circle')c.arc(x,y,r,0,7);else if(shape==='square')c.rect(x-r*.85,y-r*.85,r*1.7,r*1.7);else{c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath()}}
 // ----- ground view: a turning perspective camera on canvas 2D (from the giant project's proven renderer) -----
 // The eye sits behind and above the focus; the ground is drawn in strips, each mapped world-to-screen affinely,
@@ -1250,24 +1288,26 @@ const hud1=document.getElementById('hud1'),hud2=document.getElementById('hud2');
 function clock(){const s=Math.max(0,C.DUSK-S.t);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function mood(i){const v=S.grudge[i];return v>=C.ANGER?'ANGRY':v>=C.ANGER*.5?'wary':v<-60?'friendly':'calm'}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
-  let a,b;
+  let a,b;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
+  const duskChip=chip('Dusk',clock(),1-S.t/C.DUSK,' dusk');
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
-    a=`<span>Dusk <b>${clock()}</b></span><span>Braces <b>${braces()}/5</b></span><span>Heart <b>${pc('heart')}</b></span><span>Knees <b>${pc('kneeL')}</b> / <b>${pc('kneeR')}</b></span><span>Elbows <b>${pc('elbowL')}</b> / <b>${pc('elbowR')}</b></span><span>Neck <b>${pc('neck')}</b></span><span>Climbers <b>${climbers().length}</b></span>`;
-    {const ts=giantTasks(),n=ts.filter(x=>x.done).length;a+=`<span>Tasks <b>${n}/${C.GIANT_TASKS}</b></span>`;S.taskLine=ts.map(x=>x.name+(x.done?' done':' ('+x.note+')')).join(' \u00b7 ')}
+    const jf=id=>J[id].hp/J[id].max,worst=Math.min(jf('kneeL'),jf('kneeR'),jf('elbowL'),jf('elbowR'),jf('neck'));
+    a=chip('Heart',pc('heart'),jf('heart'))+chip('Joints',Math.round(worst*100)+'% worst',worst)+chip('Braces',braces()+'/5')+duskChip;
+    {const ts=giantTasks(),n=ts.filter(x=>x.done).length;a+=chip('Tasks',n+'/'+C.GIANT_TASKS,n/C.GIANT_TASKS,' goal')+chip('Climbers',climbers().length);S.taskLine=ts.map(x=>x.name+(x.done?' done':' ('+x.note+')')).join(' \u00b7 ')}
     b=S.t>OPENING.len&&Math.floor(S.t/8)%2?S.taskLine:!g.awake?'Asleep and chained. Someone must climb to your head and wake you ('+Math.round(S.wakeT/C.WAKE_TIME*100)+'%).':S.chains.some(q=>q.hp>0)?'Chains left: '+S.chains.filter(q=>q.hp>0).map(q=>q.name).join(', '):g.fallen>0?'You are down for '+Math.ceil(g.fallen)+' s. They are at your heart.':TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' · ')}
   else{const h=S.you;
-    a=`<span>Dusk <b>${clock()}</b></span><span>HP <b class="${h.hp<h.max*.3?'warn':''}">${Math.ceil(h.hp)}/${h.max}</b></span>`+(h.mode==='climb'?`<span>Grip <b class="${h.grip<maxGrip(h)*.25?'warn':''}">${Math.ceil(Math.max(0,h.grip))}</b></span><span>Height <b>${Math.round(h.cl.y*FT)} ft</b></span>`:`<span>Lv <b>${h.lvl}</b></span>`)+
-      `<span>Gold <b>${h.gold}</b></span><span>Pack <b>${packCount(h)}/${C.PACK}</b>${h.pack.found?'':' (ground pick ready)'}</span><span>Stored <b>${h.crystals}</b>${h.horn?' Horn':''}</span><span>Anchors <b>${h.kits.anchor}</b> Wedges <b>${h.kits.wedge}</b> Cannons <b>${h.kits.cannon}</b></span>`;
+    a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
+      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+C.PACK,1-packCount(h)/C.PACK)+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none')+duskChip;
     const q=h.quest;b=(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
       (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
-  const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.textContent=b}}
+  const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.innerHTML=String(b).replace(/^([^:.]{2,24}:)/,'<span class="k">$1</span>')}}
 
 // ================= loop =================
 let acc=0,last=performance.now();
 // the next frame is asked for first and the work is guarded, so one thrown error never freezes the game
 function frame(now){requestAnimationFrame(frame);try{frameWork(now)}catch(e){console.error(e)}}
 function frameWork(now){if(S&&S.introCam&&S.t>17.5){cam.pitch+=(.12-cam.pitch)*Math.min(1,.016*1.2);if(Math.abs(cam.pitch-.12)<.01)S.introCam=false}if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
-  if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on')}
+  paintFeed(dt);
   if(S&&!menu&&!S.over){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);
     const focus=S.role==='giant'?S.g:(S.you.mode==='climb'?S.g.feet[S.you.leg]:S.you);S.cam.x+=(focus.x-S.cam.x)*Math.min(1,dt*5);S.cam.y+=(focus.y-S.cam.y)*Math.min(1,dt*5)}

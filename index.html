@@ -4,74 +4,123 @@
 <title>Colossus</title>
 <style>
 [hidden]{display:none!important}
-/* Layout: HUD row, stage, action bar (a right-hand column on short landscape screens). Single dark look by choice. */
-:root{color-scheme:dark;--bg:#11141b;--panel:#1a1f28;--ink:#eee9dd;--dim:#a9afbb;--accent:#ffcf6a;--line:#363e4c;--bad:#ff8f80;--good:#9be08a}
+/* One interface. Every size is in rem, and rem is set from the shorter screen side, so text and buttons grow on big screens.
+   Zones: top panel (giant, dusk, towns' feeling) + goal line + feed; bottom-left your stats; actions as a thumb arc (touch), key plates (keys) or A/B/X/Y diamond (pad), chosen by body[data-dev]. */
+:root{color-scheme:dark;--bg:#11141b;--panel:#1a1f28;--ink:#eee9dd;--dim:#a9afbb;--accent:#ffcf6a;--line:#363e4c;--bad:#ff8f80;--good:#9be08a;--glass:rgba(14,16,20,.64);--sl:max(.7rem,env(safe-area-inset-left));--sr:max(.7rem,env(safe-area-inset-right));--sb:max(.7rem,env(safe-area-inset-bottom))}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-#app{position:fixed;inset:0;height:100dvh;display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);grid-template-areas:"hud" "stage" "pad"}
-#hud{grid-area:hud;min-width:0;background:var(--panel);border-bottom:1px solid var(--line);padding:6px max(10px,env(safe-area-inset-right)) 6px max(10px,env(safe-area-inset-left));padding-top:max(6px,env(safe-area-inset-top));min-height:50px}
-#hud .l1{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:14px;font-variant-numeric:tabular-nums}
-#hud b{color:var(--accent);font-weight:600}
-#hud .warn{color:var(--bad);font-weight:600}
-#hud .l2{color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-#stage{grid-area:stage;position:relative;min-height:0;overflow:hidden;touch-action:none}
+html{font-size:clamp(15px,calc(12px + .95vmin),36px)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:1rem/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#app{position:fixed;inset:0;height:100dvh}
+#stage{position:absolute;inset:0;overflow:hidden;touch-action:none}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-/* status strip: chips with bars, the dusk meter on the right, one line of what to do next */
-#hud .l1{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
-.chip{position:relative;display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:2px 8px;border-radius:7px;background:#232a36;border:1px solid var(--line);font-size:13px;white-space:nowrap;overflow:hidden}
-.chip b{color:var(--accent)}.chip .warn{color:var(--bad)}
-.chip .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--good)}.chip .bar.low{background:var(--bad)}.chip .bar.mid{background:var(--accent)}
-.chip.dusk{margin-left:auto;background:#2b2433}.chip.dusk .bar{background:#e08a4a}
-.chip.goal{background:#2e3524;border-color:#55623f}
-#hud .l2{color:var(--ink);font-size:13px;margin-top:4px;white-space:normal;line-height:1.25}
-#hud .l2 .k{color:var(--accent);font-weight:600}
-/* message feed: newest at the bottom, repeats folded, each held long enough to read */
-#feed{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;align-items:center;pointer-events:none;width:min(92%,560px);z-index:5}
-#feed div{background:rgba(10,8,12,.86);border:1px solid #3a3346;color:var(--ink);padding:5px 12px;border-radius:8px;font-size:14px;text-align:center;transition:opacity .4s}
+.glass{background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:1rem}
+body.titling #top,body.titling #stats,body.titling #pad{visibility:hidden}
+/* top: giant panel, goal line, toast and feed, centred */
+#top{position:absolute;z-index:6;left:0;right:0;top:max(.6rem,env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:.45rem;pointer-events:none;padding:0 var(--sr) 0 var(--sl)}
+#hud{width:min(100%,34rem);display:flex;gap:.8rem;align-items:center;padding:.5rem .8rem}
+#gfig{width:1.9rem;height:3.4rem;flex:none}
+#hud .gi{flex:1;min-width:0;display:flex;flex-direction:column;gap:.35rem}
+#hud .gr{display:flex;justify-content:space-between;gap:.6rem;font-size:.95rem;font-weight:700}
+#hud .gr #gd{color:#f0a050;white-space:nowrap}
+#gbar{position:relative;height:.5rem;border-radius:.3rem;background:linear-gradient(90deg,#4a7a54,#b9a35a 60%,#b04a3a);margin:.15rem 0}
+#gbar i{margin-left:var(--o,0);position:absolute;top:-.3rem;width:.28rem;height:1.1rem;border-radius:.1rem;border:1px solid rgba(0,0,0,.6);transform:translateX(-50%)}
+#hud .gs{font-size:.8rem;color:rgba(251,246,234,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hud2{max-width:min(94%,40rem);padding:.4rem .9rem;border-radius:1rem;background:rgba(14,16,20,.62);font-size:.95rem;line-height:1.25;text-align:center}
+#hud2:empty{display:none}
+#hud2 .k{color:var(--accent);font-weight:700}
+#toast{display:none;background:rgba(8,10,14,.85);color:var(--ink);padding:.35rem .8rem;border-radius:.6rem;font-size:.9rem;max-width:92%;text-align:center}
+#toast.on{display:block}
+#feed{display:flex;flex-direction:column;gap:.25rem;align-items:center;width:min(94%,32rem)}
+#feed div{background:rgba(10,8,12,.86);border:1px solid #3a3346;color:var(--ink);padding:.3rem .75rem;border-radius:.5rem;font-size:.9rem;text-align:center;transition:opacity .4s}
 #feed div b{color:var(--accent)}
-.ov.title{background:linear-gradient(90deg,rgba(6,6,10,.82),rgba(6,6,10,.35) 55%,rgba(6,6,10,0));justify-content:flex-start}
-body.titling #pad{visibility:hidden}
-.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:6px}
-.tabs .mb{text-align:center;min-height:44px;padding:6px 4px;font-size:14px}
-.tabs .mb.sel{border-color:var(--accent);background:#3a3524;color:var(--accent)}
-.card .meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin:4px 0 8px}
-@media (min-width:900px){body:not(.touch) #pad{grid-template-columns:repeat(4,minmax(0,170px));justify-content:center}}
-#toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:rgba(8,10,14,.85);color:var(--ink);padding:6px 12px;border-radius:8px;font-size:14px;pointer-events:none;max-width:92%;text-align:center;opacity:0;transition:opacity .2s}
-#toast.on{opacity:1}
-#pad{grid-area:pad;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;background:var(--panel);border-top:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));touch-action:none}
-.ab{position:relative;min-height:54px;min-width:0;overflow:hidden;border-radius:10px;border:2px solid #56627a;background:#252c39;color:var(--ink);font:600 14px system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 4px;touch-action:none}
+/* bottom-left: health, pack, crystals, gold together, then the hint for the device in use */
+#stats{position:absolute;z-index:6;left:var(--sl);bottom:var(--sb);width:min(21rem,calc(100% - var(--sl) - var(--sr)));padding:.55rem .7rem;pointer-events:none}
+#hud1{display:flex;flex-wrap:wrap;gap:.3rem .35rem;align-items:center}
+#hint{margin-top:.4rem;font-size:.8rem;color:rgba(251,246,234,.85);line-height:1.3}
+#hint:empty{display:none}
+#hint kbd{display:inline-block;padding:0 .35rem;border-radius:.3rem;background:#f3efe4;color:#1a1a1a;font:700 .75rem system-ui}
+.chip{position:relative;display:inline-flex;align-items:center;gap:.3rem;min-height:1.6rem;padding:.1rem .5rem;border-radius:.45rem;background:rgba(35,42,54,.85);border:1px solid var(--line);font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+.chip b{color:var(--accent)}.chip .warn{color:var(--bad)}
+.chip .bar{position:absolute;left:0;bottom:0;height:.2rem;background:var(--good)}.chip .bar.low{background:var(--bad)}.chip .bar.mid{background:var(--accent)}
+.chip.goal{background:#2e3524;border-color:#55623f}
+.card .meta{display:flex;flex-wrap:wrap;gap:.3rem .4rem;margin:.3rem 0 .6rem}
+/* actions */
+#pad{position:absolute;z-index:6;right:var(--sr);bottom:var(--sb);pointer-events:none;touch-action:none}
+.ab{position:absolute;pointer-events:auto;min-width:0;overflow:hidden;border:2px solid #56627a;background:rgba(28,30,38,.9);color:var(--ink);font:600 .9rem system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.15rem;touch-action:none;text-align:center}
 .ab .l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.ab small{font-weight:400;font-size:11px;color:var(--dim);line-height:1.1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.ab .k{position:absolute;top:2px;left:5px;font-size:10px;color:var(--accent);font-weight:700}
-.ab.off{opacity:.55;border-style:dashed}
+.ab small{font-weight:500;font-size:.62rem;color:var(--dim);line-height:1.1;max-width:100%;overflow:hidden}
+.ab .k{display:none;color:var(--accent);font-weight:700}
+.ab.off{opacity:.6;border-style:dashed}
 .ab:active{background:#34405a}
+/* touch: a thumb arc in the bottom-right corner, the main action nearest the thumb */
+body[data-dev=touch] #pad{width:12.8rem;height:12.8rem}
+body[data-dev=touch] .ab{width:5rem;height:5rem;border-radius:50%}
+body[data-dev=touch] .ab[data-s=A]{right:0;bottom:0;width:6.6rem;height:6.6rem;border-color:var(--accent);font-size:1.05rem}
+body[data-dev=touch] .ab[data-s=B]{right:7.5rem;bottom:.2rem}
+body[data-dev=touch] .ab[data-s=X]{right:6.3rem;bottom:7rem}
+body[data-dev=touch] .ab[data-s=Y]{right:.2rem;bottom:7.6rem}
+body[data-dev=touch] #stats{width:min(21rem,calc(100% - 13.6rem - var(--sl)))}
+@media (orientation:portrait){body[data-dev=touch] #stats{left:var(--sl);right:var(--sr);width:auto;bottom:calc(var(--sb) + 13.4rem)}}
 @media (orientation:landscape) and (max-height:520px){
-  #app{grid-template-columns:minmax(0,1fr) 200px;grid-template-rows:auto 1fr;grid-template-areas:"hud hud" "stage pad"}
-  #pad{grid-template-columns:repeat(2,minmax(0,1fr));align-content:center;border-top:0;border-left:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) 8px}
+  body[data-dev=touch] #pad{width:11.4rem;height:11.4rem}
+  body[data-dev=touch] .ab{width:4.4rem;height:4.4rem;font-size:.85rem}
+  body[data-dev=touch] .ab[data-s=A]{width:5.6rem;height:5.6rem}
+  body[data-dev=touch] .ab[data-s=B]{right:6.5rem}
+  body[data-dev=touch] .ab[data-s=X]{right:5.4rem;bottom:6rem}
+  body[data-dev=touch] .ab[data-s=Y]{bottom:6.6rem}
+  #hud{width:min(60%,30rem)}
+  body[data-dev=touch] #top{padding-right:calc(var(--sr) + 11.6rem)}
 }
-.ov{position:absolute;inset:0;background:rgba(6,8,12,.86);display:flex;align-items:center;justify-content:center;z-index:10;padding:12px max(12px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left));overflow:auto}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:480px;width:100%;max-height:100%;overflow:auto}
-.card h1{margin:0 0 4px;font-size:28px;letter-spacing:.04em;color:var(--accent)}
-.card h2{margin:0 0 8px;font-size:20px;color:var(--accent)}
-.card p{margin:6px 0}
-.card .dim{color:var(--dim);font-size:13px}
-.mb{display:block;width:100%;min-height:48px;margin:6px 0;border-radius:10px;border:2px solid #56627a;background:#252c39;color:var(--ink);font:600 16px system-ui,sans-serif;text-align:left;padding:8px 12px}
-.mb small{display:block;font-weight:400;font-size:12px;color:var(--dim)}
+/* keyboard: key-labelled plates, two by two at the bottom-right */
+body[data-dev=keys] #pad{width:19rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+body[data-dev=keys] .ab{position:relative;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:.6rem;align-items:center;justify-items:start;text-align:left;border-radius:.8rem;padding:.4rem .7rem;min-height:3rem;background:rgba(14,16,20,.74)}
+body[data-dev=keys] .ab .k{display:block;grid-row:1 / span 2;min-width:1.8rem;padding:.2rem .45rem;border-radius:.4rem;background:#f3efe4;color:#1a1a1a;text-align:center;font-size:.9rem}
+body[data-dev=keys] .ab .l,body[data-dev=pad] .ab .l{font-size:.95rem;white-space:normal;line-height:1.1}
+body[data-dev=keys] .ab small{grid-column:2;white-space:normal}
+body[data-dev=keys] .ab[data-s=A]{border-color:var(--accent)}
+/* pad: the A B X Y diamond with the face-button colours */
+body[data-dev=pad] #pad{width:15rem;height:14.4rem}
+body[data-dev=pad] .ab{width:5.2rem;height:5.2rem;border:0;background:none;gap:.1rem;justify-content:flex-start;overflow:visible}
+body[data-dev=pad] .ab .k{display:flex;align-items:center;justify-content:center;width:3rem;height:3rem;border-radius:50%;color:#fff;font-size:1.3rem}
+body[data-dev=pad] .ab .l{text-shadow:0 1px 3px #000;font-size:.9rem}
+body[data-dev=pad] .ab small{text-shadow:0 1px 3px #000;white-space:nowrap}
+body[data-dev=pad] .ab[data-s=Y]{left:4.9rem;top:0}
+body[data-dev=pad] .ab[data-s=X]{left:0;top:4.6rem}
+body[data-dev=pad] .ab[data-s=B]{right:0;top:4.6rem}
+body[data-dev=pad] .ab[data-s=A]{left:4.9rem;top:9.2rem}
+body[data-dev=pad] .ab[data-s=A] .k{background:#5fb04a}body[data-dev=pad] .ab[data-s=B] .k{background:#d0533f}body[data-dev=pad] .ab[data-s=X] .k{background:#4a8ae0}body[data-dev=pad] .ab[data-s=Y] .k{background:#e0c050;color:#1a1a1a}
+body[data-dev=pad] .ab.off{opacity:.85}body[data-dev=pad] .ab.off .k{opacity:.45}body[data-dev=pad] .ab small,body[data-dev=keys] .ab small{font-size:.72rem;color:#d6dae3}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem;margin-bottom:.4rem}
+.tabs .mb{text-align:center;min-height:2.9rem;padding:.4rem .25rem;font-size:.9rem}
+.tabs .mb.sel{border-color:var(--accent);background:#3a3524;color:var(--accent)}
+.ov{position:absolute;inset:0;background:rgba(6,8,12,.86);display:flex;align-items:center;justify-content:center;z-index:20;padding:.8rem var(--sr) .8rem var(--sl);overflow:auto}
+.ov.title{background:linear-gradient(90deg,rgba(6,6,10,.82),rgba(6,6,10,.35) 55%,rgba(6,6,10,0));justify-content:flex-start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:1rem;padding:1.05rem;max-width:30rem;width:100%;max-height:100%;overflow:auto}
+.card h1{margin:0 0 .25rem;font-size:1.85rem;letter-spacing:.04em;color:var(--accent)}
+.card h2{margin:0 0 .5rem;font-size:1.3rem;color:var(--accent)}
+.card p{margin:.4rem 0}
+.card .dim{color:var(--dim);font-size:.85rem}
+.mb{display:block;width:100%;min-height:3rem;margin:.4rem 0;border-radius:.65rem;border:2px solid #56627a;background:#252c39;color:var(--ink);font:600 1rem system-ui,sans-serif;text-align:left;padding:.5rem .75rem}
+.mb small{display:block;font-weight:400;font-size:.78rem;color:var(--dim)}
 .mb.focus{border-color:var(--accent);background:#33405a;outline:none}
 .mb.off{opacity:.6;border-style:dashed}
 .card.held .mb{opacity:.45;transition:opacity .2s}
 .mb:focus-visible{outline:2px solid var(--accent)}
-.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 .5rem}
 @media (max-width:380px){.grid2{grid-template-columns:minmax(0,1fr)}}
 </style></head><body>
 <div id="app">
-  <div id="hud"><div class="l1" id="hud1">Colossus</div><div class="l2" id="hud2"></div></div>
   <div id="stage">
     <canvas id="sky"></canvas><canvas id="gl"></canvas><canvas id="cv"></canvas>
-    <div id="toast"></div><div id="feed"></div>
-    <div class="ov" id="ov"><div class="card" id="card"></div></div>
   </div>
+  <div id="top">
+    <div id="hud" class="glass"><svg id="gfig" viewBox="0 0 54 96" role="img" aria-label="The giant and its four chains"><g fill="#c9c2b2"><circle cx="27" cy="9" r="7"/><rect x="15" y="17" width="24" height="30" rx="8"/><rect x="5" y="19" width="8" height="28" rx="4"/><rect x="41" y="19" width="8" height="28" rx="4"/><rect x="16" y="47" width="9" height="40" rx="4"/><rect x="29" y="47" width="9" height="40" rx="4"/></g><g fill="none" stroke-width="3.5"><circle id="c_wristL" cx="9" cy="51" r="5"/><circle id="c_wristR" cx="45" cy="51" r="5"/><circle id="c_ankleL" cx="20" cy="90" r="5"/><circle id="c_ankleR" cx="34" cy="90" r="5"/></g></svg>
+      <div class="gi"><div class="gr"><span id="gt">Colossus</span><span id="gd"></span></div><div id="gbar"></div><div class="gs" id="gs"></div></div></div>
+    <div id="hud2"></div><div id="toast"></div><div id="feed"></div>
+  </div>
+  <div id="stats" class="glass"><div id="hud1">Colossus</div><div id="hint"></div></div>
   <div id="pad"></div>
+  <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
 <!-- the person's Sound-engine (github Pappydapimp69/sound-engine @ 92f7662), bundled: main thread and AudioWorklet -->
@@ -1363,7 +1412,12 @@ function slotInfo(){if(!S)return null;
   if(S.role==='giant'){const r=k=>canGiant(k);return{A:{l:'Stomp',why:r('stomp')},B:{l:'Smash',why:r('smash')},X:{l:'Shake',why:r('shake')},Y:{l:'Swipe',why:r('swipe')}}}
   return humanCtx(S.you)}
 let lastSig='';
-function paintButtons(){const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
+const hintEl=document.getElementById('hint');
+function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
+  if(device==='touch')return cl?'Tap a hold to climb to it. Drag to turn the view.':'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
+  if(device==='pad')return cl?'Left stick picks a hold. Right stick turns the view.':'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
+  return cl?'Click a hold to climb to it. Q and E turn the view.':'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges.'}
+function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;{const ht=hintText();if(hintEl.dataset.v!==ht){hintEl.dataset.v=ht;hintEl.innerHTML=ht}}const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
 // combat input. Attack is a press and a held state on every device (J or Space, pad A, a finger on the Attack button,
@@ -1478,7 +1532,12 @@ function start(role,seed,first){document.body.classList.remove('titling');ov.cla
 // ================= camera and render =================
 let ctx=cv.getContext('2d');let W=0,H=0,DPR=1,shakeA=0;
 function shake(a){if(!reducedMotion)shakeA=Math.max(shakeA,a)}
-function fit(){const r=cv.getBoundingClientRect(),d=Math.min(2.5,window.devicePixelRatio||1);if(r.width!==W||r.height!==H||d!==DPR){W=r.width;H=r.height;DPR=d;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}}
+let UI=1,UIX={top:8,rb:0};const uiEls={};
+// one scale for everything: rem is set in CSS from the shorter screen side; canvas text and gauges follow it, and the HUD zones are measured so canvas drawing keeps clear of them
+function uiMeasure(){const g=n=>uiEls[n]||(uiEls[n]=document.getElementById(n));UI=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/16;
+  const t=g('hud2').offsetHeight?g('hud2'):g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;let rb=H-16*UI;
+  if(!document.body.classList.contains('titling'))for(const n of['stats','pad']){const r=g(n).getBoundingClientRect();if(r.width&&r.left<W-18*UI&&r.right>W-34*UI)rb=Math.min(rb,r.top-8*UI)}UIX.rb=Math.max(UIX.top+60*UI,rb)}
+function fit(){const r=cv.getBoundingClientRect(),d=Math.min(2.5,window.devicePixelRatio||1);if(r.width!==W||r.height!==H||d!==DPR){W=r.width;H=r.height;DPR=d;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}uiMeasure()}
 let climbCam={y:10,x:16,px:12};
 function screenToCell(sx,sy){if(G3.active&&climbing3D()){const cl=S.you.cl;let best=null,bd=48;for(let r=Math.max(0,Math.floor(cl.y)-24);r<=Math.min(ROWS-1,Math.floor(cl.y)+24);r++)for(let c=0;c<COLS;c++){if(!S.body.h[r*COLS+c])continue;const q=cellScreen(c+.5,r+.5);if(!q)continue;const d=Math.hypot(q.x-sx,q.y-sy);if(d<bd){bd=d;best={r,c}}}return best||{r:-99,c:-99}}const c=climbCam;return{c:Math.floor(c.x+(sx-W/2)/c.px),r:Math.floor(c.y-(sy-H*.55)/c.px)}}
 // body texture, drawn once per game at 8 px a cell
@@ -1869,7 +1928,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   for(const ft of g.feet)if(ft.air>0){const p=1-ft.air/ft.dur;ringOnGround(ft.lx,ft.ly,C.FOOT_R*(1.5-p*.5),null,0,null,`rgba(0,0,0,${.15+p*.35})`);ringOnGround(ft.lx,ft.ly,C.FOOT_R,'rgba(255,90,70,.95)',2.5)}
   if(g.wind&&(g.wind.k==='stomp'||g.wind.k==='smash')){const p=1-g.wind.t/g.wind.dur,pts=g.wind.k==='stomp'?g.feet:[g.wind],R=g.wind.k==='stomp'?C.STOMP_R:C.SMASH_R;for(const q of pts){ringOnGround(q.x,q.y,R*p,null,0,null,`rgba(255,80,60,${.15+p*.25})`);ringOnGround(q.x,q.y,R,'rgba(255,90,70,.95)',2.5,[8,6])}}
   for(const e of S.fx){const p=e.t/e.life;ctx.globalAlpha=1-p;if(e.k==='ring'||e.k==='mark')ringOnGround(e.x,e.y,e.k==='mark'?e.r*(1-p*.5):e.r*(.5+p*.5),e.col,3);
-    if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font='700 15px system-ui';ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
+    if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`700 ${15*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<2600)lbl('Ruins',p.x,p.y,11,'#ffcf6a')}
   mapLabels();
@@ -1896,9 +1955,9 @@ function climbOverlay3D(){const h=S.you,cl=h.cl,g=S.g,me=[Math.floor(cl.y),Math.
   for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];if(Math.abs(J.r0-cl.y)>30)continue;const q=cellScreen(J.c1+1.5,J.r1+1);if(q)lbl(JOINTS[id].name+' '+Math.ceil(j.hp/j.max*100)+'%',q.x+30,q.y,11,id==='heart'?'#ff8f9a':'#ffcf6a')}
   for(const st of S.sites){if(Math.abs(st.r-cl.y)>20)continue;const q=cellScreen(st.c+.5,st.r+1.5);if(q)lbl(st.build?st.build.k+(lv(st.build)>1?' '+lv(st.build):''):'build spot',q.x,q.y-10,10,st.build?TOWNS[st.build.town].col:'#ffcf6a')}
   const me3=cellScreen(cl.x,cl.y);if(me3){const f=clamp(h.grip/maxGrip(h),0,1),R2=Math.max(16,me3.s*30);ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.6)';ctx.beginPath();ctx.arc(me3.x,me3.y-R2*.6,R2,0,7);ctx.stroke();ctx.strokeStyle=f<.25?'#ff8f80':f<.5?'#ffcf6a':'#9be08a';ctx.beginPath();ctx.arc(me3.x,me3.y-R2*.6,R2,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.stroke()}
-  const gx=W-18,gt=16,gb=H-16;ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(gx-6,gt-4,14,gb-gt+8);for(const id in JOINTS){const J=JOINTS[id];ctx.fillStyle=id==='heart'?'#ff4d5e':'#ff9a4a';ctx.fillRect(gx-4,gb-(J.r1/ROWS)*(gb-gt),10,3)}
+  const gx=W-18*UI,gt=UIX.top,gb=UIX.rb;ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(gx-6,gt-4,14,gb-gt+8);for(const id in JOINTS){const J=JOINTS[id];ctx.fillStyle=id==='heart'?'#ff4d5e':'#ff9a4a';ctx.fillRect(gx-4,gb-(J.r1/ROWS)*(gb-gt),10,3)}
   for(const st of S.sites){ctx.fillStyle=st.build?TOWNS[st.build.town].col:'#ffcf6a';ctx.fillRect(gx-2,gb-(st.r/ROWS)*(gb-gt),6,2)}
-  ctx.fillStyle='#fff';ctx.fillRect(gx-7,gb-(cl.y/ROWS)*(gb-gt)-2,16,4);ctx.font='600 13px system-ui';ctx.textAlign='right';ctx.textBaseline='alphabetic';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const ht=Math.round(cl.y*FT)+' ft';ctx.strokeText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);ctx.fillStyle='#fff';ctx.fillText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);
+  ctx.fillStyle='#fff';ctx.fillRect(gx-7,gb-(cl.y/ROWS)*(gb-gt)-2,16,4);ctx.font=`600 ${13*UI}px system-ui`;ctx.textAlign='right';ctx.textBaseline='alphabetic';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const ht=Math.round(cl.y*FT)+' ft';ctx.strokeText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);ctx.fillStyle='#fff';ctx.fillText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);
   if(g.wind&&(g.wind.k==='shake'||g.wind.k==='swipe')){ctx.strokeStyle=`rgba(255,90,70,${.5+.5*Math.sin(S.t*20)})`;ctx.lineWidth=8;ctx.strokeRect(4,4,W-8,H-8);lbl(g.wind.k==='shake'?'BRACE: hold still':'HAND INCOMING: '+(g.wind.side==='L'?'left':'right')+' side',W/2,48,18,'#fff')}
   if(g.fallen>0)lbl('The giant is down: '+Math.ceil(g.fallen)+' s to strike the Heart-stone',W/2,H-24,15,'#ffcf6a')}
 const t3ok=c=>S.t>=c.ready;
@@ -2025,7 +2084,7 @@ function g3MapCamera(){if(!S.land||climbing3D())return;const cm=G3.cam,p=cm.posi
   G3.lift=G3.lift||0;const want=Math.max(0,need-p.y);G3.lift+=(want-G3.lift)*(want>G3.lift?.35:.08);if(G3.lift<.5)return;
   p.y+=G3.lift;const D=(S.role==='giant'?2600:760)/S.cam.czoom;cm.lookAt(fx,fz+(cam.pitch<0?-cam.pitch*D*1.6:0),fy);const F=view.F,far=new THREE.Vector3(fx+F.x*14000,0,fy+F.y*14000).project(cm);view.hz=clamp((1-far.y)/2*H,-H,H*1.2)}
 {const b0=g3Build,u0=g3Update,c0=g3Camera;g3Build=function(){b0();g3MapBuild()};g3Update=function(){u0();g3MapUpdate()};g3Camera=function(){c0();g3MapCamera()}}
-function lbl(text,x,y,size,col){ctx.font=`600 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width;ctx.fillStyle='rgba(10,12,10,.72)';ctx.fillRect(x-w/2-4,y-size*.65,w+8,size*1.3);ctx.fillStyle=col||'#eee9dd';ctx.fillText(text,x,y);ctx.textBaseline='alphabetic'}
+function lbl(text,x,y,size,col){size*=UI;ctx.font=`600 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width;ctx.fillStyle='rgba(10,12,10,.72)';ctx.fillRect(x-w/2-4,y-size*.65,w+8,size*1.3);ctx.fillStyle=col||'#eee9dd';ctx.fillText(text,x,y);ctx.textBaseline='alphabetic'}
 function pbar(x,y,w,v,col){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(x-w/2-1,y-1,w+2,6);ctx.fillStyle=col;ctx.fillRect(x-w/2,y,w*clamp(v,0,1),4)}
 function groundEllipse(x,y,r){const p=proj(x,y,0);if(!p)return null;ctx.beginPath();ctx.ellipse(p.x,p.y,r*p.s,Math.max(1,r*p.s*view.Hc/p.d),0,0,7);return p}
 function rock(x,y,r,seed){ctx.beginPath();for(let i=0;i<9;i++){const a=i/9*6.283+seed,q=r*(.8+(((seed*131+i*71)%17)/17)*.25);i?ctx.lineTo(x+Math.cos(a)*q,y+Math.sin(a)*q):ctx.moveTo(x+Math.cos(a)*q,y+Math.sin(a)*q)}ctx.closePath()}
@@ -2093,7 +2152,7 @@ function paintRift(hz,k,fl){if(fl>.7&&S&&!S.shookAt||(S&&S.shookAt&&S.t-S.shookA
 function drawStarfall(){if(!S)return;for(const e of S.events){if(e.k!=='star'||S.t-e.t>4)continue;const k=(S.t-e.t)/4,p=G3.active?p3(e.x,e.y,0):proj(e.x,e.y,0);if(!p)continue;const x0=p.x-W*.4,y0=-20,x=x0+(p.x-x0)*k,y=y0+(p.y-y0)*k;
   const g=ctx.createLinearGradient(x0,y0,x,y);g.addColorStop(0,'rgba(160,240,255,0)');g.addColorStop(1,'rgba(220,250,255,.95)');ctx.strokeStyle=g;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x0+(x-x0)*.4,y0+(y-y0)*.4);ctx.lineTo(x,y);ctx.stroke()}}
 function drawCaption(){if(!S||S.t>OPENING.len)return;for(const[a,b,text]of OPENING.captions){if(S.t<a||S.t>b)continue;const f=Math.min(1,(S.t-a)/1.2,(b-S.t)/1.2);
-  ctx.save();ctx.globalAlpha=f;ctx.font=`italic 500 ${Math.round(Math.min(26,W/22))}px Georgia,'Times New Roman',serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=12;ctx.fillStyle='#f4e4c6';
+  ctx.save();ctx.globalAlpha=f;ctx.font=`italic 500 ${Math.round(Math.min(26*UI,W/22))}px Georgia,'Times New Roman',serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=12;ctx.fillStyle='#f4e4c6';
     const y=H*.86;{const g=ctx.createLinearGradient(0,H*.74,0,H);g.addColorStop(0,'rgba(10,6,8,0)');g.addColorStop(.35,'rgba(10,6,8,.62)');g.addColorStop(1,'rgba(10,6,8,.72)');ctx.save();ctx.globalAlpha=f;ctx.shadowBlur=0;ctx.fillStyle=g;ctx.fillRect(0,H*.74,W,H*.26);ctx.restore()}const words=text.split(' ');let line='',lines=[];for(const w of words){const tr=line?line+' '+w:w;if(ctx.measureText(tr).width>W*.86){lines.push(line);line=w}else line=tr}lines.push(line);lines.forEach((l,i)=>ctx.fillText(l,W/2,y+(i-(lines.length-1)/2)*Math.min(32,W/18)));ctx.restore()}}
 function drawGround(){if(!ground||groundSeed!==S.seed)buildGround();const hz=view.hz;ctx.fillStyle='#6a7650';ctx.fillRect(0,hz,W,H-hz);ctx.imageSmoothingEnabled=true;
   const F=view.F,Rv=view.R,cx=S.cam.x,cy=S.cam.y;let y=Math.max(hz+1,0);
@@ -2161,8 +2220,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   if(S.role==='giant'&&g.tx!=null){const p=proj(g.tx,g.ty,0);if(p){ctx.strokeStyle='rgba(255,207,106,.9)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x-8,p.y-8);ctx.lineTo(p.x+8,p.y+8);ctx.moveTo(p.x+8,p.y-8);ctx.lineTo(p.x-8,p.y+8);ctx.stroke()}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   drawMinimap()}
-function drawMinimap(){drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8+tg.x*k,8+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
-function drawMinimap0(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
+function drawMinimap(){drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UIX.top,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
@@ -2174,12 +2233,12 @@ function drawMinimap0(){const s=Math.min(110,Math.min(W,H)*.26),x0=8,y0=8,k=s/C.
   // the camera's facing
   const cx=x0+S.cam.x*k,cy=y0+S.cam.y*k;ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+view.F.x*14,cy+view.F.y*14);ctx.stroke()}
 // the giant player's view of its own body: who is climbing where
-function renderBodyPanel(){const ph=Math.min(H-16,360),px=ph/ROWS,pw=COLS*px,x0=W-pw-12,y0=8;
+function renderBodyPanel(){const y0=UIX.top,ph=Math.min(UIX.rb-y0,360*UI),px=ph/ROWS,pw=COLS*px,x0=W-pw-12*UI;
   ctx.fillStyle='rgba(8,10,14,.72)';ctx.fillRect(x0-6,y0-4,pw+12,ph+8);
   ctx.imageSmoothingEnabled=false;ctx.drawImage(bodyTexture(),x0,y0,pw,ph);
   for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];ctx.fillStyle=j.crip?'#555':id==='heart'?'#ff4d5e':'#ff9a4a';ctx.globalAlpha=.4+.6*(j.hp/j.max);ctx.fillRect(x0+J.c0*px,y0+(ROWS-1-J.r1)*px,(J.c1-J.c0+1)*px,(J.r1-J.r0+1)*px);ctx.globalAlpha=1}
   for(const h of climbers()){ctx.fillStyle=TOWNS[h.town].col;shapePath(ctx,x0+h.cl.x*px,y0+(ROWS-h.cl.y)*px,Math.max(3,px*1.6),TOWNS[h.town].shape);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}
-  ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.fillStyle='#eee9dd';ctx.fillText(climbers().length+' climbing',x0+pw/2,y0+ph-4)}
+  ctx.font=`600 ${11*UI}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#eee9dd';ctx.fillText(climbers().length+' climbing',x0+pw/2,y0+ph-4)}
 function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
   const px=Math.max(14,Math.min(W/13,H/15))*S.cam.czoom;climbCam.px=px;
   const fitsW=COLS*px<=W-20;climbCam.x+=((fitsW?COLS/2:clamp(cl.x,W/2/px-1,COLS-W/2/px+1))-climbCam.x)*.15;
@@ -2206,7 +2265,7 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
     ctx.strokeStyle=j.crip?'#777':id==='heart'?'#ffb0b8':'#ffcf6a';ctx.lineWidth=2;ctx.strokeRect(x+1,y+1,w-2,hh-2);
     ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x,y-8,w,5);ctx.fillStyle=id==='heart'?'#ff4d5e':'#ffcf6a';ctx.fillRect(x,y-8,w*j.hp/j.max,5);
     j.wedges.forEach((wd,i)=>{ctx.fillStyle='#222';ctx.beginPath();const wx=x+(i+1)*w/4;ctx.moveTo(wx-4,y+hh*.3);ctx.lineTo(wx+4,y+hh*.3);ctx.lineTo(wx,y+hh*.8);ctx.closePath();ctx.fill();ctx.strokeStyle=TOWNS[wd.town].col;ctx.stroke()});
-    if(Math.abs(J.r0-climbCam.y)<40){ctx.font='600 12px system-ui';ctx.textAlign='left';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const tx=x+w+4,ty=y+hh/2+4;ctx.strokeText(JOINTS[id].name,tx,ty);ctx.fillText(JOINTS[id].name,tx,ty)}}
+    if(Math.abs(J.r0-climbCam.y)<40){ctx.font=`600 ${12*UI}px system-ui`;ctx.textAlign='left';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const tx=x+w+4,ty=y+hh/2+4;ctx.strokeText(JOINTS[id].name,tx,ty);ctx.fillText(JOINTS[id].name,tx,ty)}}
   // the holds: firm cracks, green moss that drains grip, orange loose stones; your reach and the hold you are aiming at
   {const r0=Math.max(0,Math.floor(climbCam.y-H/px*.6)),r1=Math.min(ROWS-1,Math.ceil(climbCam.y+H/px*.6)),hb=S.body.h,me=[Math.floor(cl.y),Math.floor(cl.x)];
     const aimV=readMove(),aim=!cl.move&&!cl.fall&&(aimV.x||aimV.y)?pickHold(cl,aimV.x,-aimV.y,C.REACH):null;
@@ -2231,29 +2290,40 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
       ctx.strokeStyle=f<.25?'#ff8f80':f<.5?'#ffcf6a':'#9be08a';ctx.beginPath();ctx.arc(x,y-px*.2,px*1.2,-Math.PI/2,-Math.PI/2+f*Math.PI*2);ctx.stroke()}}
   ctx.restore();
   // height gauge with ledges and joints marked
-  const gx=W-18,gt=16,gb=H-16;ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(gx-6,gt-4,14,gb-gt+8);
+  const gx=W-18*UI,gt=UIX.top,gb=UIX.rb;ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(gx-6,gt-4,14,gb-gt+8);
   for(const id in JOINTS){const J=JOINTS[id];ctx.fillStyle=id==='heart'?'#ff4d5e':'#ff9a4a';ctx.fillRect(gx-4,gb-(J.r1/ROWS)*(gb-gt),10,3)}
   ctx.fillStyle='#fff';ctx.fillRect(gx-7,gb-(cl.y/ROWS)*(gb-gt)-2,16,4);
-  ctx.font='600 13px system-ui';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const ht=Math.round(cl.y*FT)+' ft';ctx.strokeText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);ctx.fillText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);
+  ctx.font=`600 ${13*UI}px system-ui`;ctx.textAlign='right';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const ht=Math.round(cl.y*FT)+' ft';ctx.strokeText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);ctx.fillText(ht,gx-12,gb-(cl.y/ROWS)*(gb-gt)+4);
   if(g.wind&&(g.wind.k==='shake'||g.wind.k==='swipe')){ctx.strokeStyle=`rgba(255,90,70,${.5+.5*Math.sin(S.t*20)})`;ctx.lineWidth=8;ctx.strokeRect(4,4,W-8,H-8);
-    ctx.font='700 20px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=4;const s=g.wind.k==='shake'?'BRACE: hold still':'HAND INCOMING: '+(g.wind.side==='L'?'left':'right')+' side';ctx.strokeText(s,W/2,48);ctx.fillText(s,W/2,48)}
-  if(g.fallen>0){ctx.font='700 16px system-ui';ctx.textAlign='center';ctx.fillStyle='#ffcf6a';ctx.strokeStyle='#000';ctx.lineWidth=4;const s='The giant is down: '+Math.ceil(g.fallen)+' s to strike the Heart-stone';ctx.strokeText(s,W/2,H-20);ctx.fillText(s,W/2,H-20)}}
+    ctx.font=`700 ${20*UI}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=4;const s=g.wind.k==='shake'?'BRACE: hold still':'HAND INCOMING: '+(g.wind.side==='L'?'left':'right')+' side';ctx.strokeText(s,W/2,48);ctx.fillText(s,W/2,48)}
+  if(g.fallen>0){ctx.font=`700 ${16*UI}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#ffcf6a';ctx.strokeStyle='#000';ctx.lineWidth=4;const s='The giant is down: '+Math.ceil(g.fallen)+' s to strike the Heart-stone';ctx.strokeText(s,W/2,H-20);ctx.fillText(s,W/2,H-20)}}
 
 // ================= HUD =================
 const hud1=document.getElementById('hud1'),hud2=document.getElementById('hud2');let hudSig='';
 function clock(){const s=Math.max(0,C.DUSK-S.t);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
 function mood(i){const v=S.grudge[i];return v>=C.ANGER?'ANGRY':v>=C.ANGER*.5?'wary':v<-60?'friendly':'calm'}
+const pEl={t:document.getElementById('gt'),d:document.getElementById('gd'),bar:document.getElementById('gbar'),s:document.getElementById('gs')};let pSig='';
+function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(c)?1:2,ring={0:['#666',.3],1:['#f0a050',1],2:['#e8e2d2',1]};
+  const word=pre=>{const a=cs.filter(c=>c.id.startsWith(pre)).map(st);return a.every(x=>x===0)?'broken':a.every(x=>x<2)?'weakened':'hold'};
+  const t=S.role==='giant'?(g.awake?'You, the giant':'You sleep, chained'):g.fallen>0?'The giant is down':g.awake?'The giant is awake':'The giant sleeps';
+  const ch=cs.some(c=>c.hp>0)?'ankles '+word('ankle')+', wrists '+word('wrist'):'';
+  const sub=S.role==='giant'?TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' \u00b7 ')+(ch?' \u00b7 '+ch:''):(mood(h.town)[0].toUpperCase()+mood(h.town).slice(1)+' toward '+TOWNS[h.town].name+(ch?' \u00b7 '+ch:''));
+  const pos=TOWNS.map((T,i)=>Math.round(clamp((S.grudge[i]+100)/(C.ANGER+100),0,1)*100)),sig=t+clock()+sub+pos.join()+cs.map(st).join('');if(sig===pSig)return;pSig=sig;
+  pEl.t.textContent=t;pEl.d.textContent='Dusk '+clock();pEl.s.textContent=sub;
+  if(pEl.bar.children.length!==TOWNS.length)pEl.bar.innerHTML=TOWNS.map(T=>`<i style="background:${T.col}" title="${T.name}"></i>`).join('');
+  TOWNS.forEach((T,i)=>{const m=pEl.bar.children[i];m.style.left=pos[i]+'%';m.style.setProperty('--o',(i-1)*.3+'rem');m.style.opacity=factionAlive(i)?1:.3;m.style.height=(h&&h.town===i?1.4:1.1)+'rem';m.style.top=(h&&h.town===i?-.45:-.3)+'rem'});
+  cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e){e.setAttribute('stroke',ring[st(c)][0]);e.setAttribute('opacity',ring[st(c)][1])}})}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
-  const duskChip=chip('Dusk',clock(),1-S.t/C.DUSK,' dusk');
+  paintPanel();
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
     const jf=id=>J[id].hp/J[id].max,worst=Math.min(jf('kneeL'),jf('kneeR'),jf('elbowL'),jf('elbowR'),jf('neck'));
-    a=chip('Heart',pc('heart'),jf('heart'))+chip('Joints',Math.round(worst*100)+'% worst',worst)+chip('Braces',braces()+'/5')+duskChip;
+    a=chip('Heart',pc('heart'),jf('heart'))+chip('Joints',Math.round(worst*100)+'% worst',worst)+chip('Braces',braces()+'/5');
     {const ts=giantTasks(),n=ts.filter(x=>x.done).length;a+=chip('Tasks',n+'/'+C.GIANT_TASKS,n/C.GIANT_TASKS,' goal')+chip('Climbers',climbers().length);S.taskLine=ts.map(x=>x.name+(x.done?' done':' ('+x.note+')')).join(' \u00b7 ')}
     b=S.t>OPENING.len&&Math.floor(S.t/8)%2?S.taskLine:!g.awake?'Asleep and chained. Someone must climb to your head and wake you ('+Math.round(S.wakeT/C.WAKE_TIME*100)+'%).':S.chains.some(q=>q.hp>0)?'Chains left: '+S.chains.filter(q=>q.hp>0).map(q=>q.name).join(', '):g.fallen>0?'You are down for '+Math.ceil(g.fallen)+' s. They are at your heart.':TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' · ')}
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
-      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none')+duskChip;
+      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none');
     const st=tutStep();const q=h.quest;b=st&&S.tut.shown?'Goal: '+st.text+(st.note?' '+st.note(h):''):(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
       (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':!allWeak()?'The giant sleeps in chains: weaken all four ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' still strong), then a wake horn breaks them':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.innerHTML=String(b).replace(/^([^:.]{2,24}:)/,'<span class="k">$1</span>')}}

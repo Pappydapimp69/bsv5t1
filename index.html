@@ -196,10 +196,14 @@ const SHEET=[[163,1,.35],[251,.9,.28],[377,.8,.22],[529,.7,.18],[718,.6,.14],[96
 const METAL=[[61,1,9],[97,.8,7],[149,.6,6],[233,.5,4.5],[377,.38,3.5],[523,.3,2.6],[611,.26,2.2],[947,.18,1.5],[1291,.12,1]].map(([freq,gain,t60])=>({freq,gain,t60}));
 function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;se='starting';
   const url=URL.createObjectURL(new Blob([document.getElementById('se-worklet').textContent],{type:'text/javascript'}));
-  SE.SoundEngine.create({workletUrl:url,device:'stereo',zone:'openPlain',maxVoices:16}).then(e=>{se=e;actx=e.ctx;
+  SE.SoundEngine.create({workletUrl:url,device:'stereo',zone:'openPlain',maxVoices:24}).then(e=>{se=e;actx=e.ctx;
     seSrc={ui:e.createSource('synth',{level:78,priority:3}),groan:e.createSource('synth',{level:104,refDistance:70,priority:6}),
       metal:e.createSource('modal',{modes:METAL,level:100,refDistance:70,priority:6}),boom:e.createSource('synth',{level:100,refDistance:60,priority:5}),
       near:e.createSource('synth',{level:82,refDistance:8,priority:2}),sky:e.createSource('synth',{level:114,refDistance:200,priority:8}),
+      // the opening orchestra: low brass, horns, high trumpets, strings, drums and a wordless choir, all in the sky
+      skyLo:e.createSource('synth',{level:112,refDistance:200,priority:8}),skyHi:e.createSource('synth',{level:110,refDistance:200,priority:8}),
+      skyStr:e.createSource('synth',{level:104,refDistance:200,priority:8}),skyDrum:e.createSource('synth',{level:112,refDistance:200,priority:8}),
+      choir:e.createSource('voice',{tract:.17,sac:.08,level:100,refDistance:200,priority:8}),choir2:e.createSource('voice',{tract:.15,sac:.07,level:96,refDistance:200,priority:8}),
       creakL:e.createSource('modal',{modes:SHEET,level:108,refDistance:70,priority:6}),creakR:e.createSource('modal',{modes:SHEET.map(m=>({...m,freq:m.freq*1.07})),level:108,refDistance:70,priority:6}),
       // a throat the size of a hall: low, rough, wavering calls that carry for miles
       voice:e.createSource('voice',{tract:3.2,sac:1.6,level:112,refDistance:90,priority:7}),
@@ -213,7 +217,7 @@ function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!=
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
   seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
-  if(S.skyUntil>S.t)seSrc.sky.setPosition(z(S.cam.x),-z(S.cam.y),260);
+  if(S.skyUntil>S.t)for(const k of['sky','skyLo','skyHi','skyStr','skyDrum','choir','choir2'])seSrc[k].setPosition(z(S.cam.x)+(k==='skyHi'?40:k==='skyLo'?-40:0),-z(S.cam.y),260);
   seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
   // the nearest river runs where it is; the nearest filled footprint lake drips
   let rb=null,rd=1e9;for(const rv of S.rivers)for(const q of rv){const d=Math.hypot(q.x-S.cam.x,q.y-S.cam.y);if(d<rd){rd=d;rb=q}}if(rb)seSrc.river.setPosition(z(rb.x),-z(rb.y),0);
@@ -251,11 +255,29 @@ function creak(src,dur,r0,r1,amp){const t0=performance.now();let last=t0;
     src.strike(amp*env*(.55+Math.random()*.45),.25+Math.random()*.6);last=now;setTimeout(tick,1000/Math.max(6,rate)*(.55+Math.random()*.9))};tick()}
 // at the start of a game: long, low brass from somewhere high in the sky, clashing a semitone apart, as in the
 // recordings of 'trumpets' heard over cities; played once, far off, with the reverb opened up
+// The opening: about 22 s. Everything is timed from one score, which the sky painting also reads.
+// Phrygian on D: a pedal, a minor third in the horns, a semitone cluster in the trumpets, then the full chord.
 const TRUMPETS=[[0,34,5.5],[1.2,35,5],[4.5,31,6.5],[5.4,32,6],[9.5,29,7],[10.1,30,7.5]];
-function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets();return}const z=v=>v*SE_M,s=seSrc.sky;se.setZone('rockyGully');
-  S.skyUntil=S.t+20; // the sky source rides directly above the listener for as long as the trumpets last
-  TRUMPETS.forEach(([t,m,d])=>setTimeout(()=>{if(se&&S)s.note({patch:'brass',midi:m,duration:d,velocity:.8+Math.random()*.2})},t*1000));
-  setTimeout(()=>{if(se&&se!=='starting')se.setZone('openPlain')},19000)}
+const OPENING={len:22,hits:[6,9.5,12.5,13.2,14,16.5],captions:[[1.5,6.5,'On the first day the sky opened over the three towns.'],[7.5,12.5,'Trumpets sounded, though no one held them.'],[14,20,'And in its chains the stone giant slept on.']]};
+function trumpets(){if(!save.sound)return;if(!se||se==='starting'){plainTrumpets();return}const s=seSrc;se.setZone('rockyGully');S.skyUntil=S.t+OPENING.len+2;
+  const at=(t,f)=>setTimeout(()=>{if(se&&se!=='starting'&&S)f()},t*1000),r=Math.random,br=(src,m,d,v)=>src.note({patch:'brass',midi:m,duration:d,velocity:v});
+  // drums: a roll that swells, then single strokes on the hits
+  for(let i=0;i<34;i++){const t=i*.12;at(t,()=>s.skyDrum.note({patch:'tom',midi:33,duration:.4,velocity:.15+.6*(i/34)}))}
+  OPENING.hits.forEach(t=>at(t,()=>{s.skyDrum.note({patch:'kick',midi:28,duration:.9,velocity:1});s.skyDrum.sfx('explosion',{midi:26,duration:1.4,velocity:.6})}));
+  // low brass pedal, falling at the end
+  at(0,()=>br(s.skyLo,26,9,.7));at(9,()=>br(s.skyLo,26,6,.9));at(15,()=>br(s.skyLo,25,6,.9));at(18.5,()=>br(s.skyLo,22,4,.8));
+  // strings: a trembling cluster, repeated notes for the tremolo
+  for(let i=0;i<70;i++){const t=2.5+i*.17;at(t,()=>{s.skyStr.note({patch:'organ',midi:50+(i%2),duration:.22,velocity:.25+.35*Math.min(1,i/40)});if(i>30)s.skyStr.note({patch:'organ',midi:62,duration:.22,velocity:.3})})}
+  // horns: a minor third, swelling, then the trumpets' semitone cluster
+  at(3,()=>{br(s.sky,41,6,.75);br(s.sky,44,6,.7)});at(9.5,()=>{br(s.sky,41,5,.95);br(s.sky,45,5,.9)});
+  at(6,()=>{br(s.skyHi,62,3.2,.85);br(s.skyHi,63,3.2,.8)});at(9.5,()=>{br(s.skyHi,65,2.6,.95);br(s.skyHi,66,2.6,.9)});
+  // the full chord, struck three times, then a high cry that falls
+  [12.5,13.2,14].forEach((t,i)=>at(t,()=>{br(s.skyLo,26,i<2?.6:5,1);br(s.sky,38,i<2?.6:5,1);br(s.sky,41,i<2?.6:5,1);br(s.skyHi,62,i<2?.6:5,1);br(s.skyHi,63,i<2?.6:5,1);br(s.skyHi,68,i<2?.6:5,.9)}));
+  at(16.5,()=>{br(s.skyHi,74,3,1);br(s.skyHi,75,3,.9)});
+  // the choir: wordless, high and thin, entering under the trumpets
+  at(8,()=>{s.choir.call({mode:'open',duration:7,f0:294,f0End:277,amp:.7,intensity:.5,roughness:.1,breath:.35,jitter:.15,vibrato:.35,vibratoRate:5.2,mouth:.8,attack:1.6});s.choir2.call({mode:'open',duration:7,f0:349,f0End:330,amp:.6,intensity:.45,roughness:.1,breath:.35,jitter:.15,vibrato:.3,vibratoRate:4.7,mouth:.8,attack:2})});
+  at(14,()=>{s.choir.call({mode:'open',duration:6,f0:392,f0End:294,amp:.8,intensity:.7,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5.5,mouth:.9,attack:.3});s.choir2.call({mode:'open',duration:6,f0:415,f0End:311,amp:.7,intensity:.65,roughness:.2,breath:.3,jitter:.2,vibrato:.4,vibratoRate:5,mouth:.9,attack:.3})});
+  at(OPENING.len,()=>se.setZone('openPlain'))}
 // the same calls without the engine: detuned saws through a slowly opening low-pass, with a long echo
 function plainTrumpets(){if(!actx)return;const out=master||actx.destination,dl=actx.createDelay(2),fb=actx.createGain(),wet=actx.createGain();dl.delayTime.value=.42;fb.gain.value=.45;wet.gain.value=.5;dl.connect(fb).connect(dl);dl.connect(wet).connect(out);
   for(const[t0,m,d]of TRUMPETS){const t=actx.currentTime+t0,f=440*2**((m+12-69)/12),g=actx.createGain(),lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.setValueAtTime(250,t);lp.frequency.linearRampToValueAtTime(1400,t+d*.4);lp.frequency.linearRampToValueAtTime(400,t+d);
@@ -875,7 +897,7 @@ function openTown(t){const h=S.you;if(!t||!h)return;const fi=focusI;
     buy('Sharper blade',C.COST.blade,()=>h.atk+=5),h.gloves?{label:'Climbing gloves',why:'Already worn',act:()=>{}}:buy('Climbing gloves',C.COST.gloves,()=>h.gloves=1),
     {label:'Leave town',act:closeMenu}];
   openMenu({title:t.name,body:`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces. Town walls ${Math.ceil(t.hp)}/${t.max}.</p>`,items,grid:true,back:closeMenu})}
-function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);S.trumpetsDue=true;S.nextCall=24;farLand=null;closeMenu();lastSig='';
+function start(role,seed){newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;farLand=null;closeMenu();lastSig='';
   toast(role==='giant'?'You are the giant, asleep and locked in place until someone climbs to your head and wakes you. Then braces the humans bolt on let you walk: reach the gap in the hills before dusk.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
 
 // ================= camera and render =================
@@ -910,6 +932,7 @@ function render(){fit();ctx.setTransform(DPR,0,0,DPR,0,0);
   const sx=shakeA?(Math.random()-.5)*shakeA:0,sy=shakeA?(Math.random()-.5)*shakeA:0;
   ctx.save();ctx.translate(sx,sy);
   if(S.you&&S.you.mode==='climb'&&!S.you.dead)renderClimb();else{renderGround();if(S.role==='giant')renderBodyPanel()}
+  drawCaption();
   ctx.restore()}
 function shapePath(c,x,y,r,shape){c.beginPath();if(shape==='circle')c.arc(x,y,r,0,7);else if(shape==='square')c.rect(x-r*.85,y-r*.85,r*1.7,r*1.7);else{c.moveTo(x,y-r);c.lineTo(x+r,y);c.lineTo(x,y+r);c.lineTo(x-r,y);c.closePath()}}
 // ----- ground view: a turning perspective camera on canvas 2D (from the giant project's proven renderer) -----
@@ -917,7 +940,7 @@ function shapePath(c,x,y,r,shape){c.beginPath();if(shape==='circle')c.arc(x,y,r,
 // and upright things are depth-sorted, so the giant towers out of the ground and far things fade into haze.
 const cam={yaw:0,pitch:.12};const CAM={YAW_RATE:1.8,PITCH_RATE:.9};
 const view={k:1,f:1,D:1000,Hc:500,hz:0,F:null,R:null,ox:0,oy:0};
-function camTurn(dyaw,dpitch){cam.yaw=(cam.yaw+dyaw)%(Math.PI*2);cam.pitch=clamp(cam.pitch+dpitch,0,1)}
+function camTurn(dyaw,dpitch){cam.yaw=(cam.yaw+dyaw)%(Math.PI*2);cam.pitch=clamp(cam.pitch+dpitch,-.6,1);if(S)S.introCam=false}
 function setCam(){const z=S.cam.czoom,span=(S.role==='giant'?2600:800)/z,k=Math.min(W,H)/span;view.k=k;view.D=(S.role==='giant'?1900:1100)/z;view.f=k*view.D;
   view.F={x:Math.sin(cam.yaw),y:-Math.cos(cam.yaw)};view.R={x:Math.cos(cam.yaw),y:Math.sin(cam.yaw)};
   view.hz=H*((S.role==='giant'?.16:.22)-cam.pitch*.55);view.Hc=(H*.7-view.hz)/k}
@@ -971,10 +994,31 @@ function figure(p,hpx,cloak,shape,badge,you){const w=hpx*.42;ctx.fillStyle='rgba
   ctx.fillStyle=cloak;ctx.strokeStyle=you?'#ffffff':'#1a1612';ctx.lineWidth=you?2:1.2;ctx.beginPath();ctx.moveTo(p.x,p.y-hpx*.82);ctx.lineTo(p.x+w,p.y);ctx.lineTo(p.x-w,p.y);ctx.closePath();ctx.fill();ctx.stroke();
   ctx.fillStyle='#e7d3b8';ctx.beginPath();ctx.arc(p.x,p.y-hpx*.85,hpx*.15,0,7);ctx.fill();ctx.stroke();
   shapePath(ctx,p.x,p.y-hpx*1.25,Math.max(3,hpx*.14),shape);ctx.fillStyle=badge;ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=1;ctx.stroke()}
-function drawSky(){const hz=view.hz;if(hz<=0)return;const gr=ctx.createLinearGradient(0,0,0,hz+2);gr.addColorStop(0,'#6f8396');gr.addColorStop(.7,'#b9b3a3');gr.addColorStop(1,'#dcc9a6');ctx.fillStyle=gr;ctx.fillRect(0,0,W,hz+2);
+function openingK(){if(!S||S.t>OPENING.len+3)return 0;const t=S.t;return clamp(Math.min(t/4,1,(OPENING.len+3-t)/5),0,1)}
+function hitFlash(){if(!S)return 0;let f=0;for(const h of OPENING.hits){const d=S.t-h;if(d>=0&&d<1.2)f=Math.max(f,1-d/1.2)}return f}
+const mix=(a,b,k)=>{const p=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16)),A=p(a),B=p(b);return'rgb('+A.map((v,i)=>Math.round(v+(B[i]-v)*k)).join(',')+')'};
+function drawSky(){const hz=view.hz;if(hz<=0)return;const ok=openingK(),fl=hitFlash();const gr=ctx.createLinearGradient(0,0,0,hz+2);gr.addColorStop(0,mix('#6f8396','#1f1624',ok));gr.addColorStop(.7,mix('#b9b3a3','#5c2a26',ok));gr.addColorStop(1,mix('#dcc9a6','#c0643a',ok));ctx.fillStyle=gr;ctx.fillRect(0,0,W,hz+2);
+  if(ok>0)paintRift(hz,ok,fl);
   // a far ridge all round the horizon, turning with the camera
-  ctx.fillStyle='#8e9aa0';ctx.beginPath();ctx.moveTo(0,hz+2);for(let x=0;x<=W;x+=8){const a=cam.yaw*3+x/W*2.2;ctx.lineTo(x,hz-8-14*(Math.sin(a*3.1)+.6*Math.sin(a*7.3)+.3*Math.sin(a*13.7)+1.9))}ctx.lineTo(W,hz+2);ctx.closePath();ctx.fill();
-  const r=mulberry32(99);ctx.fillStyle='rgba(240,236,226,.55)';for(let i=0;i<9;i++){const x=((r()*W*2-(S.t*4+cam.yaw*W*.8))%(W*1.6)+W*1.6)%(W*1.6)-W*.3,y=r()*hz*.85,w=40+r()*120;ctx.beginPath();ctx.ellipse(x,y,w,w*.22,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(x+w*.3,y-w*.08,w*.5,w*.18,0,0,7);ctx.fill()}}
+  ctx.fillStyle=mix('#8e9aa0','#3a2a2c',ok);ctx.beginPath();ctx.moveTo(0,hz+2);for(let x=0;x<=W;x+=8){const a=cam.yaw*3+x/W*2.2;ctx.lineTo(x,hz-8-14*(Math.sin(a*3.1)+.6*Math.sin(a*7.3)+.3*Math.sin(a*13.7)+1.9))}ctx.lineTo(W,hz+2);ctx.closePath();ctx.fill();
+  const r=mulberry32(99);ctx.fillStyle=ok>0?`rgba(${Math.round(240-170*ok)},${Math.round(236-190*ok)},${Math.round(226-180*ok)},${.55+.3*ok})`:'rgba(240,236,226,.55)';for(let i=0;i<9;i++){const x=((r()*W*2-(S.t*4+cam.yaw*W*.8))%(W*1.6)+W*1.6)%(W*1.6)-W*.3,y=r()*hz*.85,w=40+r()*120;ctx.beginPath();ctx.ellipse(x,y,w,w*.22,0,0,7);ctx.fill();ctx.beginPath();ctx.ellipse(x+w*.3,y-w*.08,w*.5,w*.18,0,0,7);ctx.fill()}}
+// the rift: a seam of light tearing open overhead, beams falling through it on the hits, the clouds pulled round it
+function paintRift(hz,k,fl){const t=S.t,cx=W/2+Math.sin(cam.yaw)*W*.15,cy=hz*.38,open=k*Math.min(1,Math.max(0,(t-2)/8)),rx=W*.32*open,ry=hz*.12*open+2;
+  if(open<=0)return;ctx.save();
+  // beams
+  ctx.globalCompositeOperation='lighter';for(let i=0;i<9;i++){const a=-.9+i*.22+Math.sin(t*.4+i)*.04,len=H*1.2,wd=(.035+.02*Math.sin(i*1.7+t))*(1+fl*.8);ctx.fillStyle=`rgba(255,${190+i*5},${120+i*8},${(.05+.12*fl)*open})`;
+    ctx.beginPath();ctx.moveTo(cx+Math.sin(a)*rx*.6,cy);ctx.lineTo(cx+Math.sin(a+wd)*len,cy+Math.cos(a+wd)*len);ctx.lineTo(cx+Math.sin(a-wd)*len,cy+Math.cos(a-wd)*len);ctx.closePath();ctx.fill()}
+  ctx.globalCompositeOperation='source-over';
+  // the opening itself, a glow behind a ragged dark rim
+  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,rx);g.addColorStop(0,`rgba(255,246,214,${.95*open})`);g.addColorStop(.5,`rgba(255,196,120,${.75*open})`);g.addColorStop(1,'rgba(150,50,30,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,rx,ry*1.6,0,0,7);ctx.fill();
+  ctx.fillStyle=`rgba(30,18,26,${.85*open})`;for(let i=0;i<28;i++){const a=i/28*Math.PI*2,j=1+.25*Math.sin(i*2.7+t*.6),x=cx+Math.cos(a)*rx*1.05*j,y=cy+Math.sin(a)*ry*1.7*j;ctx.beginPath();ctx.ellipse(x,y,rx*.16,ry*.9+6,a,0,7);ctx.fill()}
+  // the flash of each stroke over everything
+  if(fl>0){ctx.fillStyle=`rgba(255,220,170,${.18*fl*open})`;ctx.fillRect(0,0,W,H)}
+  ctx.restore()}
+function drawCaption(){if(!S||S.t>OPENING.len)return;for(const[a,b,text]of OPENING.captions){if(S.t<a||S.t>b)continue;const f=Math.min(1,(S.t-a)/1.2,(b-S.t)/1.2);
+  ctx.save();ctx.globalAlpha=f;ctx.font=`italic 500 ${Math.round(Math.min(26,W/22))}px Georgia,'Times New Roman',serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.9)';ctx.shadowBlur=12;ctx.fillStyle='#f4e4c6';
+    const y=H*.86;{const g=ctx.createLinearGradient(0,H*.74,0,H);g.addColorStop(0,'rgba(10,6,8,0)');g.addColorStop(.35,'rgba(10,6,8,.62)');g.addColorStop(1,'rgba(10,6,8,.72)');ctx.save();ctx.globalAlpha=f;ctx.shadowBlur=0;ctx.fillStyle=g;ctx.fillRect(0,H*.74,W,H*.26);ctx.restore()}const words=text.split(' ');let line='',lines=[];for(const w of words){const tr=line?line+' '+w:w;if(ctx.measureText(tr).width>W*.86){lines.push(line);line=w}else line=tr}lines.push(line);lines.forEach((l,i)=>ctx.fillText(l,W/2,y+(i-(lines.length-1)/2)*Math.min(32,W/18)));ctx.restore()}}
 function drawGround(){if(!ground||groundSeed!==S.seed)buildGround();const hz=view.hz;ctx.fillStyle='#6a7650';ctx.fillRect(0,hz,W,H-hz);ctx.imageSmoothingEnabled=true;
   const F=view.F,Rv=view.R,cx=S.cam.x,cy=S.cam.y;let y=Math.max(hz+1,0);
   while(y<H){const st=y<hz+30?2:y<hz+120?3:y<hz+260?4:6,d0=view.Hc*view.f/(y-hz),d1=view.Hc*view.f/(y+st-hz);
@@ -1133,7 +1177,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
 let acc=0,last=performance.now();
 // the next frame is asked for first and the work is guarded, so one thrown error never freezes the game
 function frame(now){requestAnimationFrame(frame);try{frameWork(now)}catch(e){console.error(e)}}
-function frameWork(now){if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
+function frameWork(now){if(S&&S.introCam&&S.t>17.5){cam.pitch+=(.12-cam.pitch)*Math.min(1,.016*1.2);if(Math.abs(cam.pitch-.12)<.01)S.introCam=false}if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   if(toastT>0){toastT-=dt;if(toastT<=0)toastEl.classList.remove('on')}
   if(S&&!menu&&!S.over){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);

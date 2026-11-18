@@ -71,7 +71,7 @@ const C={
   SWIPE_CD:14,SWIPE_WIND:1.6,SWIPE_GRIP:60,SWIPE_CLEAR:.75,
   FALL_TIME:24,REGEN:1,
   H_SPEED:165,
-  CLIMB_SPEED:3.6,LEDGE_SPEED:6,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
+  CLIMB_SPEED:3.6,LEDGE_SPEED:6,REACH:2.3,LUNGE_REACH:3.6,MOVE_GRIP:.4,MOVE_GRIP_CELL:.5,MOSS_DRAIN:2.5,CRUMBLE:1.4,GRIP:100,GRIP_MOVE:3,GRIP_STILL:1,GRIP_LEDGE:20,GRIP_ROPE:8,JOLT:5,LUNGE:3,LUNGE_GRIP:15,FALL_G:14,
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
   ANGER:600,DUSK:900,HOUSE_HP:200,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
   GRUDGE_FADE:240,PULL_FAVOR:40,CANNON_FAVOR:60,
@@ -118,7 +118,7 @@ function buildBody(seed){
     for(let r=Math.floor(r0-rad);r<=r0+rad;r++)for(let c=Math.floor(c0-rad);c<=c0+rad;c++){if(r<0||r>=ROWS||c<0||c>=COLS)continue;
       if(g[r*COLS+c]===HOLD&&Math.hypot(r-r0,(c-c0)*1.3)<=rad)g[r*COLS+c]=SMOOTH}}
   // guaranteed routes through each limb
-  const set=(r,c)=>{if(r>=0&&r<ROWS&&c>=0&&c<COLS&&g[r*COLS+c]===SMOOTH)g[r*COLS+c]=HOLD};
+  const forced=new Uint8Array(COLS*ROWS);const set=(r,c)=>{if(r>=0&&r<ROWS&&c>=0&&c<COLS){forced[r*COLS+c]=1;if(g[r*COLS+c]===SMOOTH)g[r*COLS+c]=HOLD}};
   const spine=(r0,r1,c0,c1)=>{let c=c0+Math.floor(R()*(c1-c0+1));for(let r=r0;r<=r1;r++){set(r,c);if(R()<.3){const n=clamp(c+(R()<.5?-1:1),c0,c1);set(r,n);c=n}}};
   const belt=(c0,c1,r0,r1)=>{let r=r0+Math.floor(R()*(r1-r0+1));for(let c=c0;c<=c1;c++){set(r,c);if(R()<.3){const n=clamp(r+(R()<.5?-1:1),r0,r1);set(n,c);r=n}}};
   spine(0,106,8,12);spine(0,106,19,23);spine(106,166,9,22);spine(106,166,11,20);spine(82,166,2,6);spine(82,166,25,29);spine(158,199,14,17);
@@ -134,21 +134,39 @@ function buildBody(seed){
     for(let i=0;i<g.length;i++)if(g[i]>=LEDGE&&!seen[i]){let r=Math.floor(i/COLS),c=i%COLS;while(r>0&&!seen[r*COLS+c]){r--;if(g[r*COLS+c]===SMOOTH){g[r*COLS+c]=HOLD;fixed++}else if(!g[r*COLS+c])break}}
     if(!fixed)break}
   const vari=new Uint8Array(COLS*ROWS);for(let i=0;i<vari.length;i++)vari[i]=Math.floor(R()*256);
-  return{g,reg,vari}}
+  // handholds: the climber moves from hold to hold, so the route is a choice. Firm cracks, mossy holds that drain grip,
+  // loose stones that crumble a moment after they take your weight. Ledges, joints and sites are always firm.
+  const h=new Uint8Array(COLS*ROWS);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const i=r*COLS+c,t=g[i];if(t<HOLD)continue;
+    if(t>=LEDGE||r<=2||(forced[i]&&r%2===0))h[i]=1;else if(R()<.33){const k=R();h[i]=k<.15?3:k<.4?2:1}}
+  for(let pass=0;pass<6;pass++){const seen=reachFrom(h,[[1,9],[1,20]]);let fixed=0;
+    for(let i=0;i<h.length;i++)if(g[i]>=LEDGE&&!seen[i]){let r=Math.floor(i/COLS);const c=i%COLS;while(r>0&&!seen[r*COLS+c]){r-=2;if(r>=0&&g[r*COLS+c]>=HOLD&&!h[r*COLS+c]){h[r*COLS+c]=1;fixed++}}}
+    if(!fixed)break}
+  return{g,reg,vari,h}}
+const OFFS=[];for(let dr=-3;dr<=3;dr++)for(let dc=-3;dc<=3;dc++)if((dr||dc)&&dr*dr+dc*dc<=C.REACH*C.REACH)OFFS.push([dr,dc]);
+function reachFrom(h,starts){const seen=new Uint8Array(h.length),q=[];for(const[r,c]of starts){const i=r*COLS+c;if(h[i]){seen[i]=1;q.push(i)}}
+  while(q.length){const i=q.pop(),r=Math.floor(i/COLS),c=i%COLS;for(const[dr,dc]of OFFS){const nr=r+dr,nc=c+dc;if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;const j=nr*COLS+nc;if(!seen[j]&&h[j]){seen[j]=1;q.push(j)}}}
+  return seen}
 function floodFrom(g,starts){const seen=new Uint8Array(g.length),q=[];
   for(const[r,c]of starts){const i=r*COLS+c;if(g[i]>=HOLD){seen[i]=1;q.push(i)}}
   while(q.length){const i=q.pop(),r=Math.floor(i/COLS),c=i%COLS;
     for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const nr=r+dr,nc=c+dc;if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;const j=nr*COLS+nc;if(!seen[j]&&g[j]>=HOLD){seen[j]=1;q.push(j)}}}
   return seen}
 function cellT(x,y){const c=Math.floor(x),r=Math.floor(y);if(r<0||r>=ROWS||c<0||c>=COLS)return AIR;return S.body.g[r*COLS+c]}
-const climbable=(x,y)=>cellT(x,y)>=HOLD;
+const holdAt=(x,y)=>{const c=Math.floor(x),r=Math.floor(y);return r<0||r>=ROWS||c<0||c>=COLS?0:S.body.h[r*COLS+c]};
+const climbable=(x,y)=>holdAt(x,y)>0;
+// the best hold in a direction within reach: closest to the line, then nearest
+function pickHold(cl,dx,dy,reach,min){const r0=Math.floor(cl.y),c0=Math.floor(cl.x),l=Math.hypot(dx,dy)||1;dx/=l;dy/=l;let best=null,bs=-1e9;
+  for(let dr=-4;dr<=4;dr++)for(let dc=-4;dc<=4;dc++){const d=Math.hypot(dr,dc);if(!d||d>reach||d<(min||0))continue;const r=r0+dr,c=c0+dc;if(!holdAt(c,r))continue;
+    const cos=(dc*dx+dr*dy)/d;if(cos<.55)continue;const sc=cos*1.4-d*.12-(S.body.h[r*COLS+c]===3?.15:0);if(sc>bs){bs=sc;best=[r,c]}}
+  return best}
 const restful=t=>t===LEDGE||t===SITE;
 function jointAt(x,y){const r=Math.floor(y),c=Math.floor(x);for(const id in JOINTS){const j=JOINTS[id];if(r>=j.r0&&r<=j.r1&&c>=j.c0&&c<=j.c1)return id}return null}
 function siteAt(x,y){const r=Math.floor(y),c=Math.floor(x);return S.sites.find(s=>s.r===r&&s.c===c)||null}
 // breadth-first path over climbable cells; returns [[r,c],...] from start (exclusive) to a goal cell
-function bfs(r0,c0,isGoal,maxN){const g=S.body.g,prev=new Int32Array(g.length).fill(-1),q=[r0*COLS+c0];prev[q[0]]=q[0];let head=0,found=-1;
+function bfs(r0,c0,isGoal,maxN){const hh=S.body.h,prev=new Int32Array(hh.length).fill(-1),q=[r0*COLS+c0];prev[q[0]]=q[0];let head=0,found=-1;
   while(head<q.length&&head<(maxN||1e9)){const i=q[head++],r=Math.floor(i/COLS),c=i%COLS;if(head>1&&isGoal(r,c)){found=i;break}
-    for(const[dr,dc]of[[1,0],[0,1],[0,-1],[-1,0]]){const nr=r+dr,nc=c+dc;if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;const j=nr*COLS+nc;if(prev[j]<0&&g[j]>=HOLD){prev[j]=i;q.push(j)}}}
+    for(const[dr,dc]of OFFS){const nr=r+dr,nc=c+dc;if(nr<0||nr>=ROWS||nc<0||nc>=COLS)continue;const j=nr*COLS+nc;if(prev[j]<0&&hh[j]){prev[j]=i;q.push(j)}}}
   if(found<0)return null;const path=[];let i=found;while(i!==q[0]){path.push([Math.floor(i/COLS),i%COLS]);i=prev[i]}return path.reverse()}
 
 // ================= save =================
@@ -179,7 +197,7 @@ function newGame(role,seed){
   S={role,seed,t:0,towns,g,joints,body:buildBody(seed),sites:SITES.map(s=>({...s,build:null})),anchors:[],
     humans:[],monsters:[],crystals:[],trees:[],prints:[],shots:[],fx:[],over:null,nextId:1,
     cam:{x:cx,y:cy,zoom:1,czoom:1},autoplay:false};
-  S.grudge=[0,0,0];S.wander=null;S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
+  S.grudge=[0,0,0];S.wander=null;S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];
   // giants that lay down long ago are mountains now: landmarks across the open world
   for(let i=0;i<6;i++){for(let k=0;k<40;k++){const x=rr(700,M-700),y=rr(700,M-700);if(S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>1500)&&Math.hypot(x-cx,y-cy)>1500&&S.marks.every(m=>Math.hypot(m.x-x,m.y-y)>2200)){S.marks.push({x,y,ang:rr(0,6.28)});break}}}
   for(let i=0;i<3;i++){let x=rr(0,M),y=i%2?0:M,a=i%2?Math.PI/2:-Math.PI/2;const pts=[];for(let k=0;k<60;k++){pts.push({x,y});a+=rr(-.35,.35);x+=Math.cos(a)*200;y+=Math.sin(a)*200;if(x<0||y<0||x>M||y>M)break}S.rivers.push(pts)}
@@ -244,7 +262,7 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
   if(w.k==='stomp'){sfx('stomp');shake(14);for(const f of g.feet){S.fx.push({k:'ring',x:f.x,y:f.y,r:C.STOMP_R,t:0,life:.6,col:'#ffcf6a'});hurtArea(f.x,f.y,C.STOMP_R,C.STOMP_DMG,C.STOMP_TOWN,'stomp')}}
   else if(w.k==='smash'){sfx('smash');shake(18);S.fx.push({k:'ring',x:w.x,y:w.y,r:C.SMASH_R,t:0,life:.7,col:'#ff8f80'});hurtArea(w.x,w.y,C.SMASH_R,C.SMASH_DMG,C.SMASH_TOWN,'smash')}
   else if(w.k==='shake'){shake(10);let lost=0,fell=0;
-    for(const h of climbers()){const braced=S.t-h.lastMove>w.dur*.8&&!h.cl.lunge,onL=restful(cellT(h.cl.x,h.cl.y));
+    for(const h of climbers()){const braced=S.t-h.lastMove>w.dur*.8&&!h.cl.move,onL=restful(cellT(h.cl.x,h.cl.y));
       const d=onL?(braced?0:8):braced?C.SHAKE_BRACED:C.SHAKE_GRIP;h.grip-=d;if(h.you)toast(d<=12?'Braced. You held on.':'Shaken! Your grip slips.')}
     S.anchors=S.anchors.filter(()=>{if(rnd()<C.SHAKE_ANCHOR){lost++;return false}return true});
     for(const id in S.joints){const j=S.joints[id];j.wedges=j.wedges.filter(()=>{if(rnd()<C.SHAKE_WEDGE){fell++;return false}return true})}
@@ -314,15 +332,15 @@ function damageJoint(id,d,by){const g=S.g,j=S.joints[id];if(g.dead||j.hp<=0&&id=
 function townAt(h){return S.towns.find(t=>t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r+20)||null}
 function nearFoot(h){const g=S.g;if(g.dead)return -1;let best=-1,bd=1e9;g.feet.forEach((f,i)=>{if(f.air>0)return;const d=Math.hypot(f.x-h.x,f.y-h.y);if(d<C.FOOT_R+45&&d<bd){bd=d;best=i}});return best}
 function nearMonster(h,r){let best=null,bd=r;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-m.r;if(d<bd){bd=d;best=m}}return best}
-function mount(h,leg){h.mode='climb';h.leg=leg;h.cl={x:leg?21.5:10.5,y:1.5,vy:0,fall:false,from:0,lunge:null,path:null};h.grip=maxGrip(h);h.tx=h.ty=null;h.rest=false;
+function mount(h,leg){h.mode='climb';h.leg=leg;h.cl={x:leg?21.5:10.5,y:1.5,vy:0,fall:false,from:0,move:null,path:null};h.grip=maxGrip(h);h.tx=h.ty=null;h.rest=false;
   sayTo(h,'You grab the '+(leg?'right':'left')+' foot. Climb with care: grip drains, ledges refill it.')}
 function dismount(h,hurt){const g=S.g,f=g.feet[h.leg]||g.feet[0];h.mode='ground';const a=rr(0,6.28),r=C.FOOT_R+40;h.x=clamp(f.x+Math.cos(a)*r,20,C.MAP-20);h.y=clamp(f.y+Math.sin(a)*r,20,C.MAP-20);h.cl=null;h.botClimb=null;h.goal=null;
   if(hurt>0)hurtHuman(h,hurt,'fall')}
 function fallDamage(cells){return Math.max(0,cells*FT-60)*.12}
-function startFall(h){const cl=h.cl;if(cl.fall)return;cl.fall=true;cl.vy=0;cl.from=cl.y;cl.lunge=null;cl.path=null;h.grip=0;sfx('fall',h.you);sayTo(h,'Your grip fails!')}
+function startFall(h){const cl=h.cl;if(cl.fall)return;cl.fall=true;cl.vy=0;cl.from=cl.y;cl.move=null;cl.path=null;h.grip=0;sfx('fall',h.you);sayTo(h,'Your grip fails!')}
 function humanCtx(h){
   if(h.dead)return{A:{l:'Wait',why:'Respawning'},B:{l:'Wait',why:'Respawning'},X:{l:'Wait',why:'Respawning'},Y:{l:'Wait',why:'Respawning'}};
-  if(h.mode==='climb'){const cl=h.cl,busy=cl.fall?'Falling':cl.lunge?'Lunging':null;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
+  if(h.mode==='climb'){const cl=h.cl,busy=cl.fall?'Falling':cl.move?'Moving':null;const j=jointAt(cl.x,cl.y),s=siteAt(cl.x,cl.y);
     let A={l:'Strike',why:'No joint or site here'};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy};
     else if(s){if(s.build&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Your cannon',why:'Already built'};else A={l:'Mount cannon ('+h.kits.cannon+')',why:busy||(!h.kits.cannon?'No cannon kits':null)}}
@@ -341,9 +359,9 @@ function humanAct(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why)
       if(s&&s.build&&s.build.town!==h.town){s.build.hp-=h.atk;sfx('hit',h.you);if(s.build.hp<=0){s.build=null;sayTo(h,'Cannon wrecked!');gainXp(h,20)}return true}
       if(s&&!s.build){h.kits.cannon--;s.build={town:h.town,owner:h.id,hp:C.CANNON_HP,cd:1};S.grudge[h.town]-=C.CANNON_FAVOR;sfx('build',h.you);gainXp(h,20);sayTo(h,'Cannon mounted on the '+s.name+'. It fires on every town but yours.');return true}
       return false}
-    if(slot==='B'){let dx=dir?dir.x:0,dy=dir?dir.y:1;const l=Math.hypot(dx,dy);if(l<.2){dx=0;dy=1}else{dx/=l;dy/=l}
-      for(let k=C.LUNGE;k>=1;k-=.5){const tx=cl.x+dx*k,ty=cl.y+dy*k;if(climbable(tx,ty)){cl.lunge={sx:cl.x,sy:cl.y,tx:Math.floor(tx)+.5,ty:Math.floor(ty)+.5,t:0};h.grip-=C.LUNGE_GRIP;h.lastMove=S.t;cl.path=null;return true}}
-      sayTo(h,'No hold within reach that way.');return false}
+    if(slot==='B'){let dx=dir?dir.x:0,dy=dir?dir.y:1;if(Math.hypot(dx,dy)<.2){dx=0;dy=1}
+      const t=pickHold(cl,dx,dy,C.LUNGE_REACH,C.REACH*.8);if(!t){sayTo(h,'No hold within a lunge that way.');return false}
+      startMove(h,t,true);h.grip-=C.LUNGE_GRIP;cl.path=null;return true}
     if(slot==='X'&&jointAt(cl.x,cl.y)&&S.joints[jointAt(cl.x,cl.y)].wedges.length){const ws=S.joints[jointAt(cl.x,cl.y)].wedges;let i=ws.findIndex(w=>w.town!==h.town);if(i<0)i=0;ws.splice(i,1);
       h.kits.wedge++;S.grudge[h.town]-=C.PULL_FAVOR;gainXp(h,8);sfx('build',h.you);sayTo(h,'You pull out a wedge. The giant remembers '+TOWNS[h.town].name+' kindly.');return true}
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
@@ -397,6 +415,11 @@ function stepHuman(h,dt,mv){
   const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);
     if(h.quest&&h.quest.done){h.gold+=h.quest.gold;gainXp(h,h.quest.xp);if(h.you){toast('Quest reward: '+h.quest.gold+' gold.');sfx('coin')}h.quest=null}
     if(!h.quest&&!h.you)h.quest=newQuest(h)}}
+function startMove(h,t,lunge){const cl=h.cl,tx=t[1]+.5,ty=t[0]+.5,d=Math.hypot(tx-cl.x,ty-cl.y);
+  cl.move={sx:cl.x,sy:cl.y,tx,ty,t:0,lunge,dur:(lunge?.45:.28+.08*d)*(S.g.fallen>0?.5:1)};h.lastMove=S.t;if(!lunge&&S.g.fallen<=0)h.grip-=C.MOVE_GRIP+C.MOVE_GRIP_CELL*d}
+// loose stones give way a moment after they are grabbed
+function stepCrumble(dt){for(let k=S.crumble.length-1;k>=0;k--){const q=S.crumble[k];q.t-=dt;if(q.t>0)continue;S.crumble.splice(k,1);S.body.h[q.i]=0;
+  for(const h of climbers())if(!h.cl.move&&!h.cl.fall&&Math.floor(h.cl.y)*COLS+Math.floor(h.cl.x)===q.i){sayTo(h,'The stone crumbles away!');startFall(h)}}}
 function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
   if(g.dead){dismount(h,0);return}
   if(cl.fall){cl.vy+=C.FALL_G*dt;const ny=cl.y-cl.vy*dt,c=Math.floor(cl.x);
@@ -405,26 +428,21 @@ function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
       if(restful(t)||caught){cl.fall=false;cl.y=r+.5;if(caught)cl.x=caught.c+.5;const d=caught?4:fallDamage(cl.from-r);h.grip=Math.min(mg,25);
         sayTo(h,caught?'Your rope catches you!':'You slam onto a ledge.');if(d>0)hurtHuman(h,d,'fall');return}}
     cl.y=ny;if(cl.y<=0){const d=fallDamage(cl.from);dismount(h,d);return}return}
-  if(cl.lunge){const L=cl.lunge;L.t+=dt/.3;const k=Math.min(1,L.t);cl.x=L.sx+(L.tx-L.sx)*k;cl.y=L.sy+(L.ty-L.sy)*k+Math.sin(k*Math.PI)*.6;if(k>=1){cl.x=L.tx;cl.y=L.ty;cl.lunge=null}return}
-  // a tapped route (touch) or a bot route: follow it cell by cell
-  let dx=mv.x,dy=mv.y;
-  if(cl.path&&!dx&&!dy){const n=cl.path[0];if(n){const tx=n[1]+.5,ty=n[0]+.5,ex=tx-cl.x,ey=ty-cl.y,d=Math.hypot(ex,ey);if(d<.12){cl.path.shift();if(!cl.path.length)cl.path=null}else{dx=ex/d;dy=ey/d}}}
-  else if(dx||dy)cl.path=null;
-  const here=cellT(cl.x,cl.y),onRest=restful(here);
-  if(dx||dy){h.lastMove=S.t;const sp=(onRest&&Math.abs(dx)>Math.abs(dy)?C.LEDGE_SPEED:C.CLIMB_SPEED)*(g.fallen>0?2:1); // a kneeling giant is walked, not climbed
-    if(dy<0&&cl.y+dy*sp*dt<.3&&cl.y<2){dismount(h,0);sayTo(h,'You step down onto the ground.');return}
-    let nx=cl.x+dx*sp*dt,ny=cl.y+dy*sp*dt;
-    if(climbable(nx,ny)){cl.x=nx;cl.y=ny}else if(Math.abs(dx)>.05&&climbable(nx,cl.y)){cl.x=nx}else if(Math.abs(dy)>.05&&climbable(cl.x,ny)){cl.y=ny}
-    // drift toward the centre of the cell across the direction of travel, so corners never snag
-    if(Math.abs(dy)>Math.abs(dx))cl.x+=(Math.floor(cl.x)+.5-cl.x)*Math.min(1,dt*6);else cl.y+=(Math.floor(cl.y)+.5-cl.y)*Math.min(1,dt*6)}
+  // hold to hold: a move takes a moment and grip in proportion to the reach
+  if(cl.move){const M=cl.move;M.t+=dt/M.dur;h.lastMove=S.t;const k=Math.min(1,M.t);cl.x=M.sx+(M.tx-M.sx)*k;cl.y=M.sy+(M.ty-M.sy)*k+(M.lunge?Math.sin(k*Math.PI)*.6:0);
+    if(k>=1){cl.x=M.tx;cl.y=M.ty;cl.move=null;const i=Math.floor(cl.y)*COLS+Math.floor(cl.x);if(S.body.h[i]===3&&!S.crumble.some(q=>q.i===i)){S.crumble.push({i,t:C.CRUMBLE});sayTo(h,'Loose stone! Move on before it gives.')}}}
+  else{let target=null;const dx=mv.x,dy=mv.y;
+    if(dx||dy){cl.path=null;if(dy<0&&cl.y<2.5&&Math.abs(dy)>Math.abs(dx)){dismount(h,0);sayTo(h,'You step down onto the ground.');return}target=pickHold(cl,dx,dy,C.REACH)}
+    else if(cl.path){target=cl.path.shift();if(!cl.path.length)cl.path=null}
+    if(target)startMove(h,target,false)}
   const rope=S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-Math.floor(cl.y))<=1&&Math.abs(a.c-Math.floor(cl.x))<=1);
-  const moving=S.t-h.lastMove<.1;
+  const moving=!!cl.move;
   if(g.fallen>0)h.grip=Math.min(mg,h.grip+C.GRIP_LEDGE*dt);
   else if(restful(cellT(cl.x,cl.y))&&!moving)h.grip=Math.min(mg,h.grip+C.GRIP_LEDGE*dt);
   else if(rope&&!moving)h.grip=Math.min(mg,h.grip+C.GRIP_ROPE*dt);
-  else h.grip-=(moving?C.GRIP_MOVE:C.GRIP_STILL)*dt;
+  else h.grip-=(holdAt(cl.x,cl.y)===2?C.MOSS_DRAIN:C.GRIP_STILL)*dt;
   if(h.you&&h.grip<25&&h.grip>0&&Math.floor(S.t*2)!==Math.floor((S.t-dt)*2))sfx('grip');
-  if(!climbable(cl.x,cl.y)||h.grip<=0){startFall(h);return}
+  if((!cl.move&&!climbable(cl.x,cl.y))||h.grip<=0){startFall(h);return}
   questTick(h,'height',Math.floor(cl.y))}
 
 // ================= monsters and shots =================
@@ -455,7 +473,7 @@ function botGoalCells(h){const g=S.g,J=S.joints;
   const k=J.kneeL.crip?'kneeR':J.kneeR.crip?'kneeL':(J.kneeL.hp<=J.kneeR.hp?'kneeL':'kneeR');
   if(J.kneeL.hp+J.kneeR.hp>2500&&h.lvl>=4&&!J.neck.crip&&rnd()<.3)return{kind:'joint',id:'neck'};
   return{kind:'joint',id:k}}
-function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.lunge)return mv;
+function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return mv;
   const r=Math.floor(cl.y),c=Math.floor(cl.x),t=cellT(cl.x,cl.y),mg=maxGrip(h);
   if(g.wind&&(g.wind.k==='shake')){cl.path=null;return mv} // brace
   if(g.wind&&g.wind.k==='swipe'&&!restful(t)){const left=g.wind.side==='L';if(r>=30&&(left?c<COLS/2:c>=COLS/2)){if(!cl.path||!h.dodging){h.dodging=true;cl.path=bfs(r,c,(rr2,cc)=>restful(S.body.g[rr2*COLS+cc])||rr2<30||(left?cc>=COLS/2:cc<COLS/2),3000)}return mv}}
@@ -545,7 +563,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
     stepHuman(h,dt,m)}
   for(const a of takePresses()){if(S.role==='giant'){if(!S.autoplay)giantDo({A:'stomp',B:'smash',X:'shake',Y:'swipe'}[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?{x:mv.x,y:-mv.y}:null)}
-  stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);
+  stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepCrumble(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
 function checkEnd(){const alive=liveFactions().map(i=>S.towns[i]);let over=null;
@@ -612,8 +630,8 @@ cv.addEventListener('pointercancel',e=>{ptrEnd(e);tapDown=null});
 cv.addEventListener('wheel',e=>{e.preventDefault();zoomBy(Math.exp(-e.deltaY*.0012))},{passive:false});
 cv.addEventListener('pointerup',e=>{ptrEnd(e);const td=tapDown;tapDown=null;if(!td||td.moved>14||!S||S.over||menu)return;
   const r=cv.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
-  if(S.you&&S.you.mode==='climb'&&!S.you.dead){const cl=S.you.cl;if(cl.fall||cl.lunge)return;const p=screenToCell(sx,sy);
-    let path=bfs(Math.floor(cl.y),Math.floor(cl.x),(rr2,cc)=>Math.abs(rr2-p.r)+Math.abs(cc-p.c)<=1,12000);
+  if(S.you&&S.you.mode==='climb'&&!S.you.dead){const cl=S.you.cl;if(cl.fall||cl.move)return;const p=screenToCell(sx,sy);
+    let path=bfs(Math.floor(cl.y),Math.floor(cl.x),(rr2,cc)=>Math.abs(rr2-p.r)<=1&&Math.abs(cc-p.c)<=1,12000);
     if(path){cl.path=path;S.fx.push({k:'cellmark',r:p.r,c:p.c,t:0,life:.8})}else toast('No route there.');return}
   const w=screenToWorld(sx,sy);
   if(S.role==='giant'){S.g.tx=w.x;S.g.ty=w.y;S.fx.push({k:'mark',x:w.x,y:w.y,t:0,life:1,r:70,col:'#ffcf6a'})}
@@ -652,7 +670,7 @@ function record(){return`<p class="dim">As the giant: ${save.giantWins} won, ${s
 function openTitle(){S=null;openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
   items:[{label:'Play as a human',sub:'Quest, shop, then climb the giant',act:()=>start('human')},{label:'Play as the giant',sub:'Answer each town as it treats you, and last until dusk',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
-function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. Grip drains while you hang on and faster while you move; stand on a ledge or rest by your own anchor to refill it. Lunge to cross bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
+function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
 <p><b>Building the world.</b> Out in the wild, Build puts up houses that thicken your settlement's walls, watchtowers that shoot beasts, or a whole new outpost of your people. Settle beside the giant's footprint lakes and they pay you gold, so towns that follow the giant grow rich, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes double damage. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
 <p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashford, your town, is what you make of it. At dusk the giant lies down as a mountain beside the town it favours most: be that town, or shatter its Heart-stone, or be the last town standing. The giant wins by lasting until dusk or by destroying two towns.</p>
@@ -846,7 +864,7 @@ function renderBodyPanel(){const ph=Math.min(H-16,360),px=ph/ROWS,pw=COLS*px,x0=
   for(const h of climbers()){ctx.fillStyle=TOWNS[h.town].col;shapePath(ctx,x0+h.cl.x*px,y0+(ROWS-h.cl.y)*px,Math.max(3,px*1.6),TOWNS[h.town].shape);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1;ctx.stroke()}
   ctx.font='600 11px system-ui';ctx.textAlign='center';ctx.fillStyle='#eee9dd';ctx.fillText(climbers().length+' climbing',x0+pw/2,y0+ph-4)}
 function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
-  const px=Math.max(8,Math.min(W/(COLS+6),H/26))*S.cam.czoom;climbCam.px=px;
+  const px=Math.max(14,Math.min(W/13,H/15))*S.cam.czoom;climbCam.px=px;
   const fitsW=COLS*px<=W-20;climbCam.x+=((fitsW?COLS/2:clamp(cl.x,W/2/px-1,COLS-W/2/px+1))-climbCam.x)*.15;
   climbCam.y+=((cl.y+3)-climbCam.y)*.12;if(Math.abs(climbCam.y-cl.y)>40)climbCam.y=cl.y;
   const toX=c=>W/2+(c-climbCam.x)*px,toY=r=>H*.55-(r-climbCam.y)*px;
@@ -872,6 +890,15 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
     ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(x,y-8,w,5);ctx.fillStyle=id==='heart'?'#ff4d5e':'#ffcf6a';ctx.fillRect(x,y-8,w*j.hp/j.max,5);
     j.wedges.forEach((wd,i)=>{ctx.fillStyle='#222';ctx.beginPath();const wx=x+(i+1)*w/4;ctx.moveTo(wx-4,y+hh*.3);ctx.lineTo(wx+4,y+hh*.3);ctx.lineTo(wx,y+hh*.8);ctx.closePath();ctx.fill();ctx.strokeStyle=TOWNS[wd.town].col;ctx.stroke()});
     if(Math.abs(J.r0-climbCam.y)<40){ctx.font='600 12px system-ui';ctx.textAlign='left';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const tx=x+w+4,ty=y+hh/2+4;ctx.strokeText(JOINTS[id].name,tx,ty);ctx.fillText(JOINTS[id].name,tx,ty)}}
+  // the holds: firm cracks, green moss that drains grip, orange loose stones; your reach and the hold you are aiming at
+  {const r0=Math.max(0,Math.floor(climbCam.y-H/px*.6)),r1=Math.min(ROWS-1,Math.ceil(climbCam.y+H/px*.6)),hb=S.body.h,me=[Math.floor(cl.y),Math.floor(cl.x)];
+    const aimV=readMove(),aim=!cl.move&&!cl.fall&&(aimV.x||aimV.y)?pickHold(cl,aimV.x,-aimV.y,C.REACH):null;
+    for(let r=r0;r<=r1;r++)for(let c=0;c<COLS;c++){const k=hb[r*COLS+c];if(!k)continue;const t=S.body.g[r*COLS+c];if(t===LEDGE||t===SITE||t===JOINT||t===HEART)continue;const x=toX(c+.5),y=Y(c,r+.5);
+      ctx.fillStyle=k===2?'#5f8a3a':k===3?'#d08a4a':'#2e2a24';ctx.beginPath();ctx.ellipse(x,y,px*.32,px*.2,0,0,7);ctx.fill();
+      ctx.fillStyle=k===2?'#9cc76a':k===3?'#f4c08a':'#d9cdb2';ctx.beginPath();ctx.ellipse(x,y-px*.12,px*.3,px*.08,0,0,7);ctx.fill();
+      if(S.crumble.some(q=>q.i===r*COLS+c)){ctx.strokeStyle='#ff5a3c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,px*.45,0,7);ctx.stroke()}
+      const d=Math.hypot(r-me[0],c-me[1]);if(!cl.fall&&d>0&&d<=C.REACH){ctx.strokeStyle='rgba(255,255,255,.45)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,px*.42,0,7);ctx.stroke()}}
+    if(aim){const x=toX(aim[1]+.5),y=Y(aim[1],aim[0]+.5);ctx.strokeStyle='#ffcf6a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,px*.55,0,7);ctx.stroke()}}
   for(const s of S.sites){const x=toX(s.c)+px/2,y=toY(s.r)+px/2;ctx.strokeStyle='#ffcf6a';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.lineTo(x+Math.cos(a)*px*.8,y+Math.sin(a)*px*.8)}ctx.closePath();ctx.stroke();
     if(s.build){ctx.fillStyle=TOWNS[s.build.town].col;ctx.fillRect(x-px*.7,y-px*1.2,px*1.4,px*.9);ctx.fillStyle='#222';ctx.fillRect(x,y-px*1.05,px*1.3,px*.45)}}
   for(const a of S.anchors){const x=toX(a.c)+px/2,y=Y(a.c,a.r+.5);ctx.strokeStyle=TOWNS[a.town].col;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x,y,px*.35,0,7);ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+px*.35);ctx.lineTo(x,y+px*1.4);ctx.stroke()}
@@ -905,7 +932,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     a=`<span>Dusk <b>${clock()}</b></span><span>HP <b class="${h.hp<h.max*.3?'warn':''}">${Math.ceil(h.hp)}/${h.max}</b></span>`+(h.mode==='climb'?`<span>Grip <b class="${h.grip<maxGrip(h)*.25?'warn':''}">${Math.ceil(Math.max(0,h.grip))}</b></span><span>Height <b>${Math.round(h.cl.y*FT)} ft</b></span>`:`<span>Lv <b>${h.lvl}</b></span>`)+
       `<span>Gold <b>${h.gold}</b></span><span>Anchors <b>${h.kits.anchor}</b> Wedges <b>${h.kits.wedge}</b> Cannons <b>${h.kits.cannon}</b></span>`;
     const q=h.quest;b=(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
-      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Heart-stone at 1340 ft. Knees at 430 ft.'):'The giant is '+mood(h.town)+' toward Ashford'+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
+      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):'The giant is '+mood(h.town)+' toward Ashford'+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.textContent=b}}
 
 // ================= loop =================

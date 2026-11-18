@@ -187,6 +187,8 @@ let master=null;
 // Sound runs on the person's Sound-engine: spatialised sources with distance delay, air absorption and reverb, so the
 // giant is heard from far away and late. The plain Web Audio blips below are only a fallback where AudioWorklet is missing.
 let se=null,seSrc=null,seFailed=false;const SE_M=.12; // metres per world unit
+// a stressed sheet of metal: dense, inharmonic and damped, so each impulse is a click, not a bell
+const SHEET=[[163,1,.35],[251,.9,.28],[377,.8,.22],[529,.7,.18],[718,.6,.14],[967,.5,.11],[1283,.42,.09],[1690,.33,.07],[2214,.25,.05],[2890,.18,.04]].map(([freq,gain,t60])=>({freq,gain,t60}));
 const METAL=[[61,1,9],[97,.8,7],[149,.6,6],[233,.5,4.5],[377,.38,3.5],[523,.3,2.6],[611,.26,2.2],[947,.18,1.5],[1291,.12,1]].map(([freq,gain,t60])=>({freq,gain,t60}));
 function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;se='starting';
   const url=URL.createObjectURL(new Blob([document.getElementById('se-worklet').textContent],{type:'text/javascript'}));
@@ -194,6 +196,7 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
     seSrc={ui:e.createSource('synth',{level:78,priority:3}),groan:e.createSource('synth',{level:104,refDistance:70,priority:6}),
       metal:e.createSource('modal',{modes:METAL,level:100,refDistance:70,priority:6}),boom:e.createSource('synth',{level:100,refDistance:60,priority:5}),
       near:e.createSource('synth',{level:82,refDistance:8,priority:2}),
+      creakL:e.createSource('modal',{modes:SHEET,level:108,refDistance:70,priority:6}),creakR:e.createSource('modal',{modes:SHEET.map(m=>({...m,freq:m.freq*1.07})),level:108,refDistance:70,priority:6}),
       // a throat the size of a hall: low, rough, wavering calls that carry for miles
       voice:e.createSource('voice',{tract:3.2,sac:1.6,level:112,refDistance:90,priority:7}),
       gfoot:e.createSource('footsteps',{level:108,refDistance:50,priority:5}),feet:e.createSource('footsteps',{level:70,refDistance:3,priority:2}),
@@ -202,7 +205,7 @@ function startEngine(){if(se||!window.SE||!window.AudioWorkletNode)return false;
 let seVol=-1;
 function seFrame(){if(!se||se==='starting')return;const v=save.sound?.8:0;if(v!==seVol){seVol=v;se.setMasterVolume(v)}if(!S)return;const g=S.g,z=v=>v*SE_M;
   se.setListener({x:z(S.cam.x),y:-z(S.cam.y),z:2,yaw:cam.yaw});seSrc.ui.setPosition(z(S.cam.x),-z(S.cam.y),2);
-  seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));
+  seSrc.groan.setPosition(z(g.x),-z(g.y),z(1300));seSrc.metal.setPosition(z(g.x),-z(g.y),z(900));{const f=fwd(g),sx=-f.y,sy=f.x;seSrc.creakL.setPosition(z(g.x-sx*300),-z(g.y-sy*300),z(1150));seSrc.creakR.setPosition(z(g.x+sx*300),-z(g.y+sy*300),z(700))}
   const ft=g.feet.find(f=>f.air<=0)||g.feet[0];seSrc.boom.setPosition(z(ft.x),-z(ft.y),1);
   seSrc.voice.setPosition(z(g.x),-z(g.y),z(g.fallen>0?200:1850));
   // the nearest river runs where it is; the nearest filled footprint lake drips
@@ -232,7 +235,20 @@ function plainAudio(){if(se)return;if(actx){if(actx.state==='suspended')actx.res
 document.addEventListener('visibilitychange',()=>{if(!actx||!actx.suspend)return;if(document.hidden)actx.suspend().catch(()=>{});else actx.resume().catch(()=>{})});
 // the giant's groan as it moves: detuned low saws beating against each other, a swept resonance like strained metal, and
 // inharmonic ringing partials bending down. Upper partials carry it on phone speakers. Heard from far away, never loud.
-function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;seSrc.groan.sfx('roar',{midi:24+Math.floor(Math.random()*4),duration:2.4+Math.random(),velocity:.9});seSrc.metal.strike(1,.45+Math.random()*.35);if(Math.random()<.5)setTimeout(()=>se&&seSrc.metal.strike(.7,.7),300+Math.random()*900);return}
+// metal bending: stick-slip, a train of uneven impulses through a damped sheet whose rate climbs and sags like
+// a joint under load; twisting is two trains at once, out of step, on opposite shoulders
+function creak(src,dur,r0,r1,amp){const t0=performance.now();let last=t0;
+  const tick=()=>{if(!se||se==='starting')return;const now=performance.now(),k=(now-t0)/1000/dur;if(k>=1)return;
+    const env=Math.sin(Math.PI*Math.min(1,k*1.15))**.6,rate=r0+(r1-r0)*Math.sin(Math.PI*k)+Math.sin(k*23)*r1*.15;
+    src.strike(amp*env*(.55+Math.random()*.45),.25+Math.random()*.6);last=now;setTimeout(tick,1000/Math.max(6,rate)*(.55+Math.random()*.9))};tick()}
+let groanTurn=0;
+function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;const r=Math.random,turn=groanTurn++%4;
+    seSrc.groan.sfx('roar',{midi:22+Math.floor(r()*5),duration:2.4+r(),velocity:.85});
+    if(turn===0)creak(seSrc.creakL,1.6+r()*1.4,9,38+r()*30,1);                                   // bending
+    else if(turn===1){seSrc.metal.strike(.9,.4+r()*.3);setTimeout(()=>creak(seSrc.creakR,1.2+r(),14,50,.8),400+r()*700)} // a bell, then it gives
+    else if(turn===2){creak(seSrc.creakL,2+r()*1.5,7,30+r()*25,1);setTimeout(()=>creak(seSrc.creakR,1.6+r(),11,45+r()*30,.9),250+r()*500)} // twisting
+    else{seSrc.metal.strike(1,.5+r()*.35);if(r()<.5)setTimeout(()=>creak(seSrc.creakL,.9,20,60,.7),900+r()*900)}
+    return}
   if(!actx||!save.sound||vol<.02)return;const t=actx.currentTime,out=actx.createGain();out.gain.setValueAtTime(.0001,t);out.gain.exponentialRampToValueAtTime(vol,t+.7);out.gain.exponentialRampToValueAtTime(.0001,t+3.4);out.connect(master);
   const bp=actx.createBiquadFilter();bp.type='bandpass';bp.Q.value=9;bp.frequency.setValueAtTime(260,t);bp.frequency.exponentialRampToValueAtTime(820+Math.random()*300,t+1.3);bp.frequency.exponentialRampToValueAtTime(190,t+3.2);bp.connect(out);
   const f0=48+Math.random()*8;for(const [m,type,g] of [[1,'sawtooth',.5],[1.013,'sawtooth',.5],[2.02,'square',.18],[3.03,'sawtooth',.25]]){const o=actx.createOscillator(),gg=actx.createGain();o.type=type;o.frequency.setValueAtTime(f0*m,t);o.frequency.linearRampToValueAtTime(f0*m*.94,t+3.2);gg.gain.value=g;o.connect(gg).connect(bp);o.start(t);o.stop(t+3.5)}

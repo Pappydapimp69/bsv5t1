@@ -1233,7 +1233,9 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   G3.badge=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshBasicMaterial({color:0xffffff}),30);
   G3.wolfB=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),160);G3.wolfH=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),160);
   G3.trollB=inst(new THREE.CylinderGeometry(.8,1,1,7),new THREE.MeshLambertMaterial({color:0xffffff}),80);G3.trollH=inst(new THREE.SphereGeometry(1,8,6),new THREE.MeshLambertMaterial({color:0xffffff}),80);
-  sc.add(G3.cloak,G3.head,G3.badge,G3.wolfB,G3.wolfH,G3.trollB,G3.trollH);
+  const limbG=new THREE.BoxGeometry(1,1,1);limbG.translate(0,-.5,0);G3.limb=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),1300);G3.tool=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),120);
+  G3.walk=new WeakMap();G3.e2=new THREE.Euler(0,0,0,'YXZ');
+  sc.add(G3.cloak,G3.head,G3.badge,G3.wolfB,G3.wolfH,G3.trollB,G3.trollH,G3.limb,G3.tool);
   G3.crystal=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xbff4ff,emissive:0x2aa8c8}),200);sc.add(G3.crystal);
   G3.water=inst(new THREE.CircleGeometry(1,28).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x4f86a8,transparent:true,opacity:.92}),200);sc.add(G3.water);
   G3.box=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),400);G3.roof=inst(new THREE.ConeGeometry(1,1,4),new THREE.MeshLambertMaterial({color:0xffffff}),300);
@@ -1280,18 +1282,46 @@ function g3Update(){const g=S.g,t=S.t;
       const mx=(px+x)/2,my=(py+y)/2,mz=(pz+z)/2,len=Math.hypot(x-px,y-py,z-pz);_p.set(mx,mz,my);const dv=new THREE.Vector3(x-px,z-pz,y-py).normalize();_q.setFromUnitVectors(new THREE.Vector3(0,1,0),dv);_s.set(9,len,9);_m.compose(_p,_q,_s);G3.chain.setMatrixAt(ci++,_m);px=x;py=y;pz=z}}
   G3.chain.count=ci;G3.chain.instanceMatrix.needsUpdate=true;
   // people: on the ground, or clinging to the giant
-  let hi=0,bi=0;const fig=(x,y,z,col,badge,you,bob)=>{if(hi>=30)return;const s=you?1.25:1;put(G3.cloak,hi,x,y,z+22*s+bob,13*s,44*s,13*s,0);put(G3.head,hi,x,y,z+48*s+bob,7*s,7*s,7*s,0);put(G3.badge,hi,x,y,z+70*s+bob,6*s,8*s,6*s,t*2);
-    G3.cloak.setColorAt(hi,_c.set(col));G3.badge.setColorAt(hi,_c.set(badge));hi++};
-  for(const h of S.humans){if(h.dead)continue;const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y),mv=h.tx!=null||(h.you&&(keys.size||padVec.x||padVec.y));fig(h.x,h.y,z,h.you?'#c0392b':T.col,T.col,h.you,mv?Math.abs(Math.sin(t*9+h.id))*5:0);
+  // every figure is posed from what it is doing (walk stride from the distance it really moved, a sword swing, hammering at a job, reaching hold to hold,
+  // flailing in a fall); render only, the sim never reads a pose
+  let hi=0,bi=0,li=0,oi=0;
+  const limb=(mesh,i,x,y,z,len,w,face,a,roll,col)=>{_p.set(x,z,y);G3.e2.set(-a,Math.PI/2-face,roll||0);_q.setFromEuler(G3.e2);_s.set(w,len,w);_m.compose(_p,_q,_s);mesh.setMatrixAt(i,_m);mesh.setColorAt(i,_c.set(col))};
+  const L=(x,y,z,len,w,face,a,roll,col)=>{if(li<1300)limb(G3.limb,li++,x,y,z,len,w,face,a,roll,col)};
+  // the tip of a limb hung from (x,y,z) and swung forward by a: where a hand holds its tool
+  const tip=(x,y,z,len,face,a)=>({x:x+Math.cos(face)*Math.sin(a)*len,y:y+Math.sin(face)*Math.sin(a)*len,z:z-Math.cos(a)*len});
+  const stride=(o,x,y,r)=>{let w=G3.walk.get(o);if(!w){w={x,y,ph:0,sp:0};G3.walk.set(o,w)}const d=Math.hypot(x-w.x,y-w.y);w.x=x;w.y=y;if(d<80)w.ph+=d/r;w.sp+=((d>.2&&d<80?1:0)-w.sp)*.25;return w};
+  const fig=(h,x,y,z,col,badge,you,face)=>{if(hi>=30)return;const s=you?1.25:1,w=stride(h,x,y,9*s),sw=Math.sin(w.ph)*.7*w.sp,cl=h.mode==='climb'&&h.cl,fall=cl&&cl.fall;
+    let legA=sw,legB=-sw,armL=-sw*.8,armR=sw*.8,bob=Math.abs(Math.sin(w.ph))*3*w.sp,tool=true;
+    if(w.sp<.05){armL=.08+Math.sin(t*1.7+h.id)*.05;armR=.08+Math.sin(t*1.7+h.id+1)*.05;bob=Math.sin(t*1.7+h.id)*.6}
+    if(fall){armL=2.6+Math.sin(t*21)*.5;armR=2.6-Math.sin(t*21)*.5;legA=Math.sin(t*17)*.7;legB=-legA;tool=false}
+    else if(cl){const M=cl.move,k=M?Math.sin(Math.min(1,M.t)*Math.PI):0,alt=h.id%2?1:-1;armL=2.5+.45*k*alt;armR=2.5-.45*k*alt;legA=.5-.4*k*alt;legB=.5+.4*k*alt;tool=false;bob=0}
+    else if(h.job){armR=1.7+Math.sin(t*11)*.9;armL=.5;legA=legB=0}
+    if(h.swing>0){const k=1-h.swing/.2;armR=3-2.5*k}
+    const sx=-Math.sin(face),sy=Math.cos(face),zb=z+bob;
+    put(G3.cloak,hi,x,y,zb+30*s,13*s,32*s,13*s,0);put(G3.head,hi,x,y,zb+51*s,7*s,7*s,7*s,0);put(G3.badge,hi,x,y,zb+72*s,6*s,8*s,6*s,t*2);
+    G3.cloak.setColorAt(hi,_c.set(col));G3.badge.setColorAt(hi,_c.set(badge));hi++;
+    L(x+sx*4*s,y+sy*4*s,zb+17*s,17*s,4.5*s,face,legA,0,'#3b3329');L(x-sx*4*s,y-sy*4*s,zb+17*s,17*s,4.5*s,face,legB,0,'#3b3329');
+    L(x+sx*9*s,y+sy*9*s,zb+42*s,17*s,4*s,face,armL,0,col);L(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,4*s,face,armR,0,col);
+    if(tool&&oi<120){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
+  for(const h of S.humans){if(h.dead)continue;const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,T.col,h.you,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
-    else if(h.cl){const a=bodyWorld(h.cl.x,h.cl.y);fig(a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,0)}}
+    else if(h.cl){const a=bodyWorld(h.cl.x,h.cl.y),f=fwd(g);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,Math.atan2(f.y,f.x))}}
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   // beasts: wolves low and long, trolls tall; a struck beast flashes white
-  let wi=0,ti=0;for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,a=Math.atan2(m.y-(m.py??m.y),m.x-(m.px??m.x));m.px=m.x;m.py=m.y;const ry=-a;
-    if(m.kind==='wolf'&&wi<160){put(G3.wolfB,wi,m.x,m.y,z+14,32,14,13,ry);put(G3.wolfH,wi,m.x+Math.cos(a)*18,m.y+Math.sin(a)*18,z+20,12,10,10,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++}
-    else if(m.kind==='troll'&&ti<80){put(G3.trollB,ti,m.x,m.y,z+30,18,60,15,ry);put(G3.trollH,ti,m.x,m.y,z+66,11,10,11,0);G3.trollB.setColorAt(ti,_c.set(fl?'#ffffff':'#7a5236'));G3.trollH.setColorAt(ti,_c.set(fl?'#ffffff':'#8f6a48'));ti++}
+  // beasts keep the heading they last moved on (a resting wolf no longer snaps to face east); wolves trot on four legs and lunge as they bite,
+  // trolls stride and swing a club, raising it as their next blow comes due; a struck beast flashes white
+  let wi=0,ti=0;for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,w=G3.walk.get(m);
+    if(w&&Math.hypot(m.x-w.x,m.y-w.y)>.2)m.fa=Math.atan2(m.y-w.y,m.x-w.x);const a=m.fa||0,ry=-a,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
+    if(m.kind==='wolf'&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.cd>.75?(m.cd-.75)/.25:0,bx=m.x+ca*lk*10,by=m.y+sa*lk*10,bz=z+14+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
+      put(G3.wolfB,wi,bx,by,bz,32,14,13,ry);put(G3.wolfH,wi,bx+ca*18,by+sa*18,bz+6-lk*6,12,10,10,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
+      for(const[f,sd,ph]of[[11,1,1],[11,-1,-1],[-11,1,-1],[-11,-1,1]])L(bx+ca*f+px*sd*4,by+sa*f+py*sd*4,bz-4,11,3.5,a,sw*ph,0,lc);
+      L(bx-ca*15,by-sa*15,bz+3,13,3,a,-2.3,Math.sin(t*7+m.id)*.5,lc)}
+    else if(m.kind==='troll'&&ti<80){const W=stride(m,m.x,m.y,13),sw=Math.sin(W.ph)*.6*W.sp,club=m.cd>0?(m.cd>.6?.7:.7+(.6-m.cd)/.6*2.3):.25+sw*.6,bz=z+Math.abs(Math.sin(W.ph))*2.5*W.sp,lc=fl?'#ffffff':'#6b4630';
+      put(G3.trollB,ti,m.x,m.y,bz+40,18,42,15,ry);put(G3.trollH,ti,m.x,m.y,bz+68,11,10,11,0);G3.trollB.setColorAt(ti,_c.set(fl?'#ffffff':'#7a5236'));G3.trollH.setColorAt(ti,_c.set(fl?'#ffffff':'#8f6a48'));ti++;
+      L(m.x+px*7,m.y+py*7,bz+22,22,8,a,sw,0,lc);L(m.x-px*7,m.y-py*7,bz+22,22,8,a,-sw,0,lc);L(m.x+px*18,m.y+py*18,bz+58,30,7,a,-sw*.8,0,lc);L(m.x-px*18,m.y-py*18,bz+58,30,7,a,club,0,lc);
+      if(oi<120){const hd=tip(m.x-px*18,m.y-py*18,bz+58,30,a,club);limb(G3.tool,oi++,hd.x,hd.y,hd.z,28,7,a,club-.3,0,'#5a3b22')}}
     if(bi<200)put(G3.blobs,bi++,m.x,m.y,z+1,m.kind==='troll'?24:18,1,m.kind==='troll'?24:18,0)}
-  for(const[m,n]of[[G3.wolfB,wi],[G3.wolfH,wi],[G3.trollB,ti],[G3.trollH,ti]]){m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
+  for(const[m,n]of[[G3.wolfB,wi],[G3.wolfH,wi],[G3.trollB,ti],[G3.trollH,ti],[G3.limb,li],[G3.tool,oi]]){m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   G3.blobs.count=bi;G3.blobs.instanceMatrix.needsUpdate=true;
   // crystals turn and bob
   let ki=0;for(const c of S.crystals){if(ki>=200)break;if(Math.hypot(c.x-S.cam.x,c.y-S.cam.y)>6000)continue;put(G3.crystal,ki++,c.x,c.y,groundH(c.x,c.y)+20+Math.sin(t*3+c.id)*5,9,15,9,t*1.5+c.id)}G3.crystal.count=ki;G3.crystal.instanceMatrix.needsUpdate=true;
@@ -1423,22 +1453,29 @@ const STONE={ok:['#9a8f80','#c2b6a2','#5c544a'],hurt:['#8f7766','#b39a86','#563f
 const PART_JOINT={lleg:'kneeL',rleg:'kneeR',torso:'heart',larm:'elbowL',rarm:'elbowR',head:'neck'};
 function partStone(k){if(S.g.dead)return STONE.dead;const j=S.joints[PART_JOINT[k]];if(j.crip)return STONE.crip;return j.hp/j.max<.5?STONE.hurt:STONE.ok}
 // the giant as a cloud of boulders in world space, each tagged with its part
-function giantBoulders(g){const f=fwd(g),side={x:-f.y,y:f.x},out=[];let n=0;const lie=g.fallen>0||g.dead;
-  const put=(lat,fw,z,r,part)=>{n++;const jit=1+((n*37)%11-5)/40;
+// the living giant's poses, from its own state (render only: climbers ride the back and legs, which bodyWorld lifts the same way)
+function windU(g,k){const w=g.wind;return w&&w.k===k?1-w.t/w.dur:-1}
+function stompLift(g,i){const u=windU(g,'stomp');if(u<0||i)return 0;return u<.8?Math.sin(u/.8*Math.PI/2)*300:300*(1-(u-.8)/.2)}
+function armPose(g){const f=fwd(g),sd={x:-f.y,y:f.x},sw=Math.sin(g.sway*Math.PI)*Math.min(1,g.v/C.G_SPEED),P=[{fw:sw*260,up:0,out:0},{fw:-sw*260,up:0,out:0}];
+  let u=windU(g,'smash');if(u>=0&&g.wind.x!=null){const i=(g.wind.x-g.x)*sd.x+(g.wind.y-g.y)*sd.y<0?0:1,r=u<.75?Math.sin(u/.75*Math.PI/2):1-(u-.75)/.25*1.15;P[i]={fw:200*r+(u>.75?500*(u-.75)/.25:0),up:1300*r,out:0}}
+  u=windU(g,'swipe');if(u>=0){const i=g.wind.side==='L'?0:1;P[i]=u<.7?{fw:-300*Math.sin(u/.7*Math.PI/2),up:-80,out:200}:{fw:-300+1000*(u-.7)/.3,up:-120,out:200-700*(u-.7)/.3}}
+  return P}
+function giantBoulders(g){const f=fwd(g),side={x:-f.y,y:f.x},out=[];let n=0;const lie=g.fallen>0||g.dead,ap=lie||!g.feet.length?null:armPose(g),shk=windU(g,'shake'),breath=!lie&&!g.awake?Math.sin(S.t*.55)*10:0;
+  const put=(lat,fw,z,r,part)=>{n++;const jit=1+((n*37)%11-5)/40;if(!lie){if(shk>=0)lat+=Math.sin(S.t*47+n)*16;if(part!=='lleg'&&part!=='rleg')z+=breath}
     if(lie){out.push({x:g.x+f.x*(z*.45+fw*.3)+side.x*lat,y:g.y+f.y*(z*.45+fw*.3)+side.y*lat,z:r*.75+20,r:r*jit,part,n});return}
     out.push({x:g.x+f.x*fw+side.x*lat,y:g.y+f.y*fw+side.y*lat,z,r:r*jit,part,n})};
-  g.feet.forEach((ft,i)=>{const s=i?1:-1,lift=ft.air>0&&!lie?Math.sin((1-ft.air/ft.dur)*Math.PI)*170:0;const fl={x:ft.x-g.x,y:ft.y-g.y},flat=fl.x*side.x+fl.y*side.y,ffw=fl.x*f.x+fl.y*f.y;
+  g.feet.forEach((ft,i)=>{const s=i?1:-1,lift=lie?0:(ft.air>0?Math.sin((1-ft.air/ft.dur)*Math.PI)*170:0)+stompLift(g,i);const fl={x:ft.x-g.x,y:ft.y-g.y},flat=fl.x*side.x+fl.y*side.y,ffw=fl.x*f.x+fl.y*f.y;
     for(let j=0;j<8;j++){const t=j/7;put(flat+(s*80-flat)*t,ffw*(1-t)+10*t,40+lift*(1-t)+(950-40-lift)*t,j===0?105:88+t*20,i?'rleg':'lleg')}});
   [[980,150,3,120],[1120,210,4,125],[1260,260,4,130],[1400,300,5,130],[1520,330,5,125]].forEach(([z,w,m,r])=>{for(let j=0;j<m;j++)put(-w+2*w*j/(m-1),-40+((j*13)%3)*25,z,r,'torso')});
   put(0,-110,1250,150,'torso');put(0,60,1200,140,'torso');
-  for(const s of[-1,1])for(let j=0;j<7;j++){const t=j/6;put(s*(380+t*60),20+t*50,1500-t*820,j===6?105:118-t*30,s<0?'larm':'rarm')}
+  for(const s of[-1,1]){const A=ap&&ap[s<0?0:1];for(let j=0;j<7;j++){const t=j/6;put(s*(380+t*60+(A?A.out*t:0)),20+t*50+(A?A.fw*t:0),1500-t*820+(A?A.up*t:0),j===6?105:118-t*30,s<0?'larm':'rarm')}}
   put(0,70,1690,118,'head');put(0,110,1640,80,'head');
   return out}
 function markBoulders(m){if(m.b)return m.b;const fake={x:m.x,y:m.y,ang:m.ang,fallen:1,dead:false,feet:[{x:m.x,y:m.y,air:0},{x:m.x,y:m.y,air:0}]};m.b=giantBoulders(fake).map(b=>({...b,z:b.z*1.4,r:b.r*1.35}));return m.b}
 // a point on the body grid (column, row) placed in the world, so climbers and cannons ride the giant
 function bodyWorld(col,row){const g=S.g,f=fwd(g),side={x:-f.y,y:f.x},lie=g.fallen>0||g.dead,z=row*FT,lat=(col-COLS/2)*26;
   if(lie)return{x:g.x+f.x*z*.45+side.x*lat,y:g.y+f.y*z*.45+side.y*lat,z:160};
-  if(z<950&&(col<COLS/2-2||col>COLS/2+1)){const ft=g.feet[col<COLS/2?0:1],t=z/950,lift=ft.air>0?Math.sin((1-ft.air/ft.dur)*Math.PI)*170*(1-t):0,bx=ft.x+(g.x+side.x*Math.sign(lat)*80-ft.x)*t,by=ft.y+(g.y+side.y*Math.sign(lat)*80-ft.y)*t;
+  if(z<950&&(col<COLS/2-2||col>COLS/2+1)){const ft=g.feet[col<COLS/2?0:1],t=z/950,lift=((ft.air>0?Math.sin((1-ft.air/ft.dur)*Math.PI)*170:0)+stompLift(g,col<COLS/2?0:1))*(1-t),bx=ft.x+(g.x+side.x*Math.sign(lat)*80-ft.x)*t,by=ft.y+(g.y+side.y*Math.sign(lat)*80-ft.y)*t;
     return{x:bx-f.x*150+side.x*(lat-Math.sign(lat)*80)*.4,y:by-f.y*150+side.y*(lat-Math.sign(lat)*80)*.4,z:z+lift}}
   return{x:g.x-f.x*230+side.x*lat,y:g.y-f.y*230+side.y*lat,z}}
 function figure(p,hpx,cloak,shape,badge,you){const w=hpx*.42;ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(p.x,p.y,w*.9,w*.3,0,0,7);ctx.fill();

@@ -476,7 +476,8 @@ function newGame(role,seed){
   S.chains=CHAINS.map(ch=>({...ch,hp:C.CHAIN_HP,max:C.CHAIN_HP}));S.wakeT=0;S.walked=0;S.avenged=false;S.feud=[[0,0,0],[0,0,0],[0,0,0]];S.events=[];S.evc={raid:0,star:0,caravan:0};S.raided=[0,0,0];S.gathered=0;S.grudge=[0,0,0];S.wander=null;{const a=-Math.PI/2+Math.PI/3+2*Math.PI/3*Math.floor(rnd()*3);S.exit={x:cx+Math.cos(a)*4200*WS,y:cy+Math.sin(a)*4200*WS}}S.crumble=[];S.builds=[];S.marks=[];S.rivers=[];S.outposts=[0,0,0];S.revT=[0,0,0];
   // the land forms in order: the fallen giants, hills, rivers to the towns, roads, forests, places (genLand), then beasts and crystals
   genLand(0);
-  for(let ti=0;ti<3;ti++)for(let k=0;k<3;k++){const you=role==='human'&&ti===0&&k===0;S.humans.push(mkHuman(ti,you,you?'you':'folk'))}
+  // each town starts with one villager (the person: 'start with 1 per town not 3'); more come only with the villages its caravans found
+  for(let ti=0;ti<3;ti++){if(role==='human'&&ti===0)S.humans.push(mkHuman(0,true,'you'));S.humans.push(mkHuman(ti,false,'folk'))}
   S.you=role==='human'?S.humans[0]:null;
   populateLand();
   if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}
@@ -882,11 +883,17 @@ function stepJob(h,dt){const j=h.job;j.t+=dt;if(j.t<j.dur)return;h.job=null;if(j
 function dropJob(h){const j=h.job;if(!j)return;h.job=null;if(j.kind==='site'&&j.s.pending===h.id)j.s.pending=null}
 function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.gold-=C.COST[k];startJob(h,{kind:'ground',k,x:h.x,y:h.y});return true}
 function finishBuild(h,k,x,y){sfx('build',h.you);const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,k);h.x=hx;h.y=hy;return true}
+function foundVillage(ti,x,y){S.outposts[ti]++;const n=S.towns.length,names=[['Ashmere','Ashwell','Ashby'],['Brindle Ford','Brindlemoor','Brindlewick'],['Corvel Rest','Corvelmere','Corvel Hollow']];
+  const v={i:ti,id:n,name:names[ti][S.outposts[ti]-1],col:TOWNS[ti].col,shape:TOWNS[ti].shape,x,y,r:100,hp:1500,max:1500,alive:true,outpost:true};S.towns.push(v);return v}
+// where a caravan of settlers makes camp: open ground a long walk out from the town, clear of stone, other settlements and the giant's feet
+function villageSite(from){if(S.outposts[from.i]>=3)return null;
+  for(let k=0;k<40;k++){const a=rnd()*6.283,d=(1500+rnd()*800)*WS,x=from.x+Math.cos(a)*d,y=from.y+Math.sin(a)*d;
+    if(x<600||y<600||x>C.MAP-600||y>C.MAP-600||inSolid(x,y,160))continue;
+    if(aliveTowns().some(t=>Math.hypot(t.x-x,t.y-y)<t.r+C.OUTPOST_GAP))continue;if(S.g.feet.some(f=>Math.hypot(f.x-x,f.y-y)<C.FOOT_R*4))continue;return{x,y}}
+  return null}
 function finishBuild0(h,k){
   if(k==='barracks')return finishBarracks(h,h.x,h.y);
-  if(k==='outpost'){S.outposts[h.town]++;const n=S.towns.length,names=[['Ashmere','Ashwell','Ashby'],['Brindle Ford','Brindlemoor','Brindlewick'],['Corvel Rest','Corvelmere','Corvel Hollow']];
-    S.towns.push({i:h.town,id:n,name:names[h.town][S.outposts[h.town]-1],col:TOWNS[h.town].col,shape:TOWNS[h.town].shape,x:h.x,y:h.y,r:100,hp:1500,max:1500,alive:true,outpost:true});
-    announce(TOWNS[h.town].name+' founded '+S.towns[n].name+(lakesNear(h.x,h.y,500)?' beside a footprint lake.':'.'));gainXp(h,30);return true}
+  if(k==='outpost'){const v=foundVillage(h.town,h.x,h.y);announce(TOWNS[h.town].name+' founded '+v.name+(lakesNear(h.x,h.y,500)?' beside a footprint lake.':'.'));gainXp(h,30);return true}
   S.builds.push({k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0});
   questTick(h,'build');
   if(k==='house'){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===h.town){const d=dist(t,h);if(d<bd){bd=d;b=t}}if(b){b.max+=C.HOUSE_HP;b.hp+=C.HOUSE_HP;b.r+=C.HOUSE_GROW;b.houses=(b.houses||0)+1}}
@@ -909,7 +916,7 @@ function upCost(kind,o){const c=C.UP[kind];return lv(o)-1<c.length?c[lv(o)-1]:nu
 function canUpgrade(h,kind,o){const c=upCost(kind,o);if(c==null)return'At its highest level';if(o.town!=null&&o.town!==h.town)return'Not yours';return h.crystals<c?'Need '+(c-h.crystals)+' more crystals':null}
 function upgrade(h,kind,o){const why=canUpgrade(h,kind,o);if(why){sayTo(h,why);return false}h.crystals-=upCost(kind,o);o.lvl=lv(o)+1;sfx('build',h.you);gainXp(h,10*o.lvl);
   if(kind==='ladder'){const st=S.sites.find(q=>q.build===o);if(st)ladderDown(st,30+25*(o.lvl-1))}
-  if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20;startCaravan(o)}
+  if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20;if(!o.outpost)startCaravan(o)} // a main town's raise sends settlers; a village's raise does not
   if(kind==='house'){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===h.town){const d=dist(t,o);if(d<bd){bd=d;b=t}}if(b){b.max+=C.HOUSE_HP;b.hp+=C.HOUSE_HP}}
   sayTo(h,{town:o.name+' is raised to level '+o.lvl+': stronger walls, a wider build area, and its shop sells level '+o.lvl+' gear.',house:'House raised to level '+o.lvl+': it reaches 120 further.',tower:'Watchtower raised to level '+o.lvl+(o.spec?': '+o.spec:': it hits harder')+'.',cannon:'Cannon raised to level '+o.lvl+': faster and heavier shot.',brace:'Brace raised to level '+o.lvl+': the giant walks faster.',ladder:'Ladder lengthened: it reaches further down.'}[kind]);return true}
 // the nearest of your own things to upgrade: a house or tower beside you, or the town you stand in
@@ -1085,17 +1092,20 @@ function startStar(){let x,y;for(let k=0;k<30;k++){x=rr(800,C.MAP-800);y=rr(800,
   for(let k=0;k<2;k++)S.monsters.push({id:S.nextId++,kind:'wolf',x:x+rr(-250,250),y:y+rr(-250,250),hx:x,hy:y,hp:40,max:40,atk:7,gold:12,xp:16,r:13,cd:0});
   eventSay('A star falls from the open sky! Ten sky crystals lie in its crater.')}
 // a caravan: set off when a town is raised; it carries trade to a neighbour and pays the town's people if it arrives
-function startCaravan(from){const to=aliveTowns().filter(t=>t.i!==from.i).sort((a,b)=>dist(a,from)-dist(b,from))[0];if(!to)return;
-  const ev={k:'caravan',i:from.i,from:from.id,to:to.id,x:from.x,y:from.y,hp:C.CARAVAN_HP,max:C.CARAVAN_HP,t:S.t};S.events.push(ev);S.evc.caravan++;
+function startCaravan(from){const site=villageSite(from),to=site?{x:site.x,y:site.y,site:true}:aliveTowns().filter(t=>t.i!==from.i).sort((a,b)=>dist(a,from)-dist(b,from))[0];if(!to)return;
+  const ev={k:'caravan',i:from.i,from:from.id,to:to.site?null:to.id,site,x:from.x,y:from.y,hp:C.CARAVAN_HP,max:C.CARAVAN_HP,t:S.t};S.events.push(ev);S.evc.caravan++;
   for(let k=0;k<3;k++){const f=.35+.15*k,x=from.x+(to.x-from.x)*f+rr(-300,300),y=from.y+(to.y-from.y)*f+rr(-300,300);S.monsters.push({id:S.nextId++,kind:k?'wolf':'troll',x,y,hx:x,hy:y,hp:k?36:100,max:k?36:100,atk:k?7:13,gold:k?10:24,xp:k?14:30,r:k?13:22,cd:0,ambush:ev})}
-  eventSay(TOWNS[from.i].name+' sends a caravan to '+to.name+'. Beasts lie in wait on the road.')}
+  eventSay(site?TOWNS[from.i].name+' sends settlers out to found a village. Beasts lie in wait on the road.':TOWNS[from.i].name+' sends a caravan to '+to.name+'. Beasts lie in wait on the road.')}
 function stepEvents(dt){
   for(let i=0;i<3;i++){const n=S.raided[i];if(n<C.RAID_AT.length&&wealth(i)>=C.RAID_AT[n]&&factionAlive(i)){S.raided[i]++;const t=nearestOwn(i,C.MAP/2,C.MAP/2);if(t)startRaid(t,'Beasts are gathering beyond '+t.name+', drawn by its wealth. They march in 20 s!')}}
   for(let k=S.events.length-1;k>=0;k--){const e=S.events[k];
     if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length)eventSay('The raid on '+town.name+' is beaten off.');continue}
       e.x=left[0].x;e.y=left[0].y}
     if(e.k==='star'){e.left=S.crystals.filter(c=>c.star===e).length;if(!e.left){S.events.splice(k,1);continue}}
-    if(e.k==='caravan'){const to=S.towns.find(t=>t.id===e.to);if(!to||!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);
+    if(e.k==='caravan'){const to=e.site?{x:e.site.x,y:e.site.y,r:60}:S.towns.find(t=>t.id===e.to);if(!to||e.site==null&&!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);
+      if(e.site&&d<to.r){S.events.splice(k,1);if(S.outposts[e.i]>=3||!factionAlive(e.i)){eventSay('The settlers from '+TOWNS[e.i].name+' find no room and turn home.');continue}
+        const v=foundVillage(e.i,e.site.x,e.site.y),f=mkHuman(e.i,false,'folk');f.x=v.x+rr(-40,40);f.y=v.y+rr(-40,40);S.humans.push(f);
+        eventSay('Settlers from '+TOWNS[e.i].name+' found '+v.name+'. A new villager lives there.');continue}
       if(d<to.r){S.events.splice(k,1);for(const h of S.humans)if(h.town===e.i)h.gold+=40;eventSay('The caravan from '+TOWNS[e.i].name+' reaches '+to.name+'. Every one of its people earns 40 gold.');continue}
       const near=S.monsters.find(m=>Math.hypot(m.x-e.x,m.y-e.y)<m.r+40);if(near){if(near.cd<=0){near.cd=1;e.hp-=near.atk}}else{const st=steerSolid(e,to.x,to.y,30);e.x+=st.x*55*WS*dt;e.y+=st.y*55*WS*dt;solidPush(e,30)}
       if(e.hp<=0){S.events.splice(k,1);eventSay('The caravan from '+TOWNS[e.i].name+' is lost on the road.')}}}}
@@ -1648,7 +1658,7 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Building takes time.</b> A house takes 6 seconds, a tower 8, an outpost 15, anything on the giant 5 or 6; you are held at the work until it is done, and on the giant your grip still counts.</p>
 <p><b>Upgrading on the map.</b> Crystals are stored at home but spent anywhere: stand by one of your houses or towers, or in your town, and press Upgrade. A raised town sells the next level of gear (blades, armour, packs, gloves, greater potions); a raised house widens your build area; a tower's first raise makes it a ballista, a volley tower or a watchfire, or simply sharpens it.</p>
 <p><b>Sky crystals.</b> Crystals are what upgrades cost. Raise your town in its hall for thicker walls and a wider build area; stand by one of your houses or towers and Build to raise it (a house pays more rent, a tower reaches further and hits harder); on the giant, use your own cannon or brace to raise it (a cannon fires faster and heavier, a brace carries the giant faster). The wake horn is forged from them too.</p>
-<p><b>Events.</b> A town that grows rich draws beast raids: its people must come home and fight them off. Robbing a ruin can rouse its trolls against your town. Every sixteen sky crystals gathered call a falling star with ten more in its crater. Raising a town sends a caravan to its neighbour, with beasts waiting on the road; escort it there and every one of its people is paid.</p>
+<p><b>Events.</b> A town that grows rich draws beast raids: its people must come home and fight them off. Robbing a ruin can rouse its trolls against your town. Every sixteen sky crystals gathered call a falling star with ten more in its crater. Each town starts with one villager. Raising a town sends a caravan of settlers out, with beasts waiting on the road; escort it, and where it stops it founds a village with a new villager. A town with three villages already sends trade to its neighbour instead, and every one of its people is paid.</p>
 <p><b>Your pack.</b> You carry six things. Sky crystals lie on the ground; pelts and more crystals drop from beasts you defeat. When the pack is full you can pick up nothing more until you go home. Coming home empties your pack: crystals go into your store for upgrades and the wake horn, pelts are sold.</p>
 <p><b>Ruins.</b> The old giants lying across the land are ruins, guarded by trolls. Search their ribs for gold, sky crystals and kits; each fills again after a few minutes.</p>
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>

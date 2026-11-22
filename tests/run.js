@@ -292,10 +292,26 @@ async function drive(p,act,label,visited){
           if(__prank.phase==='wrap'&&e<EPS-1)__prank.next();else if(__prank.career().over)break}
         idle=sum(__prank.career().viewers);
         const win=played>idle*1.5&&played-idle>=0.3;if(win)wins++;rows.push(`${seed}:${played.toFixed(1)}/${idle.toFixed(1)}`)}
+      // a bot making random choices with the same budget must do clearly worse than the one that plays well
+      let rwins=0;const rrows=[];
+      for(let seed=1;seed<=12;seed++){const tot=mode=>{__prank.bot(false);__prank.start(seed);__prank.bot(mode);let g=0;
+          while(__prank.career().viewers.length<EPS&&!__prank.career().over&&g++<900){__prank.stepBy(5);if(__prank.phase==='wrap')__prank.next()}
+          return sum(__prank.career().viewers)};
+        const good=tot(true),rnd=tot('random');if(good>rnd*1.3)rwins++;rrows.push(`${seed}:${good.toFixed(1)}/${rnd.toFixed(1)}`)}
+      __prank.bot(false);
+      // one gag never snaps a mark who was under their line, even with two people watching
+      const cap=[];for(const kind of ['bucket','spider','cushion']){__prank.start(3);__prank.pickSet(0);__prank.dare(-1);__prank.open();
+        const s=G.s,ms=s.marks.slice(0,3),sp=s.spots.find(q=>q.f===0&&PRANKABLE.includes(q.kind));
+        for(const m of ms){m.state='onset';m.gone=false;m.climb=0;m.f=0;m.x=sp.x;m.mode='dwell'}
+        const m=ms[0];m.fluster=0.9*m.line;m.hate=GAGS[kind].tag;sp.gag=kind;const on=onlookers(m);fireGag(m,sp);
+        cap.push({kind,on,state:m.state,r:+(m.fluster/m.line).toFixed(2)})}
       const fp=s=>{__prank.bot(false);__prank.start(s);__prank.bot(true);__prank.stepBy(60);return __prank.fingerprint()};
-      return{wins,rows,f1:fp(9),f2:fp(9),f3:fp(10)}});
+      return{wins,rows,rwins,rrows,cap,f1:fp(9),f2:fp(9),f3:fp(10)}});
     console.log('     seeds bot/idle total viewers (M): '+r.rows.join(' '));
     ok(`choices decide: bot total viewers clearly above idle on ${r.wins}/12 seeds`,r.wins>=11);
+    console.log('     seeds good/random-bot total viewers (M): '+r.rrows.join(' '));
+    ok(`choices decide: good bot clearly above a random-choice bot on ${r.rwins}/12 seeds`,r.rwins>=10);
+    for(const c of r.cap)ok(`cap: a ${c.kind} on a mark at 0.9 of their line with ${c.on} watching leaves them on set`,c.on>=2&&c.state==='onset'&&c.r<=1.25,JSON.stringify(c));
     ok('determinism: same seed same fingerprint',r.f1===r.f2,`${r.f1} ${r.f2}`);
     ok('determinism: another seed differs',r.f1!==r.f3);
     ok('sim: no console errors',!errs.length,errs.join(' | '));await ctx.close()}

@@ -875,7 +875,7 @@ function canBuild(h,k){const ab=armyCanBuild(h,k);if(ab)return ab;const own=aliv
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
-function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:t.r+C.HOME_REACH+120*(lv(t)-1)});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH+120*(lv(b)-1)});return out}
+function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH+120*(lv(b)-1)});return out}
 function inTerritory(i,x,y){return territory(i).some(c=>Math.hypot(c.x-x,c.y-y)<=c.r)}
 function lakesNear(x,y,r){return S.prints.filter(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<r).length}
 const BUILD_TIME={house:6,tower:8,outpost:15,cannon:6,brace:6,ladder:5,platform:6};
@@ -885,7 +885,7 @@ function dropJob(h){const j=h.job;if(!j)return;h.job=null;if(j.kind==='site'&&j.
 function build(h,k){const why=canBuild(h,k);if(why){sayTo(h,why);return false}h.gold-=C.COST[k];startJob(h,{kind:'ground',k,x:h.x,y:h.y});return true}
 function finishBuild(h,k,x,y){sfx('build',h.you);const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,k);h.x=hx;h.y=hy;return true}
 function foundVillage(ti,x,y){S.outposts[ti]++;const n=S.towns.length,names=[['Ashmere','Ashwell','Ashby'],['Brindle Ford','Brindlemoor','Brindlewick'],['Corvel Rest','Corvelmere','Corvel Hollow']];
-  const v={i:ti,id:n,name:names[ti][S.outposts[ti]-1],col:TOWNS[ti].col,shape:TOWNS[ti].shape,x,y,r:100,hp:1500,max:1500,alive:true,outpost:true};S.towns.push(v);return v}
+  const v={i:ti,id:n,name:names[ti][S.outposts[ti]-1],col:TOWNS[ti].col,shape:TOWNS[ti].shape,x,y,r:100,hp:1500,max:1500,alive:true,outpost:true,born:S.t};S.towns.push(v);return v}
 // where a caravan of settlers makes camp: open ground a long walk out from the town, clear of stone, other settlements and the giant's feet
 function villageSite(from){if(S.outposts[from.i]>=3)return null;
   for(let k=0;k<40;k++){const a=rnd()*6.283,d=(1500+rnd()*800)*WS,x=from.x+Math.cos(a)*d,y=from.y+Math.sin(a)*d;

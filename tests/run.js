@@ -56,8 +56,11 @@ async function screens(p,label){
       if(!(await p.evaluate(()=>__prank.state().picker)))continue;
       const opt=p.locator('#pkBtns button:not([aria-disabled="true"])').first();
       if(!(await opt.count()))continue;const before=await p.evaluate(()=>__prank.state().pranks);
-      const bx=await opt.boundingBox();await p.touchscreen.tap(bx.x+bx.width/2,bx.y+bx.height/2);await wait(p,80);
-      await p.evaluate(()=>__prank.stepBy(150));if((await p.evaluate(()=>__prank.state().pranks))>before||await p.evaluate(()=>__prank.state().stats.laugh+__prank.state().stats.sour+__prank.state().stats.turned>0)){set=true;break}}
+      const f0=await p.evaluate(()=>__prank.state().stats.fizzled);
+      const bx=await opt.boundingBox();await p.touchscreen.tap(bx.x+bx.width/2,bx.y+bx.height/2);
+      // the tap's own effect: the setup starts (busy), or it already finished, or a resident caught it; what happens after is the game, not the input
+      const started=await p.evaluate(()=>__prank.state().busy);await p.evaluate(()=>__prank.stepBy(150));
+      const st=await p.evaluate(()=>__prank.state());if(started||st.pranks>before||st.stats.fizzled>f0){set=true;break}}
     ok('touch: a prank set by taps alone',set);
     await p.evaluate(()=>__prank.stepBy(181*60));ok('touch: day ends',await p.evaluate(()=>__prank.phase)==='dayend');
     await tapEl('#bNext');ok('touch: Next day by tap',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===1));

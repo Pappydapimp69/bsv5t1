@@ -875,7 +875,10 @@ function canBuild(h,k){const ab=armyCanBuild(h,k);if(ab)return ab;const own=aliv
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
-function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH+120*(lv(b)-1)});return out}
+function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
+// the settlement whose ring a spot is in: barracks count against it, not the whole people
+function homeOf(i,x,y){let b=null,bd=1e9;for(const t of aliveTowns()){if(t.i!==i)continue;const d=Math.hypot(t.x-x,t.y-y);if(d<=ringR(t)&&d<bd){bd=d;b=t}}return b}
+function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:ringR(t)});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:C.HOUSE_REACH+120*(lv(b)-1)});return out}
 function inTerritory(i,x,y){return territory(i).some(c=>Math.hypot(c.x-x,c.y-y)<=c.r)}
 function lakesNear(x,y,r){return S.prints.filter(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<r).length}
 const BUILD_TIME={house:6,tower:8,outpost:15,cannon:6,brace:6,ladder:5,platform:6};
@@ -957,8 +960,8 @@ const wallsDown=t=>!!t&&t.hp<t.max*ARMY.CLOSED;
 const playerBuilt=b=>!!(S.you&&S.role==='human'&&!S.autoplay&&b.owner===S.you.id);
 function barracksOf(i,who){return S.builds.filter(b=>b.k==='barracks'&&b.town===i&&(who==null||playerBuilt(b)===!!(who.you&&!S.autoplay)))}
 function barracksCap(i){let m=0;for(const t of aliveTowns())if(t.i===i)m=Math.max(m,lv(t));return m}
-function armyCanBuild(h,k){if(k!=='barracks')return null;const cap=barracksCap(h.town),n=barracksOf(h.town,h).length+S.humans.filter(o=>o!==h&&o.town===h.town&&!!o.you===!!h.you&&o.job&&o.job.k==='barracks').length;
-  return n>=cap?'Your towns allow '+cap+' barracks: raise a town for more':null}
+function armyCanBuild(h,k){if(k!=='barracks')return null;const t=homeOf(h.town,h.x,h.y);if(!t)return'Outside your build area: build nearer your homes';const mine=q=>homeOf(h.town,q.x,q.y)===t,cap=lv(t),n=barracksOf(h.town,h).filter(mine).length+S.humans.filter(o=>o!==h&&o.town===h.town&&!!o.you===!!h.you&&o.job&&o.job.k==='barracks'&&mine(o.job)).length;
+  return n>=cap?t.name+' allows '+cap+' barracks: raise it for more':null}
 function barracksNear(h){let b=null,bd=90;for(const q of S.builds){if(q.k!=='barracks'||q.town!==h.town||h.you&&!playerBuilt(q))continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
 function soldiersOf(b){return b.sol.map(id=>S.humans.find(h=>h.id===id)).filter(Boolean)}
 function readySoldiers(b){return soldiersOf(b).filter(h=>!h.dead&&!h.ord&&h.mode==='ground'&&Math.hypot(h.x-b.x,h.y-b.y)<380)}
@@ -1702,7 +1705,7 @@ function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub)=>({label:
   const lk=lakesNear(h.x,h.y,500),near=buildNear(h);
   const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?': more walls and rent':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
   openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold, ${h.crystals} sky crystals. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
-    items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('barracks','Barracks','Trains up to three soldiers; one barracks per town level ('+barracksOf(h.town,h).length+'/'+barracksCap(h.town)+')'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
+    items:[...upItem,it('house','House','Grows your nearest settlement and pushes your build area outward'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('barracks','Barracks','Trains up to three soldiers; one barracks per level of the settlement it stands by'),it('outpost','Found an outpost','A new settlement of your people, at least 800 from any other'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
 let townTab='Board';
 function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const fi=focusI;const tb=townTab;
   const buy=(k,cost,fn,sub)=>({label:k+' – '+cost+' gold',sub,why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});

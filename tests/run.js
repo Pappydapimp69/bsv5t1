@@ -1,15 +1,30 @@
-// Prank Day browser checks. Run: node tests/run.js  (prints PASS/FAIL lines, exits 1 on any FAIL)
+// Gotcha! browser checks. Run: node tests/run.js  (prints PASS/FAIL lines, exits 1 on any FAIL)
+// Everything goes through the page's own UI plus the window.__prank test hook (see the spec's "Test hook" section).
 const {chromium}=require('playwright');const path=require('path');
 const URL='file://'+path.resolve(__dirname,'../index.html');
 let fails=0;const ok=(name,cond,why='')=>{console.log((cond?'PASS ':'FAIL ')+name+(cond?'':'  '+why));if(!cond)fails++};
 const wait=(p,ms)=>p.waitForTimeout(ms);
+const J=x=>JSON.stringify(x);
 
 async function page(b,opt){const ctx=await b.newContext(opt);const p=await ctx.newPage();const errs=[];
   p.on('console',m=>{if(m.type()==='error')errs.push(m.text())});p.on('pageerror',e=>errs.push('PAGEERR '+e.message));
+  // tutorial off and sound off for every run; state may be a getter or a function, __st() reads either
+  await p.addInitScript(()=>{try{localStorage.setItem('prank.settings',JSON.stringify({sound:false,volume:2,motion:'system',tutorialDone:true}))}catch(e){}
+    window.__st=()=>{const s=window.__prank.state;return typeof s==='function'?s():s}});
   if(opt.pad)await p.addInitScript(()=>{const btn=()=>({pressed:false,touched:false,value:0});
     window.__pad={connected:true,index:0,id:'fake pad',mapping:'standard',timestamp:0,axes:[0,0,0,0],buttons:Array.from({length:17},btn),vibrationActuator:null};
     navigator.getGamepads=()=>[window.__pad.connected?window.__pad:null,null,null,null]});
   await p.goto(URL);await wait(p,300);return {p,ctx,errs}}
+
+const ph=p=>p.evaluate(()=>__prank.phase);
+// move to a phase through the hook alone; falls back to clicking a continue-style button if the hook call does not move on
+const CONT=/^(continue|next|done|ready|to the dare|to dares|rig|start rigging|confirm|go)\b/i;
+async function toPhase(p,target,max=14){
+  for(let i=0;i<max;i++){const cur=await ph(p);if(cur===target)return true;
+    await p.evaluate(()=>{const P=__prank;switch(P.phase){case'shop':P.pickSet(0);P.dare(-1);break;case'dare':P.dare(-1);break;case'rig':P.open();break;case'live':P.fastForward();break;case'wrap':P.next();break}});
+    if((await ph(p))===cur)await p.evaluate(re=>{const b=[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&b.getAttribute('aria-disabled')!=='true'&&new RegExp(re,'i').test(b.textContent.trim()));if(b)b.click()},CONT.source);
+    await wait(p,30)}
+  return (await ph(p))===target}
 
 // every visible control inside the viewport, at least 44px, no page scroll, panels never over the game view
 async function layout(p,label){
@@ -21,98 +36,131 @@ async function layout(p,label){
     const v=document.getElementById('view').getBoundingClientRect(),over=[];
     if(document.getElementById('ov').hidden)for(const id of['hud','msg','ctl','side']){const e=document.getElementById(id);if(!e||e.offsetParent===null)continue;const q=e.getBoundingClientRect();
       const ix=Math.min(q.right,v.right)-Math.max(q.left,v.left),iy=Math.min(q.bottom,v.bottom)-Math.max(q.top,v.top);if(ix>1&&iy>1)over.push(id)}
-    return{bad,scroll,over,vw:v.width/vw}});
-  ok(`${label}: controls on screen and >=44px`,!r.bad.length,r.bad.join(', '));
+    return{bad,scroll,over,vw:v.width/vw,nbtn:[...document.querySelectorAll('button')].filter(b=>b.offsetParent!==null).length}});
+  ok(`${label}: controls on screen and >=44px`,!r.bad.length&&r.nbtn>0,r.bad.join(', ')||'no visible controls');
   ok(`${label}: no page scroll`,!r.scroll);ok(`${label}: no panel over the game view`,!r.over.length,r.over.join(','));return r}
 
 async function screens(p,label){
-  // walk the phases through the page's own buttons and hooks
-  const phases={};
-  await p.evaluate(()=>{__prank.start({seed:2});});phases.play=await layout(p,label+' play');
-  await p.evaluate(()=>document.getElementById('pauseB').click());await wait(p,50);await layout(p,label+' pause');
-  await p.evaluate(()=>document.getElementById('bSet').click());await wait(p,50);await layout(p,label+' settings');
-  await p.evaluate(()=>document.getElementById('bBack').click());await p.evaluate(()=>document.getElementById('bQuit').click());await wait(p,50);await layout(p,label+' title');
-  await p.evaluate(()=>document.getElementById('bHow').click());await wait(p,50);await layout(p,label+' howto');
-  await p.evaluate(()=>{__prank.start({seed:2});__prank.stepBy(181*60)});await wait(p,50);await layout(p,label+' day end');
-  await p.evaluate(()=>{__prank.bot(true);__prank.stepBy(3*181*60)});await wait(p,50);await layout(p,label+' match end');
-  return phases}
+  const out={};
+  await p.reload();await wait(p,300);out.title=await layout(p,label+' title');
+  await p.evaluate(()=>__prank.start(2));await wait(p,60);await layout(p,label+' shop');
+  await p.evaluate(()=>__prank.buy('cushion'));await wait(p,30);
+  await p.evaluate(()=>{__prank.pickSet(0)});await wait(p,60);
+  if(await toPhase(p,'dare')){await layout(p,label+' dare')}else ok(label+' dare screen reached',false,await ph(p));
+  if(await toPhase(p,'rig')){await wait(p,60);out.rig=await layout(p,label+' rig')}else ok(label+' rig screen reached',false,await ph(p));
+  await p.evaluate(()=>__prank.open());await p.evaluate(()=>__prank.stepBy(20));await wait(p,60);
+  if((await ph(p))==='live')out.live=await layout(p,label+' live');else ok(label+' live screen reached',false,await ph(p));
+  await p.evaluate(()=>document.getElementById('pauseB').click());await wait(p,60);
+  ok(label+': pause button pauses',(await ph(p))==='pause');await layout(p,label+' pause');
+  await p.evaluate(()=>document.getElementById('bSet').click());await wait(p,60);ok(label+': settings reached',(await ph(p))==='settings');await layout(p,label+' settings');
+  await p.evaluate(()=>document.getElementById('bBack').click());await wait(p,60);
+  await p.evaluate(()=>{const b=document.getElementById('bResume');if(b)b.click()});await wait(p,60);
+  await p.evaluate(()=>__prank.fastForward());await wait(p,80);
+  if((await ph(p))==='wrap')await layout(p,label+' wrap');else ok(label+' wrap screen reached',false,await ph(p));
+  return out}
+
+// ---- input helpers shared by the touch, pad and keyboard runs ----
+// find a visible enabled button whose text matches, tag it, return its centre
+const find=(p,re)=>p.evaluate(src=>{document.querySelectorAll('[data-tt]').forEach(e=>e.removeAttribute('data-tt'));
+  const b=[...document.querySelectorAll('button')].find(b=>b.offsetParent!==null&&b.getAttribute('aria-disabled')!=='true'&&new RegExp(src,'i').test(b.textContent.trim()));
+  if(!b)return null;b.setAttribute('data-tt','1');const r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}},re.source);
+const focusText=p=>p.evaluate(()=>document.activeElement?document.activeElement.textContent.trim():'');
+const touchTap=async(p,re)=>{const c=await find(p,re);if(!c)return false;await p.touchscreen.tap(c.x,c.y);await wait(p,150);return true};
+const padTapper=p=>async(i,ms=90)=>{await p.evaluate(i=>{__pad.buttons[i].pressed=true;__pad.buttons[i].value=1},i);await wait(p,ms);await p.evaluate(i=>{__pad.buttons[i].pressed=false;__pad.buttons[i].value=0},i);await wait(p,90)};
+const PAD={A:0,B:1,START:9,UP:12,DOWN:13};
+// move focus with the D-pad or arrow keys until it sits on a button whose text matches, then confirm
+async function navTo(p,re,next,prev,confirm){if(!(await find(p,re)))return false;
+  for(const step of[next,prev])for(let i=0;i<16;i++){if(re.test(await focusText(p))){await confirm();await wait(p,150);return true}await step()}
+  return re.test(await focusText(p))?(await confirm(),await wait(p,150),true):false}
+
+// drive the whole episode loop with one device: title -> shop (buy) -> set -> dare -> rig -> Doors open -> live (hook) -> wrap -> next shop
+async function drive(p,act,label,visited){
+  const SET=/caf[eé]|corner|office|launderette|hotel|gym/i,DARE=/dare|get 3|reveal|steer|never|land|air a|^no dare|skip/i;
+  const rec=async()=>{const c=await ph(p);visited.add(c);return c};
+  ok(`${label}: Play starts a career`,await act(/^play$|^new|^start/i)&&['shop','dare','rig'].includes(await rec()),await ph(p));
+  if((await ph(p))==='shop'){ok(`${label}: buy a gag from the shop`,await(async()=>{const before=await p.evaluate(()=>__prank.career().budget);const hit=await act(/cushion|bucket|spider|peel|popper/i);
+      const after=await p.evaluate(()=>__prank.career().budget);return hit&&after<before})(),'budget did not drop');
+    await act(SET);await act(CONT);await rec()}
+  for(let i=0;i<4&&(await ph(p))==='dare';i++){await act(DARE);await rec();if((await ph(p))==='dare')await act(CONT)}
+  await rec();
+  ok(`${label}: Doors open starts the live episode`,(await ph(p))==='rig'&&await act(/doors open/i)&&await(async()=>{await wait(p,100);return(await rec())==='live'})(),await ph(p));
+  await p.evaluate(()=>__prank.stepBy(40));await p.evaluate(()=>__prank.fastForward());await wait(p,100);
+  ok(`${label}: live runs out to the wrap screen`,(await rec())==='wrap',await ph(p));
+  ok(`${label}: wrap goes on to the next episode's shop`,await act(/next|continue/i)&&await p.evaluate(()=>__prank.phase==='shop'&&__prank.career().episode>=1),await ph(p))}
 
 (async()=>{const b=await chromium.launch();
-  // 1. layouts
+  // 1. layouts: eight screens at three sizes
   for(const [w,h,touch] of [[390,844,true],[844,390,true],[1280,720,false]]){
     const {p,ctx,errs}=await page(b,{viewport:{width:w,height:h},hasTouch:touch,isMobile:touch});
-    const ph=await screens(p,`${w}x${h}`);
-    if(w>h&&h<500)ok(`${w}x${h}: game view at least 40% of the width`,ph.play.vw>=0.4,String(ph.play.vw));
+    const sc=await screens(p,`${w}x${h}`);
+    if(w>h&&h<500&&sc.live)ok(`${w}x${h}: game view at least 40% of the width`,sc.live.vw>=0.4,String(sc.live.vw));
     ok(`${w}x${h}: no console errors`,!errs.length,errs.slice(0,3).join(' | '));await ctx.close()}
 
-  // 2. touch only: title to a set prank to the next day, all by taps
+  // 2. touch only: Play, buy, set and dare by tap, place by tapping the set, Doors open, live by the hook, wrap by tap to the next shop
   {const {p,ctx,errs}=await page(b,{viewport:{width:390,height:844},hasTouch:true,isMobile:true});
-    const tapEl=async sel=>{const bx=await p.locator(sel).first().boundingBox();await p.touchscreen.tap(bx.x+bx.width/2,bx.y+bx.height/2);await wait(p,120)};
-    await tapEl('#bPlay');ok('touch: Play starts a game',await p.evaluate(()=>__prank.phase)==='play');
-    ok('touch: hints name taps',/Tap/.test(await p.textContent('#ctlHint')));
-    let set=false;for(const spot of['sofa','kfloor','front','hfloor','cup','arm']){
-      const at=await p.evaluate(s=>__prank.spotScreen(s),spot);await p.touchscreen.tap(at.x,at.y);
-      for(let i=0;i<40&&!(await p.evaluate(()=>__prank.state().picker));i++){await p.evaluate(()=>__prank.stepBy(6));await wait(p,10)}
-      if(!(await p.evaluate(()=>__prank.state().picker)))continue;
-      const opt=p.locator('#pkBtns button:not([aria-disabled="true"])').first();
-      if(!(await opt.count()))continue;const before=await p.evaluate(()=>__prank.state().pranks);
-      const f0=await p.evaluate(()=>__prank.state().stats.fizzled);
-      const bx=await opt.boundingBox();await p.touchscreen.tap(bx.x+bx.width/2,bx.y+bx.height/2);
-      // the tap's own effect: the setup starts (busy), or it already finished, or a resident caught it; what happens after is the game, not the input
-      const started=await p.evaluate(()=>__prank.state().busy);await p.evaluate(()=>__prank.stepBy(150));
-      const st=await p.evaluate(()=>__prank.state());if(started||st.pranks>before||st.stats.fizzled>f0){set=true;break}}
-    ok('touch: a prank set by taps alone',set);
-    await p.evaluate(()=>__prank.stepBy(181*60));ok('touch: day ends',await p.evaluate(()=>__prank.phase)==='dayend');
-    await tapEl('#bNext');ok('touch: Next day by tap',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===1));
-    await p.evaluate(()=>__prank.stepBy(181*60));await tapEl('#bNext');await p.evaluate(()=>__prank.stepBy(181*60));
-    ok('touch: the match plays to its end screen',await p.evaluate(()=>__prank.phase)==='matchend');
-    ok('touch: the end screen names what you did',/You landed \d+ pranks/.test(await p.textContent('#ovp')));
-    await tapEl('#bAgain');ok('touch: Play again by tap',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===0));
+    const act=re=>touchTap(p,re);const seen=new Set();
+    ok('touch: Play starts a career',await act(/^play$|^new|^start/i)&&(await ph(p))==='shop',await ph(p));seen.add('shop');
+    const b0=await p.evaluate(()=>__prank.career().budget);
+    ok('touch: a gag bought by tap',await act(/cushion/i)&&(await p.evaluate(()=>__prank.career().budget))<b0,'budget did not drop');
+    await act(/caf[eé]|corner|office|launderette|hotel|gym/i);await act(CONT);
+    for(let i=0;i<4&&(await ph(p))==='shop';i++){await act(CONT);await wait(p,50)}
+    let c=await ph(p);ok('touch: set chosen, on to the dare pick',c==='dare'||c==='rig',c);
+    if(c==='dare'){ok('touch: a dare taken by tap',await act(/dare|get 3|reveal|steer|never|land|air a/i)||await act(/skip|no dare|none/i),'no dare button');
+      for(let i=0;i<3&&(await ph(p))==='dare';i++)await act(CONT)}
+    ok('touch: rigging reached',(await ph(p))==='rig',await ph(p));seen.add('rig');
+    // find a seat spot in the raw state, tap it on screen, then tap a picker button
+    const spot=await p.evaluate(()=>{const seen=new Set(),found=[];(function walk(o,d){if(!o||typeof o!=='object'||seen.has(o)||d>7)return;seen.add(o);
+        if(typeof o.id==='string'&&o.kind==='seat')found.push(o.id);for(const k in o)walk(o[k],d+1)})(__st(),0);return found[0]||null});
+    ok('touch: the set has a seat spot to rig',!!spot,'no spot with kind seat found in state');
+    const gb=await p.evaluate(()=>__prank.career().gags.cushion);
+    if(spot){const at=await p.evaluate(s=>__prank.spotScreen(s),spot);await p.touchscreen.tap(at.x,at.y);
+      for(let i=0;i<30&&!(await p.evaluate(()=>{const e=document.getElementById('pkBtns');return e&&e.offsetParent!==null&&e.querySelector('button')}));i++){await p.evaluate(()=>__prank.stepBy(1));await wait(p,30)}
+      const opened=await p.evaluate(()=>{const e=document.getElementById('pkBtns');return !!(e&&e.offsetParent!==null&&e.querySelector('button'))});
+      ok('touch: tapping the spot opens the picker',opened);
+      if(opened){await layout(p,'touch picker');const pb=await find(p,/cushion/i)||await p.evaluate(()=>{const b=document.querySelector('#pkBtns button:not([aria-disabled="true"])');if(!b)return null;const r=b.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}});
+        if(pb)await p.touchscreen.tap(pb.x,pb.y);await wait(p,150);
+        ok('touch: a gag placed from the picker',(await p.evaluate(()=>__prank.career().gags.cushion))<gb&&!(await p.evaluate(()=>{const e=document.getElementById('pkBtns');return e&&e.offsetParent!==null})),'gag count did not drop or picker stayed')}}
+    ok('touch: Doors open by tap',await act(/doors open/i)&&(await ph(p))==='live',await ph(p));seen.add('live');
+    for(let i=0;i<6;i++){await p.evaluate(()=>__prank.stepBy(8));await wait(p,20)}
+    ok('touch: live is running',(await ph(p))==='live'&&(await p.evaluate(()=>__prank.marks().length))>0);
+    await p.evaluate(()=>__prank.fastForward());await wait(p,100);
+    ok('touch: live ends on the wrap screen',(await ph(p))==='wrap',await ph(p));
+    ok('touch: wrap names the result',/viewers|aired|budget/i.test(await p.textContent('#ov')));
+    ok('touch: wrap to the next shop by tap',await act(/next|continue/i)&&await p.evaluate(()=>__prank.phase==='shop'&&__prank.career().episode===1),await ph(p));
     ok('touch: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
-  // 3. pad only: every menu, a prank, pause, next day, then unplug pauses
+  // 3. pad only
   {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720},pad:true});
-    const tap=async(i,ms=90)=>{await p.evaluate(i=>{__pad.buttons[i].pressed=true;__pad.buttons[i].value=1},i);await wait(p,ms);await p.evaluate(i=>{__pad.buttons[i].pressed=false;__pad.buttons[i].value=0},i);await wait(p,90)};
-    const A=0,B=1,START=9,UP=12,DOWN=13;const ph=()=>p.evaluate(()=>__prank.phase);const foc=()=>p.evaluate(()=>document.activeElement&&document.activeElement.id);
+    const tap=padTapper(p);const visited=new Set();
     await p.evaluate(()=>dispatchEvent(Object.assign(new Event('gamepadconnected'),{gamepad:__pad})));
-    await tap(DOWN);ok('pad: D-pad moves menu focus',await foc()==='bHow',await foc());
-    await tap(A);ok('pad: A opens How to play',await ph()==='howto');
-    ok('pad: hints name pad buttons',/left stick/.test(await p.textContent('#ovp')));
-    await tap(B);ok('pad: B backs out',await ph()==='title');
-    for(let i=0;i<3&&(await foc())!=='bSet';i++)await tap(DOWN);await tap(A);ok('pad: Settings opens',await ph()==='settings');
-    await tap(A);ok('pad: a setting toggles in place, focus kept',await foc()==='bSnd',await foc());
-    await tap(B);for(let i=0;i<3&&(await foc())!=='bPlay';i++)await tap(UP);
-    // hold A through the start: the press must not leak into the first frames of play
-    await p.evaluate(()=>{__pad.buttons[0].pressed=true});await wait(p,400);
-    ok('pad: Play starts with A',await ph()==='play');ok('pad: held start press does not act in play',!(await p.evaluate(()=>__prank.state().picker||__prank.state().busy)));
-    await p.evaluate(()=>{__pad.buttons[0].pressed=false});await wait(p,120);
-    let opened=false;for(let i=0;i<40&&!opened;i++){await p.evaluate(()=>{__pad.axes[0]=1});await wait(p,110);await p.evaluate(()=>{__pad.axes[0]=0});await wait(p,40);
-      await tap(A);opened=await p.evaluate(()=>__prank.state().picker);if((await p.evaluate(()=>__prank.state().player.x))>23)break}
-    ok('pad: A at a spot opens its choices',opened);
-    if(opened){const before=await p.evaluate(()=>__prank.state().pranks+__prank.state().traps);
-      for(let i=0;i<6;i++){if(await p.evaluate(()=>document.activeElement&&document.activeElement.getAttribute('aria-disabled')!=='true'&&!!document.activeElement.dataset.o&&document.activeElement.dataset.o!=='leave'))break;await tap(DOWN)}
-      await tap(A);await p.evaluate(()=>__prank.stepBy(150));ok('pad: choosing with A does something',!(await p.evaluate(()=>__prank.state().picker)),'picker still open');}
-    await tap(START);ok('pad: Start pauses',await ph()==='pause');await tap(A);ok('pad: A on Resume resumes',await ph()==='play');
-    await p.evaluate(()=>__prank.stepBy(181*60));await tap(A);ok('pad: A on day end goes to the next day',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===1));
-    await p.evaluate(()=>__prank.stepBy(181*60));await tap(A);await p.evaluate(()=>__prank.stepBy(181*60));
-    ok('pad: the match plays to its end screen',await ph()==='matchend');
-    await tap(A);ok('pad: A on the end screen plays again',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===0));
-    await p.evaluate(()=>{__pad.connected=false;dispatchEvent(Object.assign(new Event('gamepaddisconnected'),{gamepad:__pad}))});await wait(p,100);
-    ok('pad: unplugging pauses',await ph()==='pause');ok('pad: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
+    const act=re=>navTo(p,re,()=>tap(PAD.DOWN),()=>tap(PAD.UP),()=>tap(PAD.A));
+    await tap(PAD.DOWN);ok('pad: D-pad moves menu focus on the title',/\S/.test(await focusText(p)),await focusText(p));
+    await tap(PAD.UP);
+    ok('pad: hints name pad buttons',/left stick|\bA\b|Start/.test(await p.textContent('#ov')+await p.textContent('#ctlHint')));
+    await drive(p,act,'pad',visited);
+    ok('pad: every phase was reached with the pad',['shop','dare','rig','live','wrap'].every(x=>visited.has(x)),[...visited].join(','));
+    // pause with Start during live, resume, then unplug
+    await p.evaluate(()=>{const P=__prank;P.pickSet(0);P.dare(-1);P.open()});await wait(p,100);
+    if((await ph(p))==='live'){await tap(PAD.START);ok('pad: Start pauses',(await ph(p))==='pause',await ph(p));
+      ok('pad: A on Resume resumes',await act(/resume/i)&&(await ph(p))==='live',await ph(p))}
+    else ok('pad: live reached for pause',false,await ph(p));
+    await p.evaluate(()=>{__pad.connected=false;dispatchEvent(Object.assign(new Event('gamepaddisconnected'),{gamepad:__pad}))});await wait(p,150);
+    ok('pad: unplugging pauses',(await ph(p))==='pause',await ph(p));
+    ok('pad: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
   // 4. keyboard only
-  {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
-    await p.keyboard.press('ArrowDown');await p.keyboard.press('Enter');ok('keys: Enter opens How to play',await p.evaluate(()=>__prank.phase)==='howto');
-    await p.keyboard.press('Escape');ok('keys: Escape backs out',await p.evaluate(()=>__prank.phase)==='title');
-    for(let i=0;i<3;i++)await p.keyboard.press('ArrowUp');await p.keyboard.press('Enter');await wait(p,100);ok('keys: Enter on Play starts',await p.evaluate(()=>__prank.phase)==='play');
-    ok('keys: hints name keys',/\bD\b|→/.test(await p.textContent('#ctlHint')),await p.textContent('#ctlHint'));
-    const x0=await p.evaluate(()=>__prank.state().player.x);await p.keyboard.down('KeyD');await wait(p,500);await p.keyboard.up('KeyD');
-    ok('keys: D walks right',(await p.evaluate(()=>__prank.state().player.x))>x0+0.5);
-    await p.keyboard.press('Escape');ok('keys: Escape pauses',await p.evaluate(()=>__prank.phase)==='pause');
-    await p.keyboard.press('Escape');ok('keys: Escape resumes',await p.evaluate(()=>__prank.phase)==='play');
+  {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});const visited=new Set();
+    const key=k=>p.keyboard.press(k);
+    ok('keys: hints name keys',/Enter|Space|\bD\b|\bE\b|arrow|→/i.test(await p.textContent('#ov')+await p.textContent('#ctlHint')));
+    const act=re=>navTo(p,re,()=>key('ArrowDown'),()=>key('ArrowUp'),()=>key('Enter'));
+    await drive(p,act,'keys',visited);
+    ok('keys: every phase was reached with keys',['shop','dare','rig','live','wrap'].every(x=>visited.has(x)),[...visited].join(','));
+    await p.evaluate(()=>{const P=__prank;P.pickSet(0);P.dare(-1);P.open()});await wait(p,100);
+    if((await ph(p))==='live'){await key('Escape');ok('keys: Escape pauses',(await ph(p))==='pause',await ph(p));await key('Escape');ok('keys: Escape resumes',(await ph(p))==='live',await ph(p))}
+    else ok('keys: live reached for pause',false,await ph(p));
     ok('keys: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
-  // 5. contrast of every visible text over its real (composited) background, normal and under colour-blind stand-ins
+  // 5. contrast of every visible text over its real (composited) background, on every screen
   {const {p,ctx}=await page(b,{viewport:{width:844,height:390},hasTouch:true});
     const audit=async label=>{const r=await p.evaluate(()=>{
       const rgba=s=>{const m=s.match(/[\d.]+/g)||[0,0,0,0];return[+m[0],+m[1],+m[2],m[3]==null?1:+m[3]]};
@@ -125,108 +173,131 @@ async function screens(p,label){
         const cs=getComputedStyle(el);const bg=bgOf(el),fg=over(rgba(cs.color),bg);const L1=lum(fg),L2=lum(bg);const cr=(Math.max(L1,L2)+.05)/(Math.min(L1,L2)+.05);
         if(cr<4.5)low.push(`${el.id||el.className||el.tagName}:"${el.textContent.trim().slice(0,18)}" ${cr.toFixed(2)}`)}return low});
       ok(`contrast ${label}: all text >= 4.5:1`,!r.length,r.slice(0,6).join('; '))};
-    await p.evaluate(()=>__prank.start({seed:4}));await p.evaluate(()=>__prank.stepBy(600));await audit('play');
-    await p.evaluate(()=>document.getElementById('pauseB').click());await audit('pause');
-    await p.evaluate(()=>{__prank.start({seed:4});__prank.stepBy(181*60)});await audit('day end');
-    await p.evaluate(()=>{__prank.start({seed:4,bot:true});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);});await audit('match end');
-    await p.reload();await wait(p,300);await audit('title');
+    await audit('title');
     await p.evaluate(()=>document.getElementById('bHow').click());await wait(p,100);await audit('how to play');
     await p.evaluate(()=>document.getElementById('bBack').click());await p.evaluate(()=>document.getElementById('bSet').click());await wait(p,100);await audit('settings');
-    // the two sides differ by shape, not hue: your coin is round, Moss's badge is a diamond, in the HUD and on the card badges
-    const shapes=await p.evaluate(()=>{const y=document.querySelector('.bY'),m=document.querySelector('.bM');const cy=getComputedStyle(y),cm=getComputedStyle(m);return{y:cy.borderRadius,m:cm.transform}});
-    ok('colour-blind: your mark round, Moss mark a diamond',/50%|\d{2,}px/.test(shapes.y)&&shapes.m!=='none',JSON.stringify(shapes));
-    // the canvas under protanopia and deuteranopia stand-ins: score marks still read by shape, so check the two side colours differ in luminance too
-    const lum=await p.evaluate(()=>{const c=s=>getComputedStyle(document.documentElement).getPropertyValue(s).trim();return[c('--you'),c('--moss')]});
-    const L=h=>{const n=parseInt(h.slice(1),16),v=[n>>16,n>>8&255,n&255].map(x=>{x/=255;return x<=.03928?x/12.92:((x+.055)/1.055)**2.4});return .2126*v[0]+.7152*v[1]+.0722*v[2]};
-    const sim=(h,M)=>{const n=parseInt(h.slice(1),16),v=[n>>16,n>>8&255,n&255];return'#'+M.map(r=>Math.max(0,Math.min(255,Math.round(r[0]*v[0]+r[1]*v[1]+r[2]*v[2])))).map(x=>x.toString(16).padStart(2,'0')).join('')};
-    const PROT=[[.567,.433,0],[.558,.442,0],[0,.242,.758]],DEUT=[[.625,.375,0],[.7,.3,0],[0,.3,.7]];
-    for(const [n,M] of [['normal',null],['protanopia',PROT],['deuteranopia',DEUT]]){const a=M?sim(lum[0],M):lum[0],c=M?sim(lum[1],M):lum[1];const r=(Math.max(L(a),L(c))+.05)/(Math.min(L(a),L(c))+.05);
-      ok(`colour-blind ${n}: you and Moss differ in brightness (>=1.3:1)`,r>=1.3,`${a} ${c} ${r.toFixed(2)}`)}
+    await p.evaluate(()=>__prank.start(4));await wait(p,80);await audit('shop');
+    await p.evaluate(()=>{__prank.buy('cushion');__prank.pickSet(0)});await wait(p,80);
+    if(await toPhase(p,'dare')){await wait(p,80);await audit('dare')}else ok('contrast dare: reached',false,await ph(p));
+    if(await toPhase(p,'rig')){await wait(p,80);await audit('rig')}else ok('contrast rig: reached',false,await ph(p));
+    await p.evaluate(()=>{__prank.open();__prank.stepBy(40)});await wait(p,80);await audit('live');
+    await p.evaluate(()=>document.getElementById('pauseB').click());await wait(p,80);await audit('pause');
+    await p.evaluate(()=>{const b=document.getElementById('bResume');if(b)b.click();__prank.fastForward()});await wait(p,100);await audit('wrap');
     await ctx.close()}
 
-  // 6. the player's choices decide the outcome; 7. determinism
+  // 6. tells are shown as text and shape on each mark's card, never colour alone
   {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
-    const r=await p.evaluate(()=>{let played=0,idle=0;const rows=[];for(let seed=1;seed<=12;seed++){
-        __prank.start({seed,bot:true});for(let i=0;i<10&&__prank.stepBy(60*60)!=='matchend';i++);const a=__prank.state().score;if(a.you>a.moss)played++;
-        __prank.start({seed,bot:false});for(let d=0;d<3;d++){__prank.stepBy(181*60);__prank.next()}const c=__prank.state().score;if(c.you>c.moss)idle++;
-        rows.push(`${seed}:${a.you}-${a.moss}/${c.you}-${c.moss}`)}
-      const f1=(__prank.start({seed:9,bot:true}),__prank.stepBy(4000),__prank.fingerprint()),f2=(__prank.start({seed:9,bot:true}),__prank.stepBy(4000),__prank.fingerprint());
-      const f3=(__prank.start({seed:10,bot:true}),__prank.stepBy(4000),__prank.fingerprint());
-      return{played,idle,rows,f1,f2,f3}});
-    console.log('     seeds played/idle: '+r.rows.join(' '));
-    ok(`choices decide: played seat wins ${r.played}/12, idle ${r.idle}/12`,r.played>=10&&r.idle<=1);
-    ok('determinism: same seed same state',r.f1===r.f2,`${r.f1} ${r.f2}`);
-    // Moss reads you: a player who keeps to one room should find Moss's sealed guess there on days 2 and 3, and the read is kept for the next match
-    const L=await p.evaluate(()=>{let hits=0,days=0,set=0;const rows=[];for(let seed=1;seed<=6;seed++)for(const room of[0,2]){
-        __prank.start({seed,bot:true,botRoom:room});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);const h=__prank.state().history,sc=__prank.state().score;
-        if(h[0].actual===room){set++;for(const d of h.slice(1)){days++;if(d.guess===room)hits++}}rows.push(`${seed}/${room}:${h.map(d=>d.guess+'>'+d.actual).join(',')} ${sc.you}-${sc.moss}`)}
-      localStorage.removeItem('prank.moss');__prank.start({seed:3,bot:true,botRoom:2,blank:false});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);
-      let kept=null;try{kept=JSON.parse(localStorage.getItem('prank.moss'))}catch(e){}
-      __prank.start({seed:5,bot:false,blank:false});const g=__prank.state().guess;return{hits,days,set,rows,kept:kept&&kept.last,g}});
-    console.log('     one-room player, guess>actual by day, score: '+L.rows.join(' '));
-    ok(`Moss reads a one-room player: guess right on ${L.hits} of ${L.days} later days`,L.set>=8&&L.hits>=L.days*0.8,`${L.set} of 12 matches pranked the room on day 1`);
-    ok('Moss keeps its read for the next match',L.kept===2&&L.g===2,JSON.stringify({last:L.kept,nextGuess:L.g}));ok('determinism: another seed differs',r.f1!==r.f3);
-    ok('sim: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
+    await p.evaluate(()=>{__prank.start(6);__prank.bot(true)});
+    const TELL=[[0.6,/laughs it off/i],[0.9,/rattled/i],[1.0001,/on the edge/i],[1e9,/losing it/i]];
+    const labelOf=r=>TELL.find(t=>r<t[0])[1];
+    const seen=new Set(),bad=[];let sampled=0,states=new Set(),shape=false;
+    for(let i=0;i<90;i++){await p.evaluate(()=>__prank.stepBy(1.5));await wait(p,40);
+      const snap=await p.evaluate(()=>({marks:__prank.marks(),ph:__prank.phase}));
+      if(snap.ph==='wrap'||snap.ph==='career')break;
+      for(const m of snap.marks){states.add(m.state);if(m.state!=='onset'||m.line<=0)continue;
+        const r=m.fluster/m.line;if(r>1.25)continue;const want=labelOf(r);sampled++;
+        const info=await p.evaluate(([name,src])=>{const re=new RegExp(src,'i');
+          const els=[...document.querySelectorAll('#app *')].filter(e=>e.offsetParent!==null&&[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.includes(name)));
+          for(const e of els){let a=e;for(let k=0;k<5&&a;k++,a=a.parentElement)if(re.test(a.innerText||''))return{hit:true,shape:!!a.querySelector('svg,[class*=tell],[class*=shape],[data-tell]')||/[●◆▲■✕!?~]/.test(a.innerText||'')};}
+          return{hit:false,card:els.length>0}},[m.name,want.source]);
+        if(info.hit){seen.add(want.source);if(info.shape)shape=true}else if(info.card)bad.push(`${m.name} ${r.toFixed(2)} wants ${want.source}`)}}
+    ok('tells: each visible mark card names its tell in text',sampled>0&&!bad.length,`sampled ${sampled}; ${bad.slice(0,3).join(' | ')}`);
+    ok('tells: more than one tell state was shown during an episode',seen.size>=2,[...seen].join(','));
+    ok('tells: a tell is also drawn as a shape or glyph, not colour alone',shape,'no svg/glyph/tell element found beside the tell text');
+    ok('tells: mark states change as the episode runs',states.size>=2,[...states].join(','));
+    ok('tells: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
-  // 8. moods last across days, and a resident pushed far enough storms out to the park where you can follow and keep pranking
+  // 7. effects through the hook
   {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
-    const m=await p.evaluate(()=>{__prank.start({seed:2,bot:false});__prank.setWind('mum',5);__prank.setWind('gramps',3);__prank.setWind('kid',0);
-      __prank.stepBy(180*60-2);const before=__prank.state().folk.map(f=>({id:f.id,wind:f.wind,hits:f.hits}));__prank.stepBy(60);const ph=__prank.phase;
-      const after=__prank.state().folk.map(f=>f.wind);__prank.next();const day2=__prank.state().folk.map(f=>({wind:f.wind,out:f.out,x:f.x}));
-      return{before,after,ph,day2,moods:__prank.state().moods[0]}});
-    const want=m.before.map(f=>Math.max(0,f.wind-1-(f.hits?0:1)));
-    ok('moods: overnight each resident cools by 1, or 2 if left alone',m.ph==='dayend'&&want.every((w,i)=>Math.abs(w-m.after[i])<1e-9),JSON.stringify({before:m.before,after:m.after}));
-    ok('moods: the mood carries into the next day',m.day2.every((d,i)=>Math.abs(d.wind-m.after[i])<1e-9)&&m.after.some(w=>w>0),JSON.stringify(m.day2));
-    ok('moods: the day-end record names each mood change',m.moods&&m.moods.length===3&&m.moods.every(x=>x.name&&x.from!=null&&x.to!=null),JSON.stringify(m.moods));
-    ok('moods: nobody is still out in the park at the start of a day',m.day2.every(d=>!d.out&&d.x<24),JSON.stringify(m.day2));
-    const so=await p.evaluate(()=>{__prank.start({seed:5,bot:true});for(const id of['gramps','mum','kid'])__prank.setWind(id,3.5);
-      let t=0;for(;t<6000;t+=10){__prank.stepBy(10);if(__prank.state().folk.some(f=>f.out&&f.x>24))break}
-      const st=__prank.state();return{t,stormed:st.stats.stormed,out:st.folk.filter(f=>f.out).map(f=>f.id+'@'+f.x.toFixed(1))}});
-    ok('moods: a Grumpy resident storms out past the house wall',so.out.length>0&&so.stormed>0,JSON.stringify(so));
-    ok('moods: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
+    // shared setup in page: a set, one gag at a spot of a given kind, cameras mounted or not
+    await p.evaluate(()=>{window.__spots=()=>{const seen=new Set(),found=[];(function walk(o,d){if(!o||typeof o!=='object'||seen.has(o)||d>7)return;seen.add(o);
+        if(typeof o.id==='string'&&typeof o.kind==='string'&&['seat','door','floor','cupboard','counter'].includes(o.kind))found.push({id:o.id,kind:o.kind,room:o.room});
+        for(const k in o)walk(o[k],d+1)})(__st(),0);return found};
+      window.__mark=id=>{const seen=new Set();let hit=null;(function walk(o,d){if(hit||!o||typeof o!=='object'||seen.has(o)||d>7)return;seen.add(o);
+        if(o.id===id&&typeof o.fluster==='number'&&typeof o.line==='number'){hit=o;return}for(const k in o)walk(o[k],d+1)})(__st(),0);return hit};
+      window.__rig=(seed,withCam)=>{__prank.bot(false);__prank.start(seed);__prank.buy('cushion');__prank.buy('cushion');
+        __prank.pickSet(0);__prank.dare(-1);const sp=__spots().find(s=>s.kind==='seat');
+        const placed=sp?__prank.place(sp.id,'cushion'):false;let mounted=false;
+        if(withCam&&sp){mounted=sp.room!=null?__prank.mount(sp.room):false;if(!mounted)for(let r=0;r<6&&!mounted;r++)mounted=__prank.mount(r)}
+        return{spot:sp,placed,mounted,phase:__prank.phase}};
+      // run live until some mark is on set; steer it to the spot; run until its fluster moves or the time runs out
+      window.__land=(spot,limit)=>{__prank.open();let m=null;for(let t=0;t<limit;t+=0.5){__prank.stepBy(0.5);m=__prank.marks().find(x=>!x.star&&x.state==='onset');if(m)break}
+        if(!m)return null;__prank.steer(m.id,spot.id);for(let t=0;t<60;t+=0.5){__prank.stepBy(0.5);const c=__prank.marks().find(x=>x.id===m.id);if(c.fluster>0||c.state!=='onset')return c.id}return m.id}});
+    const prep=async(seed,cam)=>p.evaluate(([s,c])=>__rig(s,c),[seed,cam]);
+
+    // a reveal at or under the line airs footage
+    let r=await prep(3,true);ok('effects: a gag placed and a camera mounted in its room',r.placed&&r.mounted,J(r)+' '+await p.evaluate(()=>__prank.lastRefusal));
+    let id=await p.evaluate(sp=>__land(sp,40),r.spot);ok('effects: a mark walked into the rigged gag',!!id);
+    let e=await p.evaluate(id=>{const m=__prank.marks().find(x=>x.id===id);return m&&{footage:m.footage,fluster:m.fluster,line:m.line,state:m.state}},id);
+    ok('effects: the gag on camera made footage',e&&e.footage>0,J(e));
+    if(e&&e.footage>0&&e.fluster<=e.line&&e.state==='onset'){const rv=await p.evaluate(id=>{const ok=__prank.reveal(id);__prank.stepBy(3);const m=__prank.marks().find(x=>x.id===id);return{ok,aired:m.aired,state:m.state}},id);
+      ok('effects: a reveal at or under the line airs footage (aired > 0)',rv.ok&&rv.aired>0,J(rv))}
+    else ok('effects: a reveal at or under the line airs footage (aired > 0)',false,'mark not revealable after the gag: '+J(e));
+
+    // pushed past 1.25 x line, a reveal is refused
+    r=await prep(3,true);id=await p.evaluate(sp=>__land(sp,40),r.spot);
+    const ref=await p.evaluate(id=>{const raw=__mark(id);if(!raw)return null;raw.fluster=raw.line*1.3;const res=__prank.reveal(id);const lr=__prank.lastRefusal;__prank.stepBy(3);const m=__prank.marks().find(x=>x.id===id);return{res,lr,aired:m.aired}},id);
+    ok('effects: a reveal past 1.25 x line is refused and airs nothing',ref&&ref.res===false&&ref.aired===0,J(ref));
+    ok('effects: the refusal names its cause on screen',ref&&/\S/.test(ref.lr||''),J(ref));
+
+    // no camera in the room, no footage
+    r=await prep(3,false);id=await p.evaluate(sp=>__land(sp,40),r.spot);
+    const nc=await p.evaluate(id=>{const m=__prank.marks().find(x=>x.id===id);return m&&{footage:m.footage,fluster:m.fluster}},id);
+    ok('effects: a gag with no camera in the room gives no footage',nc&&nc.fluster>0&&nc.footage===0,J(nc)+' '+J(r));
+
+    // steer changes next
+    const st=await p.evaluate(()=>{__rig(3,true);const sp=__spots();__prank.open();let m=null;for(let t=0;t<40&&!m;t+=0.5){__prank.stepBy(0.5);m=__prank.marks().find(x=>!x.star&&x.state==='onset')}
+      if(!m)return null;const target=sp.find(s=>s.id!==m.next&&s.kind!=='door'||s.id!==m.next);const before=m.next;const res=__prank.steer(m.id,target.id);
+      return{before,target:target.id,res,after:__prank.marks().find(x=>x.id===m.id).next,lr:__prank.lastRefusal}});
+    ok('effects: steer(mark, spot) changes that mark\'s next stop',st&&st.res&&st.after===st.target&&st.after!==st.before,J(st));
+
+    // the star persists across episodes with buy-in kept
+    const sr=await p.evaluate(()=>{const r=__rig(5,true);const c0=__prank.career();const star0=__prank.marks().find(m=>m.star);
+      const out={hasStar:!!star0,name:star0&&star0.name,careerStar:c0.star&&c0.star.name,placed:r.placed&&r.mounted};
+      __prank.open();let s=null;for(let t=0;t<60&&!s;t+=0.5){__prank.stepBy(0.5);s=__prank.marks().find(m=>m.star&&m.state==='onset')}
+      if(s){__prank.steer(s.id,r.spot.id);for(let t=0;t<60;t+=0.5){__prank.stepBy(0.5);if(__prank.career().star.buyIn>0)break}}
+      out.buyIn1=__prank.career().star.buyIn;__prank.fastForward();let g=0;while(__prank.phase!=='wrap'&&g++<8)__prank.fastForward();
+      __prank.next();__prank.pickSet(0);__prank.dare(-1);const c1=__prank.career();const star1=__prank.marks().find(m=>m.star);
+      out.name1=star1&&star1.name;out.buyIn2=c1.star.buyIn;out.episode=c1.episode;out.blown=c1.star.blown;return out});
+    ok('effects: the star appears with a name and in career()',sr.hasStar&&sr.name&&sr.careerStar===sr.name,J(sr));
+    ok('effects: a gag on camera builds the star\'s buy-in',sr.buyIn1>0,J(sr));
+    ok('effects: the same star returns next episode with buy-in kept',sr.name1===sr.name&&sr.episode===1&&sr.buyIn2>=sr.buyIn1&&sr.buyIn2>0,J(sr));
+
+    // save, reload the page, load: career() round-trips
+    const before=await p.evaluate(()=>{__prank.start(8);__prank.buy('bucket');__prank.pickSet(0);__prank.dare(-1);__prank.open();__prank.fastForward();__prank.next();__prank.save();return JSON.stringify(__prank.career())});
+    await p.reload();await wait(p,300);
+    const resume=await p.evaluate(()=>[...document.querySelectorAll('#ov button')].some(b=>/resume|continue/i.test(b.textContent)));
+    ok('save: an unfinished career is offered as Resume after reload',resume);
+    const after=await p.evaluate(()=>{__prank.load();return JSON.stringify(__prank.career())});
+    ok('save: save() then reload then load() round-trips career()',before===after,before.slice(0,140)+' != '+after.slice(0,140));
+    // a finished career is never offered as Resume
+    const fin=await p.evaluate(()=>{__prank.bot(false);__prank.start(11);let g=0;
+      while(!__prank.career().over&&g++<40){const ph=__prank.phase;if(ph==='shop'){__prank.pickSet(0);__prank.dare(-1)}else if(ph==='dare')__prank.dare(-1);else if(ph==='rig')__prank.open();else if(ph==='live')__prank.fastForward();else if(ph==='wrap')__prank.next();else break}
+      __prank.save();return{over:__prank.career().over,phase:__prank.phase}});
+    ok('save: an idle run reaches the end of the career',fin.over===true,J(fin));
+    await p.reload();await wait(p,300);
+    const resume2=await p.evaluate(()=>[...document.querySelectorAll('#ov button')].some(b=>/resume|continue/i.test(b.textContent)));
+    ok('save: a saved finished career is not offered as Resume',!resume2);
+    ok('effects: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
+
+  // 8. the player's choices decide the outcome (12 seeds), and determinism
   {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
-    const e=await p.evaluate(()=>{const id='kid',go=w=>{__prank.start({seed:3,bot:false});__prank.setWind(id,w)};go(0);
-      let near=null,soft=null;const n=__prank.dial(id,0,1).n;
-      for(let pi=0;pi<n;pi++)for(const lv of[1,2,3]){const d=__prank.dial(id,pi,lv),q=d.V/d.L;if(!near&&q>.82&&q<=.97)near={pi,lv};if(!soft&&q>.2&&q<.7)soft={pi,lv}}
-      const out={near,soft};
-      if(near){go(0);out.calm=__prank.land(id,near.pi,near.lv);go(7);out.fuming=__prank.land(id,near.pi,near.lv)}
-      if(soft){go(0);out.cheeryPts=__prank.land(id,soft.pi,soft.lv);go(4.5);out.grumpyPts=__prank.land(id,soft.pi,soft.lv)}
-      return out});
-    ok('moods: a prank that is a laugh on a cheery resident goes past the line of a fuming one',e.near&&e.calm.kind==='laugh'&&e.fuming.kind!=='laugh',JSON.stringify(e));
-    ok('moods: the same safe prank pays more on a grumpy resident',e.soft&&e.cheeryPts.kind==='laugh'&&e.grumpyPts.kind==='laugh'&&e.grumpyPts.pts>=1.3*e.cheeryPts.pts,JSON.stringify(e));
-    ok('moods: no console errors (dial)',!errs.length,errs.join(' | '));await ctx.close()}
-  for(const [label,opt] of [['desktop mouse',{viewport:{width:1280,height:720}}],['portrait touch',{viewport:{width:390,height:844},hasTouch:true,isMobile:true}],['landscape touch',{viewport:{width:844,height:390},hasTouch:true,isMobile:true}]]){
-    const {p,ctx,errs}=await page(b,opt);const rows=[];let landed=false,onScreen=true,cued=false;
-    for(const seed of[5,6,7,8]){
-      const set=await p.evaluate(seed=>{__prank.start({seed,bot:true});for(const id of['gramps','mum','kid'])__prank.setWind(id,3.5);
-        for(let t=0;t<6000;t+=10){__prank.stepBy(10);if(__prank.state().folk.some(f=>f.out&&f.x>24&&f.state==='walk'))break}
-        __prank.bot(false);const st=__prank.state(),r=st.folk.find(f=>f.out);if(!r)return null;
-        const plan=__prank.folkPlan(r.id),spot=plan.slice(1).find(id=>['bench','bin','swing'].includes(id));return{id:r.id,spot,park:st.stats.park}},seed);
-      if(!set||!set.spot){rows.push(seed+':nobody out');continue}
-      await p.evaluate(()=>__prank.stepBy(40));await wait(p,80);
-      const tapAt=async(x,y)=>{if(opt.hasTouch)await p.touchscreen.tap(x,y);else await p.mouse.click(x,y)};
-      const where=()=>p.evaluate(id=>{const c=document.querySelector('#cv').getBoundingClientRect(),q=__prank.spotScreen(id);return{...q,in:q.x>=c.left+20&&q.x<=c.right-20&&q.y>=c.top&&q.y<=c.bottom}},set.spot);
-      let sc=await where();
-      // a person heads that way: the edge marker if the resident is out of view, else a tap at the edge of the garden
-      for(let tries=0;tries<6&&!sc.in;tries++){const cue=(await p.evaluate(()=>__prank.cues())).find(c=>c.id===set.id);
-        if(cue){cued=true;await tapAt(cue.x,cue.y)}else{const c=await p.evaluate(()=>{const r=document.querySelector('#cv').getBoundingClientRect();return{l:r.left,r:r.right}});await tapAt(sc.x>c.r?c.r-30:c.l+30,sc.y-8)}
-        for(let i=0;i<12&&!(sc=await where()).in;i++){await p.evaluate(()=>__prank.stepBy(15));await wait(p,30)}}
-      if(!sc.in){onScreen=false;rows.push(seed+':'+set.spot+' still off screen');continue}
-      if(opt.hasTouch)await p.touchscreen.tap(sc.x,sc.y-8);else await p.mouse.click(sc.x,sc.y-8);
-      for(let i=0;i<60&&!(await p.evaluate(()=>__prank.state().picker));i++){await p.evaluate(()=>__prank.stepBy(10))}
-      const pk=await p.evaluate(()=>{const b=[...document.querySelectorAll('#pkBtns button')].find(b=>/^p\d/.test(b.dataset.o)&&b.getAttribute('aria-disabled')!=='true');return b?b.dataset.o:null});
-      if(!pk){rows.push(seed+':'+set.spot+' no prank to set');continue}
-      if(opt.hasTouch){const bx=await p.evaluate(o=>{const r=document.querySelector(`#pkBtns button[data-o="${o}"]`).getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}},pk);await p.touchscreen.tap(bx.x,bx.y)}
-      else await p.click(`#pkBtns button[data-o="${pk}"]`);
-      const res=await p.evaluate(([park0,id])=>{for(let i=0;i<60*45;i+=30){__prank.stepBy(30);const st=__prank.state();
-          if(st.stats.park>park0)return{landed:true,px:st.player.x};if(__prank.phase!=='play')break}
-        const st=__prank.state();return{landed:false,px:st.player.x,stats:st.stats,folk:st.folk.find(f=>f.id===id)}},[set.park,set.id]);
-      rows.push(`${seed}:${set.id}@${set.spot} ${res.landed?'landed':'no '+JSON.stringify(res)}`);
-      if(res.landed){landed=true;break}}
-    console.log(`     park (${label}): `+rows.join(' | '));
-    ok(`park (${label}): heading toward the park brings the spot a resident goes to on screen`,onScreen,rows.join(' | '));
-    if(label==='portrait touch')ok('park (portrait touch): the edge marker was used to follow',cued,rows.join(' | '));
-    ok(`park (${label}): follow by tapping, set a prank, and it lands in the park`,landed,rows.join(' | '));
-    ok(`park (${label}): no console errors`,!errs.length,errs.join(' | '));await ctx.close()}
+    const r=await p.evaluate(()=>{const EPS=4;const sum=a=>a.reduce((x,y)=>x+y,0);let wins=0;const rows=[];
+      for(let seed=1;seed<=12;seed++){
+        __prank.bot(false);__prank.start(seed);__prank.bot(true);let g=0;
+        while(__prank.career().viewers.length<EPS&&!__prank.career().over&&g++<900){__prank.stepBy(5);if(__prank.phase==='wrap')__prank.next()}
+        const played=sum(__prank.career().viewers);
+        __prank.bot(false);__prank.start(seed);let idle=0;
+        for(let e=0;e<EPS;e++){let h=0;while(__prank.phase!=='wrap'&&h++<12){const ph=__prank.phase;if(ph==='shop'){__prank.pickSet(0);__prank.dare(-1)}else if(ph==='dare')__prank.dare(-1);else if(ph==='rig')__prank.open();else if(ph==='live')__prank.fastForward();else break}
+          if(__prank.phase==='wrap'&&e<EPS-1)__prank.next();else if(__prank.career().over)break}
+        idle=sum(__prank.career().viewers);
+        const win=played>idle*1.5&&played-idle>=0.3;if(win)wins++;rows.push(`${seed}:${played.toFixed(1)}/${idle.toFixed(1)}`)}
+      const fp=s=>{__prank.bot(false);__prank.start(s);__prank.bot(true);__prank.stepBy(60);return __prank.fingerprint()};
+      return{wins,rows,f1:fp(9),f2:fp(9),f3:fp(10)}});
+    console.log('     seeds bot/idle total viewers (M): '+r.rows.join(' '));
+    ok(`choices decide: bot total viewers clearly above idle on ${r.wins}/12 seeds`,r.wins>=11);
+    ok('determinism: same seed same fingerprint',r.f1===r.f2,`${r.f1} ${r.f2}`);
+    ok('determinism: another seed differs',r.f1!==r.f3);
+    ok('sim: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
   await b.close();console.log(fails?`${fails} FAILED`:'ALL PASSED');process.exit(fails?1:0)})();

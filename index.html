@@ -25,13 +25,20 @@ body.titling #top,body.titling #stats,body.titling #pad{visibility:hidden}
 #gbar{position:relative;height:.5rem;border-radius:.3rem;background:linear-gradient(90deg,#4a7a54,#b9a35a 60%,#b04a3a);margin:.15rem 0}
 #gbar i{margin-left:var(--o,0);position:absolute;top:-.3rem;width:.28rem;height:1.1rem;border-radius:.1rem;border:1px solid rgba(0,0,0,.6);transform:translateX(-50%)}
 #hud .gs{font-size:.8rem;color:rgba(251,246,234,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#side{position:absolute;z-index:6;right:var(--sr);top:5rem;width:min(17rem,46vw);display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;pointer-events:none}
+#goal{background:rgba(14,16,20,.62);padding:.3rem .7rem;border-radius:.7rem;font-size:.85rem;font-weight:600;max-width:100%;text-align:right;border-left:3px solid var(--accent)}
+#goal:empty{display:none}
+#goal .k{color:var(--accent);font-weight:700}
+body.film #top,body.film #stats,body.film #pad,body.film #side{visibility:hidden}
+#hud .gs{transition:opacity .8s}#hud .gs.quiet{opacity:0}#hud .gs.pulse{color:var(--accent)}
+#gfig circle.flash{animation:cflash .45s 6}@keyframes cflash{50%{stroke:#ffd27a;stroke-width:7}}
 #hud2{max-width:min(94%,40rem);padding:.4rem .9rem;border-radius:1rem;background:rgba(14,16,20,.62);font-size:.95rem;line-height:1.25;text-align:center}
 #hud2:empty{display:none}
 #hud2 .k{color:var(--accent);font-weight:700}
 #toast{display:none;background:rgba(8,10,14,.85);color:var(--ink);padding:.35rem .8rem;border-radius:.6rem;font-size:.9rem;max-width:92%;text-align:center}
 #toast.on{display:block}
-#feed{display:flex;flex-direction:column;gap:.25rem;align-items:center;width:min(94%,32rem)}
-#feed div{background:rgba(10,8,12,.86);border:1px solid #3a3346;color:var(--ink);padding:.3rem .75rem;border-radius:.5rem;font-size:.9rem;text-align:center;transition:opacity .4s}
+#feed{display:flex;flex-direction:column;gap:.25rem;align-items:flex-end;width:100%}
+#feed div{background:rgba(10,8,12,.7);color:var(--ink);padding:.25rem .6rem;border-radius:.5rem;font-size:.78rem;text-align:right;max-width:100%;transition:opacity .4s}
 #feed div b{color:var(--accent)}
 /* bottom-left: health, pack, crystals, gold together, then the hint for the device in use */
 #stats{position:absolute;z-index:6;left:var(--sl);bottom:var(--sb);width:min(21rem,calc(100% - var(--sl) - var(--sr)));padding:.55rem .7rem;pointer-events:none}
@@ -116,8 +123,9 @@ body[data-dev=pad] .ab.off{opacity:.85}body[data-dev=pad] .ab.off .k{opacity:.45
   <div id="top">
     <div id="hud" class="glass"><svg id="gfig" viewBox="0 0 54 96" role="img" aria-label="The giant and its four chains"><g fill="#c9c2b2"><circle cx="27" cy="9" r="7"/><rect x="15" y="17" width="24" height="30" rx="8"/><rect x="5" y="19" width="8" height="28" rx="4"/><rect x="41" y="19" width="8" height="28" rx="4"/><rect x="16" y="47" width="9" height="40" rx="4"/><rect x="29" y="47" width="9" height="40" rx="4"/></g><g fill="none" stroke-width="3.5"><circle id="c_wristL" cx="9" cy="51" r="5"/><circle id="c_wristR" cx="45" cy="51" r="5"/><circle id="c_ankleL" cx="20" cy="90" r="5"/><circle id="c_ankleR" cx="34" cy="90" r="5"/></g></svg>
       <div class="gi"><div class="gr"><span id="gt">Colossus</span><span id="gd"></span></div><div id="gbar"></div><div class="gs" id="gs"></div></div></div>
-    <div id="hud2"></div><div id="toast"></div><div id="feed"></div>
+    <div id="hud2" hidden></div><div id="toast"></div>
   </div>
+  <div id="side"><div id="goal"></div><div id="feed"></div></div>
   <div id="stats" class="glass"><div id="hud1">Colossus</div><div id="hint"></div></div>
   <div id="pad"></div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
@@ -668,7 +676,8 @@ let toastT=0;const toastEl=document.getElementById('toast');
 const feedEl=document.getElementById('feed');let feed=[];
 // messages queue instead of overwriting each other; a repeat folds into the one already showing
 function toast(s){const last=feed[feed.length-1];if(last&&last.text===s){last.n++;last.t=Math.max(last.t,3);return}feed.push({text:s,n:1,t:Math.min(6,2.6+s.length/40)});if(feed.length>3)feed.shift()}
-function paintFeed(dt){for(const f of feed)f.t-=dt;feed=feed.filter(f=>f.t>0);const html=feed.map(f=>`<div style="opacity:${Math.min(1,f.t/.5)}">${f.text}${f.n>1?' <b>x'+f.n+'</b>':''}</div>`).join('');if(html!==feedEl._h){feedEl._h=html;feedEl.innerHTML=html}}
+function paintFeed(dt){if(!FILM)for(const f of feed)f.t-=dt; // messages wait out the opening film instead of expiring unseen
+  feed=feed.filter(f=>f.t>0);const html=feed.map(f=>`<div style="opacity:${Math.min(1,f.t/.5)}">${f.text}${f.n>1?' <b>x'+f.n+'</b>':''}</div>`).join('');if(html!==feedEl._h){feedEl._h=html;feedEl.innerHTML=html}}
 function announce(s){toast(s)}
 function sayTo(h,s){if(h&&h.you)toast(s)}
 
@@ -677,6 +686,10 @@ function fwd(g){return{x:Math.cos(g.ang),y:Math.sin(g.ang)}}
 function braces(){return S.sites.filter(s=>s.build&&s.build.k==='brace').length}
 // the giant starts all but unable to move; every brace humans bolt onto it lets it walk faster and do more
 function chained(id){const ch=S.chains.find(c=>c.id===id);return ch&&ch.hp>0}
+// rival people leave the chains alone until about minute 15, and not before the player's own chain step on the first day,
+// so the waking is a late turn of the match the player can see coming (the person: it woke before they saw chains break)
+C.CHAIN_OPEN=900;C.CHAIN_HOLD_MAX=1200; // a player who leaves the first day unfinished does not hold the whole match back past minute 20
+function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return !st||S.t>=C.CHAIN_HOLD_MAX||FIRST_DAY.findIndex(x=>x.id==='chain')<S.tut.i}
 const chainWeak=ch=>ch.hp<=ch.max*C.CHAIN_WEAK;const allWeak=()=>S.chains.every(c=>c.hp<=0||chainWeak(c));
 function giantSpeed(){if(!S.g.awake||chained('ankleL')||chained('ankleR'))return 0;const bl=S.sites.reduce((n,s)=>n+(s.build&&s.build.k==='brace'?lv(s.build):0),0);let s=Math.min(C.G_SPEED,C.G_DORMANT+bl*C.G_PER_BRACE);if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
 // momentum: it gathers speed slowly, needs room to stop, and turns wider the faster it walks
@@ -801,8 +814,8 @@ function reachT(h){const cl=h.cl,R=C.REACH;let b={d:R+1e-6,j:null,s:null,ch:null
   return b}
 // beside a planted foot the ankle chain on that leg can be struck from the ground
 function footChain(h){const f=nearFoot(h);if(nightLock())return null;if(f<0)return null;return S.chains.find(c=>c.id===(f?'ankleR':'ankleL')&&c.hp>0)||null}
-function strikeChain(h,ch){if(h.cd>0)return false;h.cd=.5;h.swing=.2;if(chainWeak(ch))return false;ch.hp=Math.max(0,ch.hp-h.atk);if(!S.headless&&Math.random()<.3)chainClank(ch);sfx('hit',h.you);
-  if(chainWeak(ch)){S.grudge[h.town]-=30;regard(h,30);gainXp(h,25);announce('The '+ch.name+' breaks.'+(allWeak()?' All four chains are broken: a wake horn sounded at its head will wake it.':''))}return true}
+function strikeChain(h,ch){if(h.cd>0)return false;if(!h.you&&!chainsOpen())return false;h.cd=.5;h.swing=.2;if(chainWeak(ch))return false;ch.hp=Math.max(0,ch.hp-h.atk);if(!S.headless&&Math.random()<.3)chainClank(ch);sfx('hit',h.you);
+  if(chainWeak(ch)){S.grudge[h.town]-=30;regard(h,30);gainXp(h,25);(S.chainFlash||(S.chainFlash={}))[ch.id]=S.t;if(!S.headless)chainClank(ch,true);announce('The '+ch.name+' breaks.'+(allWeak()?' All four chains are broken: a wake horn sounded at its head will wake it.':''))}return true}
 // the giant's regard for each person: fed like the grudges but credited to whoever acted; fades the same way
 function regard(h,a){if(!h||!S)return;S.reg=S.reg||{};S.reg[h.id]=(S.reg[h.id]||0)+a}
 function favoredPerson(){const sc=x=>(S.reg&&S.reg[x.id]||0)-S.grudge[x.town]*1e-4;let f=null;for(const x of S.humans)if(factionAlive(x.town)&&(!f||sc(x)>sc(f)))f=x;return f}
@@ -813,9 +826,10 @@ function humanCtx(h){
     let A={l:'Strike',why:'No joint or site here'};
     const chH=rt.ch;
     if(chH)A={l:chainWeak(chH)?chH.name+': broken':'Strike '+chH.name,why:busy||(chainWeak(chH)?'Already broken':null)};
-    if(!S.g.awake&&cl.y>=C.WAKE_ROW)A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: break all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy||(!S.g.awake?'It sleeps as stone':null)};
     else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Upgrade '+s.build.k+(upCost(s.build.k,s.build)!=null?' ('+upCost(s.build.k,s.build)+' crystals)':''),why:busy||canUpgrade(h,s.build.k,s.build)};else{const kn=Object.keys(SITE_KITS).filter(k=>h.kits[k]).length;A={l:s.pending?'Being built':'Build at '+s.r*FT+' ft',why:busy||(s.pending?'Someone is building here':!kn?'No kits for the giant: buy them in town':null)}}}
+    // at the head a carried wake horn takes the button over any joint or build spot there, or no one could sound it standing on the crown's ladder
+    if(!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||!j&&!s))A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':S.waker&&S.waker!==h&&S.waker.waking?'Another horn is sounding':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: break all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
     const siteFree=s&&!s.build;
     const hasA=S.anchors.some(a=>a.r===Math.floor(cl.y)&&a.c===Math.floor(cl.x));
     const X=j&&S.joints[j].wedges.length?{l:'Pull wedge',why:busy}:{l:'Anchor ('+h.kits.anchor+')',why:busy||(!h.kits.anchor?'No anchor kits':hasA?'Anchor already here':null)};
@@ -828,7 +842,7 @@ function humanCtx(h){
 function humanAct(h,slot,dir){if(slot==='A'&&(h.mode==='climb'?reachT(h).ch:!attackTarget(h)&&footChain(h)))h.chainHits=(h.chainHits||0)+1;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
-    if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW){if(!h.horn||!allWeak())return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}
+    if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||(rt=>!rt.j&&!rt.s)(reachT(h)))){if(!h.horn||!allWeak()||S.waker&&S.waker!==h&&S.waker.waking)return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}
     {const ch=slot==='A'?reachT(h).ch:null;if(ch)return strikeChain(h,ch)}
     if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const rt=reachT(h),j=rt.j,s=rt.s;
       if(j){damageJoint(j,h.atk,h);gainXp(h,1);sfx('hit',h.you);questTick(h,'strike');return true}
@@ -981,7 +995,7 @@ function soldierMove(h,dt){const b=h.sol.b,o=h.ord,mv={x:0,y:0};if(!S.builds.inc
   if(!o){const a=(h.id%7)*.9,px=b.x+Math.cos(a)*40,py=b.y+Math.sin(a)*40;if(!fight(b.x,b.y))go(px,py,16);return mv}
   if(S.g.dead&&o.k==='giant'){tire(h);return mv}
   const P=orderPost(h);if(!P){tire(h);return mv}
-  if(o.ph==='walk'){if(go(P.x,P.y,30)<=45){o.ph='hold';o.t=0}return mv}
+  if(o.ph==='walk'){if(go(P.x,P.y,30)<=45){o.ph='hold';o.t=0;if(o.k==='giant'&&playerArmy(h)&&!S.judgeTaught){S.judgeTaught=1;S.gsPulse=S.t+7;announce('The giant marks who guards it. Your standing in its regard rises.')}}return mv}
   o.t+=dt;if(o.t>=ARMY.HOLD){tire(h);return mv}
   if(o.k==='attack'){
     const at=attackTarget(h);if(at){humanAct(h,'A');return mv}
@@ -1050,7 +1064,7 @@ function pickGoalSol(h){const g=S.g,home=homeOf(h),b=h.sol.b;if(!home)return nul
    const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town);if(car&&(h.role==='raider'||h.role==='warden'&&h.id%2)){const m=S.monsters.find(m=>m.ambush===car&&Math.hypot(m.x-car.x,m.y-car.y)<500);if(m)return{k:'monster',id:m.id};return{k:'go',x:car.x+30,y:car.y+30}}}
   if(h.role==='keeper'&&!g.awake&&!h.horn&&h.crystals>=C.HORN_CRYSTALS)return{k:'shop',town:home,x:home.x,y:home.y};
   const tgt=g.target&&g.target.alive?g.target:null;
-  const ready=(h.role==='raider'||h.role==='keeper')&&!g.awake&&S.chains.some(q=>q.hp>0&&!chainWeak(q))&&rnd()<.5?true:h.role==='keeper'?(!g.awake&&h.horn&&allWeak()||wedgedJoints().length>0||(h.kits.cannon>0||h.kits.brace>0||h.kits.ladder>0||h.kits.platform>0)&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):g.awake&&(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
+  const ready=(h.role==='raider'||h.role==='keeper')&&!g.awake&&chainsOpen()&&S.chains.some(q=>q.hp>0&&!chainWeak(q))&&rnd()<.5?true:h.role==='keeper'?(!g.awake&&h.horn&&allWeak()||wedgedJoints().length>0||(h.kits.cannon>0||h.kits.brace>0||h.kits.ladder>0||h.kits.platform>0)&&S.sites.some(s=>!s.build)):h.role==='raider'?h.kits.cannon>0&&S.sites.some(s=>!s.build)&&(!tgt||tgt.i!==h.town):g.awake&&(h.kits.wedge>0||h.lvl>=3||g.fallen>0);
   if(!g.dead&&ready){let bi=0,bd=1e9;g.feet.forEach((f,i)=>{const d=Math.hypot(f.x-h.x,f.y-h.y);if(d<bd&&f.air<=0){bd=d;bi=i}});return{k:'foot',i:bi}}
   const want=h.role==='warden'?'wedge':h.role==='keeper'?(braces()>=BRACES_MAX?'ladder':'brace'):'cannon';
   if(h.gold>=C.COST[want]+(h.potions?0:C.COST.potion)&&h.kits[want]<2)return{k:'shop',town:home,x:home.x,y:home.y};
@@ -1127,33 +1141,38 @@ function strikeHuman(h,o,dm,hk){if(untouchable(o)){dodgedFx(o);return}const d=dm
 // card that pauses with the view held on you; pressing on flies the camera to the goal, the next press flies it back,
 // then play resumes. Each step tops up what it spends and moves on by itself after 150 s.
 const FIRST_DAY=[
-  {id:'crystal',text:'On the first day the giant sleeps. Sky crystals glow blue across the land: pick one up.',
+  // each step: a side name of a few words (the goal line), and a card of one idea in at most two sentences
+  {id:'crystal',name:'Pick up a crystal',text:'Sky crystals glow blue across the land. Walk into one to pick it up.',
    setup(h){const t=S.towns[h.town];if(!S.crystals.some(c=>c.tut)){let a=rnd()*6.28;for(let k=0;k<12&&inSolid(t.x+Math.cos(a)*520,t.y+Math.sin(a)*520,60);k++)a+=.5;S.crystals.push({id:S.nextId++,x:t.x+Math.cos(a)*520,y:t.y+Math.sin(a)*520,tut:1})}S.tut.base=h.pack.crystals+h.crystals}, // the player's own crystal: bots leave it
    target(h){const t=S.towns[h.town];const own=S.crystals.find(c=>c.tut);if(own)return own;let b=null,bd=1e9;for(const c of S.crystals){const d=Math.hypot(c.x-h.x,c.y-h.y)+.5*Math.hypot(c.x-t.x,c.y-t.y);if(d<bd){bd=d;b=c}}return b},
    check(h){return h.pack.crystals+h.crystals>S.tut.base}},
-  {id:'home',text:'Carry it home. Walking into Ashford empties your pack into the town\u2019s store, and stored crystals pay for upgrades anywhere.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
-  {id:'board',text:'Ashford\u2019s board has work. In Ashford, press Town and take the job on the Board.',setup(h){if(h.quest&&!h.quest.tut)h.quest=null},target(h){return S.towns[h.town]},check(h){return!!(h.quest&&h.quest.tut)}},
-  {id:'hunt',get text(){return'Wolves prowl outside Ashford. Walk up to one and press Attack: it strikes the weakest beast in reach, ringed in red. Hold Attack for a heavy blow. A red ring shrinking under you means a wolf is about to lunge: step out of it, or dodge ('+dodgeName()+'). Your health refills in town.'},
-   setup(h){tutWolves(h)},target(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t},
-   note(h){const q=h.quest;return q&&q.tut?'('+Math.min(q.n,q.need)+'/'+q.need+')':''},check(h){return!h.quest||!h.quest.tut||h.quest.done},hold:true},
-  {id:'reward',text:'The job is done. Walk back into Ashford to collect your reward: finished jobs pay when you come home.',setup(h){S.tut.base=h.claimed||0},target(h){return S.towns[h.town]},check(h){return(h.claimed||0)>S.tut.base},hold:true},
-  {id:'house',text:'Build a house inside the dashed ring around Ashford: stand there, press Build and choose House. It takes six seconds.',
+  {id:'home',name:'Bank it in Ashford',text:'Walk home into Ashford. Your pack empties into the town’s store.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
+  {id:'board',name:'Take the job',text:'In Ashford, press Town and take the job on the Board.',setup(h){if(h.quest&&!h.quest.tut)h.quest=null},target(h){return S.towns[h.town]},check(h){return!!(h.quest&&h.quest.tut)}},
+  {id:'strike',name:'Strike down a wolf',text:'Walk up to a wolf and press Attack. It hits the weakest beast in reach.',
+   setup(h){tutWolves(h)},target:tutWolfNear,note:tutCount,check(h){const q=h.quest;return!q||!q.tut||q.n>=1},hold:true},
+  {id:'dodge',name:'Dodge a lunge',get text(){return'A red ring shrinking under you means a wolf will lunge. Dodge ('+dodgeName()+') or step out of it.'},
+   setup(h){tutWolves(h);S.tut.base=h.dodgedN||0;S.tut.base2=h.lunges||0},target:tutWolfNear,check(h){return(h.dodgedN||0)>S.tut.base||(h.lunges||0)-S.tut.base2>=3}},
+  {id:'heavy',name:'A heavy blow',text:'Hold Attack until its ring fills, then let go. A heavy blow hits two and a half times as hard.',
+   setup(h){tutWolves(h);S.tut.base=h.heavyKills||0},target:tutWolfNear,check(h){return(h.heavyKills||0)>S.tut.base}},
+  {id:'reward',get name(){const q=S.you&&S.you.quest;return q&&q.tut&&!q.done?'Slay wolves':'Collect your pay'},text:'Finish the job, then walk into Ashford. Jobs pay when you come home.',
+   setup(h){S.tut.base=h.claimed||0;tutWolves(h)},target(h){const q=h.quest;return q&&q.tut&&!q.done?tutWolfNear(h):S.towns[h.town]},note:tutCount,check(h){return(h.claimed||0)>S.tut.base},hold:true},
+  {id:'house',name:'Build a house',text:'Stand inside the dashed ring, press Build and choose House.',
    setup(h){if(h.gold<C.COST.house+10)h.gold=C.COST.house+10},target(h){const t=S.towns[h.town];return{x:t.x+t.r+170,y:t.y+40}},
    check(h){return S.builds.some(b=>b.owner===h.id&&b.k==='house')}},
-  {id:'upgrade',text:'Your house shows a gold arrow and Ready to raise: you hold enough crystals to upgrade it. Stand by it and press Upgrade. Crystals in Ashford\u2019s store pay for it, and a raised house reaches further.',
+  {id:'upgrade',name:'Raise your house',text:'A gold arrow means you hold the crystals to raise it. Stand by your house and press Upgrade.',
    setup(h){if(h.crystals<C.UP.house[0])h.crystals=C.UP.house[0]},target(h){return S.builds.find(b=>b.owner===h.id&&b.k==='house')},check(h){return S.builds.some(b=>b.owner===h.id&&lv(b)>1)}},
-  {id:'barracks',text:'Town folk only gather; soldiers fight for you. Build a barracks inside the ring: press Build and choose Barracks. Ashford may have one barracks for each level of the town.',
+  {id:'barracks',name:'Build a barracks',text:'Town folk only gather; soldiers fight for you. Press Build and choose Barracks.',
    setup(h){if(h.gold<C.COST.barracks+ARMY.SOLDIER+10)h.gold=C.COST.barracks+ARMY.SOLDIER+10},target(h){const t=S.towns[h.town];return{x:t.x-t.r-150,y:t.y+40}},check(h){return!!tutBarracks(h)}},
-  {id:'soldier',text:'Stand beside your barracks and press Barracks, then Train a soldier. Training takes six seconds; each barracks holds three.',
+  {id:'soldier',name:'Train a soldier',text:'Beside your barracks, press Barracks, then Train a soldier.',
    setup(h){S.tut.base=h.trained||0;if(h.gold<ARMY.SOLDIER+10)h.gold=ARMY.SOLDIER+10},target(h){return tutBarracks(h)},check(h){const b=tutBarracks(h);return(h.trained||0)>S.tut.base&&!!b&&b.sol.length>0}},
-  {id:'order',text:'Your soldier is ready. At the barracks choose Defend giant: soldiers walk to its nearest foot, hold it for twenty seconds, then come home. The giant remembers who guards it, and thinks better of you for it.',
+  {id:'order',name:'Send it to the giant',text:'At the barracks, choose Defend giant. Your soldier walks to the giant’s foot and guards it.',
    target(h){return tutBarracks(h)},check(h){return S.humans.some(x=>x.sol&&x.sol.b.owner===h.id&&x.ord&&x.ord.k==='giant')}},
-  {id:'chain',text:'Now the giant. Its ankles are chained: walk to the foot past the chains, stand beside the chain marked Goal and press Attack. Every blow wears it; worn through, it breaks, and the giant thanks whoever broke it.',
+  {id:'chain',name:'Strike the ankle chain',text:'Walk to the giant’s foot and press Attack beside its chain. Every blow wears the chain toward breaking.',
    setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
-  {id:'climb',text:'Now climb it. Beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'knee',text:'Climb to the knee ledge, about 460 feet up. Push toward a hold to reach for it; rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21.5:9.5,46.5);return{x:a.x,y:a.y,z:a.z}},check(h){return h.cl&&h.cl.y>=46}},
-  {id:'judged',info:true,text:'The giant judges each of you. Blows and wedges count against you; breaking its chains, guarding it, building on it and waking it count for you. The panel at the top shows where you stand. At the first dusk after it wakes, it honours the one person it regards best: be that person.',target(){return null},check(){return true}},
-  {id:'end',text:'When all four chains are broken, a wake horn forged in town from twenty sky crystals and sounded at its head wakes it. Each day ends in a short night when no one can touch the giant while it is chained. The rest of the day is yours.',target(){return null},check(){return true}}];
+  {id:'climb',name:'Climb the giant',text:'Beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
+  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip.',target(h){const a=bodyWorld(h.leg?21.5:9.5,46.5);return{x:a.x,y:a.y,z:a.z}},check(h){return h.cl&&h.cl.y>=46}}];
+function tutWolfNear(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t}
+function tutCount(h){const q=h.quest;return q&&q.tut&&!q.done?Math.min(q.n,q.need)+'/'+q.need:''}
 function tutBarracks(h){return S.builds.find(b=>b.k==='barracks'&&b.owner===h.id&&b.town===h.town)||null}
 // while the first day runs up to its barracks step, Ashford's folk leave the town's one barracks for you to build
 function tutHoldsBarracks(i){return S.tut&&!S.tut.done&&S.you&&S.you.town===i&&FIRST_DAY.findIndex(x=>x.id==='barracks')>=S.tut.i}
@@ -1161,16 +1180,17 @@ function tutHoldsBarracks(i){return S.tut&&!S.tut.done&&S.you&&S.you.town===i&&F
 // the button then says why it no longer gives, which is the lesson
 function tutChain(h){const me=h.cl?h.cl.x:h.leg?22:9,a=S.chains.slice(0,2).filter(c=>c.hp>0).sort((p,q)=>Math.abs(p.c-me)-Math.abs(q.c-me));return a[0]||null}
 function tutJob(){const t=tutStep();return t&&t.id==='board'}
-function tutWolves(h){const t=S.towns[h.town],q=h.quest,want=q&&q.tut&&!q.done?q.need-q.n:0;let have=S.monsters.filter(m=>m.tut).length;
+function tutWolves(h){const t=S.towns[h.town],q=h.quest,st=tutStep(),want=Math.max(q&&q.tut&&!q.done?q.need-q.n:0,st&&(st.id==='dodge'||st.id==='heavy')?1:0);let have=S.monsters.filter(m=>m.tut).length;
   for(;have<want;have++){const a=rnd()*6.28,d=t.r+380+rnd()*220,x=clamp(t.x+Math.cos(a)*d,100,C.MAP-100),y=clamp(t.y+Math.sin(a)*d,100,C.MAP-100);
     S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:x,hy:y,hp:30,max:30,atk:5,gold:8,xp:12,r:13,cd:0,tut:1})}}
 function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
 function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
   if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
-  S.tut.t+=dt;if(st.id==='hunt'&&S.t%2<dt)tutWolves(h);if(st.check(h)||(S.tut.t>150&&!st.hold)){if(S.tut.t>150&&!st.check(h))toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;
-    if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist()}}}
+  S.tut.t+=dt;if(TUT_HUNT.includes(st.id)&&S.t%2<dt)tutWolves(h);if(st.check(h)||(S.tut.t>150&&!st.hold)){if(S.tut.t>150&&!st.check(h))toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;
+    if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}}}
+const TUT_HUNT=['strike','dodge','heavy','reward'];
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
-  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day',body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
@@ -1260,7 +1280,7 @@ function stepMonsters(dt){
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;
       if(foe){beastFight(m,foe,dt);continue}if(d>town.r){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;hurtTown(town,m.atk*1.5)}continue}}
     let tgt=null,bd=260;
-    for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)&&!(h.you&&S.tut&&!S.tut.done&&S.tut.i<FIRST_DAY.findIndex(s=>s.id==='hunt'))){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
+    for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&!townAt(h)&&!(h.you&&S.tut&&!S.tut.done&&S.tut.i<FIRST_DAY.findIndex(s=>s.id==='strike'))){const d=Math.hypot(h.x-m.x,h.y-m.y);if(d<bd){bd=d;tgt=h}}
     if(tgt)beastFight(m,tgt,dt);
     else{const dx=m.hx-m.x,dy=m.hy-m.y,d=Math.hypot(dx,dy);if(d>30){m.x+=dx/d*40*dt;m.y+=dy/d*40*dt}else if(rnd()<.01){m.hx=clamp(m.x+rr(-200,200),100,C.MAP-100);m.hy=clamp(m.y+rr(-200,200),100,C.MAP-100)}}}
   for(const m of S.monsters)solidPush(m,m.r);
@@ -1284,7 +1304,7 @@ function tokenFree(m,tg){if(S.t<(tg.nextTok||0))return false;let n=0,pack=0;for(
 function beastFight(m,tg,dt){const dx=tg.x-m.x,dy=tg.y-m.y,d=Math.hypot(dx,dy)||1,sp=m.kind==='troll'?85:120,reach=m.r+(m.kind==='troll'?34:30);
   m.eng=tg.id;m.engT=S.t;const free=m.cd<=0&&tokenFree(m,tg);
   // the turn is ours and the target is in reach: lock the spot where it stands and wind up
-  if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:CB.WIND[m.kind]||.7,x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};cstat('winds');if(two)cstat('two');
+  if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:CB.WIND[m.kind]||.7,x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};tg.lunges=(tg.lunges||0)+1;cstat('winds');if(two)cstat('two');
     if(tg.you&&!S.headless)sfx('warn',true);return}
   if(free){m.x+=dx/d*sp*dt;m.y+=dy/d*sp*dt;return}
   // waiting for a turn: circle at a slot round the target, kept apart from the rest of the pack; a person who walks in is not fled
@@ -1301,7 +1321,7 @@ function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.C
   const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
   if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
   if(!hit.includes(tg)){cstat('missed');if(tg.you&&!S.headless)S.fx.push({k:'txt',x:tg.x,y:tg.y,z:95,text:'Missed',t:0,life:.8,col:'#d8f0ff'})}
-  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);continue}cstat('hits');hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
+  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);h.dodgedN=(h.dodgedN||0)+1;continue}cstat('hits');hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
 // a dodge: a quick sidestep, untouchable for its first part, then a short cooldown; no stamina
 function threatOf(h){let b=null,bd=1e9;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-(m.wind&&m.wind.id===h.id?1e4:0);if(d<bd&&d<300){bd=d;b=m}}if(!b)b=rivalNear(h,200);return b}
 function humanDodge(h,dir){if(h.dead||h.mode!=='ground'||h.job)return false;if(h.dodge||(h.dodgeCd||0)>0)return false;
@@ -1323,7 +1343,7 @@ function heavyStrike(h,k){if(h.cd>0)return false;const at=attackTarget(h);h.swin
   const d=Math.round(h.atk*2.5);if(at.town!=null){strikeHuman(h,at,d,k);return true}
   const m=at;m.hp-=d;m.hitT=S.t;if(k>=1&&m.wind){m.wind=null;m.rec=.6;m.cd=Math.max(m.cd,.6)}onBlow(h,m,d,k);
   if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?95:55,text:'-'+d+(k>=1?'!':''),t:0,life:1,col:k>=1?'#ffb347':'#ffd890'});if(k>=1)S.fx.push({k:'ring',x:m.x,y:m.y,r:m.r+26,t:0,life:.35,col:'#ffcf6a'})}
-  sfx(k>=1?'cannon':'hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}
+  sfx(k>=1?'cannon':'hit',h.you||nearPlayer(m));if(m.hp<=0){if(k>=1)h.heavyKills=(h.heavyKills||0)+1;killMonster(m,h)}return true}
 // a blow that lands: knockback by its strength (a troll is heavier), a short hit-stop and a small shake for the player
 function onBlow(h,o,d,k){const dx=o.x-h.x,dy=o.y-h.y,l=Math.hypot(dx,dy)||1,pw=(18+150*k)*(o.kind==='troll'?.55:o.town!=null?.6:1);
   o.kb={x:dx/l,y:dy/l,left:pw,by:h.id,dmg:d,k,wet:o.town==null&&lakeAt(o.x,o.y)};
@@ -1357,7 +1377,7 @@ function wedgedJoints(){return Object.keys(S.joints).filter(id=>S.joints[id].wed
 function botGoalCells(h){const g=S.g,J=S.joints;
   if(h.quest&&h.quest.k==='tend'&&!h.quest.done&&wedgedJoints().length)return{kind:'pull',id:wedgedJoints()[0]};
   if(h.role==='keeper'&&!g.awake&&h.horn&&allWeak())return{kind:'wake',test:r=>r>=C.WAKE_ROW};
-  if((h.role==='keeper'||h.role==='raider')&&!g.awake){const ch=S.chains.filter(q=>q.hp>0&&!chainWeak(q)).sort((a,b)=>a.r-b.r)[0];if(ch)return{kind:'chain',id:ch.id,test:(r,c)=>r===ch.r&&c===ch.c};return{kind:'down',test:r=>r===0}}
+  if((h.role==='keeper'||h.role==='raider')&&!g.awake&&chainsOpen()){const ch=S.chains.filter(q=>q.hp>0&&!chainWeak(q)).sort((a,b)=>a.r-b.r)[0];if(ch)return{kind:'chain',id:ch.id,test:(r,c)=>r===ch.r&&c===ch.c};return{kind:'down',test:r=>r===0}}
   if(false){const ch=S.chains.filter(q=>q.hp>0).sort((a,b)=>a.r-b.r)[0];if(ch)return{kind:'chain',id:ch.id,test:(r,c)=>r===ch.r&&c===ch.c}}
   if(h.role==='keeper'){const w=wedgedJoints();if(w.length)return{kind:'pull',id:w[0]};
     for(const k of['brace','ladder','platform'])if(h.kits[k]>0&&(k!=='brace'||braces()<BRACES_MAX)){const free=S.sites.filter(s=>!s.build&&!s.pending);if(free.length)return{kind:'kit',kit:k,test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
@@ -1553,9 +1573,10 @@ function slotInfo(){if(!S)return null;
 let lastSig='';
 const hintEl=document.getElementById('hint');
 function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
-  if(device==='touch')return cl?'Tap a hold to climb to it. Drag to turn the view.':'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
-  if(device==='pad')return cl?'Left stick picks a hold. Right stick turns the view.':'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
-  return cl?'Click a hold to climb to it. Q and E turn the view.':'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges.'}
+  const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
+  if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
+  if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
+  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;{const ht=hintText();if(hintEl.dataset.v!==ht){hintEl.dataset.v=ht;hintEl.innerHTML=ht}}const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
@@ -1670,7 +1691,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
     items=[{label:'Raise '+t.name+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:'+600 walls and a wider build area',why:t.i!==h.town?'Not your town':canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
 function start(role,seed,first){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed);cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
-  toast(role==='giant'?'You are the giant, asleep and locked in place until someone climbs to your head and wakes you. Then braces the humans bolt on let you walk: survive until dusk and complete three of five tasks.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford. The giant is calm toward your town: how your people treat it decides whether it stays that way.')}
+  toast(role==='giant'?'You are the giant, asleep in chains. Survive to dusk and complete three of five tasks.':role==='giant'?'You are the giant, barely able to move. Braces the humans bolt onto you let you walk: reach the gap in the hills before dusk.':'You are of Ashford.')}
 
 // ================= camera and render =================
 let ctx=cv.getContext('2d');let W=0,H=0,DPR=1,shakeA=0;
@@ -1678,7 +1699,7 @@ function shake(a){if(!reducedMotion)shakeA=Math.max(shakeA,a)}
 let UI=1,UIX={top:8,rb:0};const uiEls={};
 // one scale for everything: rem is set in CSS from the shorter screen side; canvas text and gauges follow it, and the HUD zones are measured so canvas drawing keeps clear of them
 function uiMeasure(){const g=n=>uiEls[n]||(uiEls[n]=document.getElementById(n));UI=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/16;
-  const t=g('hud2').offsetHeight?g('hud2'):g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;let rb=H-16*UI;
+  const t=g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;g('side').style.top=UIX.top+'px';let rb=H-16*UI;
   if(!document.body.classList.contains('titling'))for(const n of['stats','pad']){const r=g(n).getBoundingClientRect();if(r.width&&r.left<W-18*UI&&r.right>W-34*UI)rb=Math.min(rb,r.top-8*UI)}UIX.rb=Math.max(UIX.top+60*UI,rb)}
 function fit(){const r=cv.getBoundingClientRect(),d=Math.min(2.5,window.devicePixelRatio||1);if(r.width!==W||r.height!==H||d!==DPR){W=r.width;H=r.height;DPR=d;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}uiMeasure()}
 let climbCam={y:10,x:16,px:12};
@@ -1764,6 +1785,7 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   G3.box=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),400);G3.roof=inst(new THREE.ConeGeometry(1,1,4),new THREE.MeshLambertMaterial({color:0xffffff}),300);
   G3.disc=inst(new THREE.CylinderGeometry(1,1,1,32),new THREE.MeshLambertMaterial({color:0xffffff}),40);G3.ball=inst(new THREE.SphereGeometry(1,10,8),new THREE.MeshLambertMaterial({color:0x1d1d1d}),60);
   G3.beacon=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,20,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:.6,depthWrite:false,side:THREE.DoubleSide,fog:false}));G3.beacon.visible=false;sc.add(G3.beacon);
+  G3.hornBeam=new THREE.Mesh(new THREE.CylinderGeometry(60,60,1,20,1,true),new THREE.MeshBasicMaterial({color:0xffe6a8,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide,fog:false}));G3.hornBeam.visible=false;sc.add(G3.hornBeam);
   G3.hold=inst(new THREE.SphereGeometry(1,7,5),new THREE.MeshLambertMaterial({color:0xffffff}),900);sc.add(G3.hold);
   sc.add(G3.box,G3.roof,G3.disc,G3.ball)}
 const STONE3={ok:'#7a7064',hurt:'#80604f',crip:'#6a3a2c',dead:'#4e4842'};
@@ -1883,6 +1905,8 @@ function g3Update(){const g=S.g,t=S.t;
       for(const st of S.sites)if(st.build&&st.build.k==='ladder')for(const r of st.build.cells||[]){if(Math.abs(r-cl.y)>30)continue;const a=bodyWorld(st.c+.5,r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,22,3,4,'#7a5a36')}
       for(const ch of S.chains)if(ch.hp>0&&Math.abs(ch.r-cl.y)<30){const a=bodyWorld(ch.c+.5,ch.r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,24,24,24,'#2b2b2e')}
       G3.box.count=bx2;G3.box.instanceMatrix.needsUpdate=true;if(G3.box.instanceColor)G3.box.instanceColor.needsUpdate=true}}
+  // while a wake horn sounds, a beam of light stands over the giant's head, seen from anywhere on the land
+  {const on=!!S.waker&&!S.g.awake;G3.hornBeam.visible=on;if(on){const a=bodyWorld(16,198);G3.hornBeam.position.set(a.x,a.z+2500,a.y);G3.hornBeam.scale.set(1,5000,1);G3.hornBeam.material.opacity=.35+.25*Math.sin(t*5)}}
   {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;G3.beacon.visible=!!tg&&tg.z==null;if(G3.beacon.visible){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
   // light and haze follow the opening's sky
   const ok=openingK();G3.hemi.color.set('#e4e8ff').lerp(_c.set('#c87048'),ok*.7);G3.sun.intensity=.9-.45*ok;S.fogC=S.fogC||new THREE.Color();G3.scene.fog.color.set('#cdbfa2').lerp(_c.set('#6a3a30'),ok*.8)}
@@ -2229,7 +2253,7 @@ function g3MapCamera(){if(!S.land||climbing3D())return;const cm=G3.cam,p=cm.posi
   G3.lift=G3.lift||0;const want=Math.max(0,need-p.y);G3.lift+=(want-G3.lift)*(want>G3.lift?.35:.08);if(G3.lift<.5)return;
   p.y+=G3.lift;const D=(S.role==='giant'?2600:760)/S.cam.czoom;cm.lookAt(fx,fz+(cam.pitch<0?-cam.pitch*D*1.6:0),fy);const F=view.F,far=new THREE.Vector3(fx+F.x*14000,0,fy+F.y*14000).project(cm);view.hz=clamp((1-far.y)/2*H,-H,H*1.2)}
 {const b0=g3Build,u0=g3Update,c0=g3Camera;g3Build=function(){b0();g3MapBuild()};g3Update=function(){u0();g3MapUpdate()};g3Camera=function(){c0();g3MapCamera()}}
-function lbl(text,x,y,size,col){size*=UI;ctx.font=`600 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width;ctx.fillStyle='rgba(10,12,10,.72)';ctx.fillRect(x-w/2-4,y-size*.65,w+8,size*1.3);ctx.fillStyle=col||'#eee9dd';ctx.fillText(text,x,y);ctx.textBaseline='alphabetic'}
+function lbl(text,x,y,size,col){if(FILM)return;size*=UI;ctx.font=`600 ${size}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const w=ctx.measureText(text).width;ctx.fillStyle='rgba(10,12,10,.72)';ctx.fillRect(x-w/2-4,y-size*.65,w+8,size*1.3);ctx.fillStyle=col||'#eee9dd';ctx.fillText(text,x,y);ctx.textBaseline='alphabetic'}
 function pbar(x,y,w,v,col){ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(x-w/2-1,y-1,w+2,6);ctx.fillStyle=col;ctx.fillRect(x-w/2,y,w*clamp(v,0,1),4)}
 function groundEllipse(x,y,r){const p=proj(x,y,0);if(!p)return null;ctx.beginPath();ctx.ellipse(p.x,p.y,r*p.s,Math.max(1,r*p.s*view.Hc/p.d),0,0,7);return p}
 function rock(x,y,r,seed){ctx.beginPath();for(let i=0;i<9;i++){const a=i/9*6.283+seed,q=r*(.8+(((seed*131+i*71)%17)/17)*.25);i?ctx.lineTo(x+Math.cos(a)*q,y+Math.sin(a)*q):ctx.moveTo(x+Math.cos(a)*q,y+Math.sin(a)*q)}ctx.closePath()}
@@ -2366,7 +2390,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   if(S.role==='giant'&&g.tx!=null){const p=proj(g.tx,g.ty,0);if(p){ctx.strokeStyle='rgba(255,207,106,.9)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p.x-8,p.y-8);ctx.lineTo(p.x+8,p.y+8);ctx.moveTo(p.x+8,p.y-8);ctx.lineTo(p.x-8,p.y+8);ctx.stroke()}}
   if(S.you&&S.you.dead)lbl('Back to town in '+Math.ceil(S.you.dead)+' s',W/2,H/2,16,'#ff8f80');
   drawMinimap()}
-function drawMinimap(){drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap(){if(FILM)return;drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
 function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UIX.top,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
@@ -2456,6 +2480,8 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
   const t=S.role==='giant'?(g.awake?'You, the giant':'You sleep, chained'):g.fallen>0?'The giant is down':g.awake?'The giant is awake':'The giant sleeps';
   const ch=cs.some(c=>c.hp>0)?'ankles '+word('ankle')+', wrists '+word('wrist'):'';
   const sub=S.role==='giant'?TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' \u00b7 ')+(ch?' \u00b7 '+ch:''):(mood(h.town)[0].toUpperCase()+mood(h.town).slice(1)+' toward '+TOWNS[h.town].name+' \u00b7 '+standing(h)+(ch?' \u00b7 '+ch:''));
+  {const key=(S.role==='giant'?'':mood(h.town)+(standing(h)==='it regards you most'))+ch;if(key!==S.gsKey){S.gsKey=key;S.gsAt=S.t}const pulse=S.t<(S.gsPulse||0),quiet=!pulse&&S.t-(S.gsAt||0)>6;pEl.s.classList.toggle('quiet',quiet);pEl.s.classList.toggle('pulse',pulse)}
+  cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e)e.classList.toggle('flash',S.t-((S.chainFlash||{})[c.id]??-99)<3)});
   const pos=TOWNS.map((T,i)=>Math.round(clamp((S.grudge[i]+100)/(C.ANGER+100),0,1)*100)),sig=t+clock()+sub+pos.join()+cs.map(st).join('');if(sig===pSig)return;pSig=sig;
   pEl.t.textContent=t;pEl.d.textContent='Dusk '+clock();pEl.s.textContent=sub;
   if(pEl.bar.children.length!==TOWNS.length)pEl.bar.innerHTML=TOWNS.map(T=>`<i style="background:${T.col}" title="${T.name}"></i>`).join('');
@@ -2468,13 +2494,13 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     const jf=id=>J[id].hp/J[id].max,worst=Math.min(jf('kneeL'),jf('kneeR'),jf('elbowL'),jf('elbowR'),jf('neck'));
     a=chip('Heart',pc('heart'),jf('heart'))+chip('Joints',Math.round(worst*100)+'% worst',worst)+chip('Braces',braces()+'/5');
     {const ts=giantTasks(),n=ts.filter(x=>x.done).length;a+=chip('Tasks',n+'/'+C.GIANT_TASKS,n/C.GIANT_TASKS,' goal')+chip('Climbers',climbers().length);S.taskLine=ts.map(x=>x.name+(x.done?' done':' ('+x.note+')')).join(' \u00b7 ')}
-    b=S.t>OPENING.len&&Math.floor(S.t/8)%2?S.taskLine:!g.awake?'Asleep and chained. Someone must climb to your head and wake you ('+Math.round(S.wakeT/C.WAKE_TIME*100)+'%).':S.chains.some(q=>q.hp>0)?'Chains left: '+S.chains.filter(q=>q.hp>0).map(q=>q.name).join(', '):g.fallen>0?'You are down for '+Math.ceil(g.fallen)+' s. They are at your heart.':TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' · ')}
+    b=!g.awake?'<span class="k">Asleep</span> chained until a horn wakes you'+(S.waker?' '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':''):g.fallen>0?'<span class="k">Down</span> '+Math.ceil(g.fallen)+' s':''}
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Wake horn','carried'):'')+chip('Kits',[h.kits.anchor&&h.kits.anchor+' anchor',h.kits.wedge&&h.kits.wedge+' wedge',h.kits.cannon&&h.kits.cannon+' cannon',h.kits.brace&&h.kits.brace+' brace'].filter(Boolean).join(', ')||'none');
-    const st=tutStep();const q=h.quest;b=st&&S.tut.shown?'Goal: '+st.text+(st.note?' '+st.note(h):''):(q?(q.done?'Quest done: return to town. ':'Quest: '+q.text+' ('+Math.min(q.n,q.need)+'/'+q.need+'). '):'No quest: visit a town board. ')+
-      (h.mode==='climb'?(restful(cellT(h.cl.x,h.cl.y))?'On a ledge: grip refills while you rest.':'Pick your holds: green moss drains grip, orange stones crumble, white rings are within reach.'):(!S.g.awake?(S.waker?TOWNS[S.waker.town].name+' is sounding the wake horn: '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':!allWeak()?'The giant sleeps in chains: break all four ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' still hold), then a wake horn wakes it':(S.humans.some(x=>x.horn&&!x.you)?'Another town has a wake horn. ':'')+'The giant sleeps in chains: forge a wake horn from '+C.HORN_CRYSTALS+' sky crystals to wake it'):S.chains.some(q=>q.hp>0&&q.id.startsWith('ankle'))?'The giant is awake but its ankles are chained':'The giant is '+mood(h.town)+' toward Ashford')+(S.g.fallen>0?' · THE GIANT IS DOWN':''))}
-  const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;hud2.innerHTML=String(b).replace(/^([^:.]{2,24}:)/,'<span class="k">$1</span>')}}
+    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):''}
+  const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
+const goalEl=document.getElementById('goal');
 
 // ================= loop =================
 let acc=0,last=performance.now();
@@ -2486,7 +2512,8 @@ function introCamera(){if(!S||!S.introCam||!S.you&&S.role!=='giant')return;const
   cam.yaw=turn+(((toGiant-turn+Math.PI*3)%(Math.PI*2))-Math.PI)*k;
   cam.pitch=-.55+.25*ease((t-6)/5)+(.12-(-.3))*back;if(t<11)cam.pitch=Math.min(cam.pitch,-.3);
   S.cam.zoom=.75+.25*back+(t>11&&t<17?-.15*Math.sin(Math.PI*(t-11)/6):0);if(t>21.5){S.introCam=false;cam.pitch=.12;S.cam.zoom=1}}
-function frameWork(now){introCamera();if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
+let FILM=false;
+function frameWork(now){{const f=!!S&&S.t<OPENING.len;if(f!==FILM){FILM=f;document.body.classList.toggle('film',f)}}introCamera();if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   paintFeed(dt);
   if(S&&S.tut&&S.tut.cardDue&&!menu&&!S.fly)openTutorialCard();
   const fl=S&&S.fly?stepFly(dt):null;

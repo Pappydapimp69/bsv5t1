@@ -125,6 +125,10 @@ async function screens(p,label){
     await p.evaluate(()=>__prank.start({seed:4}));await p.evaluate(()=>__prank.stepBy(600));await audit('play');
     await p.evaluate(()=>document.getElementById('pauseB').click());await audit('pause');
     await p.evaluate(()=>{__prank.start({seed:4});__prank.stepBy(181*60)});await audit('day end');
+    await p.evaluate(()=>{__prank.start({seed:4,bot:true});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);});await audit('match end');
+    await p.reload();await wait(p,300);await audit('title');
+    await p.evaluate(()=>document.getElementById('bHow').click());await wait(p,100);await audit('how to play');
+    await p.evaluate(()=>document.getElementById('bBack').click());await p.evaluate(()=>document.getElementById('bSet').click());await wait(p,100);await audit('settings');
     // the two sides differ by shape, not hue: your coin is round, Moss's badge is a diamond, in the HUD and on the card badges
     const shapes=await p.evaluate(()=>{const y=document.querySelector('.bY'),m=document.querySelector('.bM');const cy=getComputedStyle(y),cm=getComputedStyle(m);return{y:cy.borderRadius,m:cm.transform}});
     ok('colour-blind: your mark round, Moss mark a diamond',/50%|\d{2,}px/.test(shapes.y)&&shapes.m!=='none',JSON.stringify(shapes));
@@ -148,7 +152,17 @@ async function screens(p,label){
       return{played,idle,rows,f1,f2,f3}});
     console.log('     seeds played/idle: '+r.rows.join(' '));
     ok(`choices decide: played seat wins ${r.played}/12, idle ${r.idle}/12`,r.played>=10&&r.idle<=1);
-    ok('determinism: same seed same state',r.f1===r.f2,`${r.f1} ${r.f2}`);ok('determinism: another seed differs',r.f1!==r.f3);
+    ok('determinism: same seed same state',r.f1===r.f2,`${r.f1} ${r.f2}`);
+    // Moss reads you: a player who keeps to one room should find Moss's sealed guess there on days 2 and 3, and the read is kept for the next match
+    const L=await p.evaluate(()=>{let hits=0,days=0,set=0;const rows=[];for(let seed=1;seed<=6;seed++)for(const room of[0,2]){
+        __prank.start({seed,bot:true,botRoom:room});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);const h=__prank.state().history,sc=__prank.state().score;
+        if(h[0].actual===room){set++;for(const d of h.slice(1)){days++;if(d.guess===room)hits++}}rows.push(`${seed}/${room}:${h.map(d=>d.guess+'>'+d.actual).join(',')} ${sc.you}-${sc.moss}`)}
+      localStorage.removeItem('prank.moss');__prank.start({seed:3,bot:true,botRoom:2,blank:false});for(let i=0;i<10&&__prank.stepBy(3600)!=='matchend';i++);
+      let kept=null;try{kept=JSON.parse(localStorage.getItem('prank.moss'))}catch(e){}
+      __prank.start({seed:5,bot:false,blank:false});const g=__prank.state().guess;return{hits,days,set,rows,kept:kept&&kept.last,g}});
+    console.log('     one-room player, guess>actual by day, score: '+L.rows.join(' '));
+    ok(`Moss reads a one-room player: guess right on ${L.hits} of ${L.days} later days`,L.set>=8&&L.hits>=L.days*0.8,`${L.set} of 12 matches pranked the room on day 1`);
+    ok('Moss keeps its read for the next match',L.kept===2&&L.g===2,JSON.stringify({last:L.kept,nextGuess:L.g}));ok('determinism: another seed differs',r.f1!==r.f3);
     ok('sim: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
   await b.close();console.log(fails?`${fails} FAILED`:'ALL PASSED');process.exit(fails?1:0)})();

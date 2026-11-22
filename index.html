@@ -560,6 +560,7 @@ function botThink(){
   if(here){const p=prankAt(here.i);if(p&&p.owner==='you'&&p.level<2){const nv=nextVisitor(here.i);if(nv&&estimate(nv.r,p.prop,p.level+1)==='safe'){openPicker(here);return}}}
   const cand=[];
   for(const r of s.folk){if(r.sulk>0)continue;for(let k=1;k<=2;k++){const sp=r.route[(r.ri+k)%r.route.length].sp;const q=SPOTS[sp];
+    if(G.botRoom!=null&&q.room!==G.botRoom)continue;
     if(prankAt(sp)&&prankAt(sp).owner==='you')continue;if(userOf(sp))continue;
     if(!PROPS.some((pr,i)=>pr.fits.includes(q.kind)&&s.inv[i]>0)&&!(prankAt(sp)))continue;
     const dist=Math.abs(pl.x-q.x)+(pl.f!==q.f?8:0);cand.push({sp,score:-dist+(k===1?3:0)+rng()})}}
@@ -1128,13 +1129,13 @@ requestAnimationFrame(frame);
 function hashState(){const s=G.s;const o={t:s.tick,sc:s.score,f:s.folk.map(r=>[r.f,+r.x.toFixed(3),r.ri,r.mood,+r.Lmul.toFixed(3)]),p:s.pranks.map(p=>[p.spot,p.prop,p.level,p.owner]),tr:s.traps.map(t=>t.spot),
   pl:[s.player.f,+s.player.x.toFixed(3)],m:[s.moss.f,+s.moss.x.toFixed(3)],st:s.stats,g:s.guess};const str=JSON.stringify(o);let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16)}
 window.__prank={
-  start(o={}){G.botOn=!!o.bot;newMatch(o.seed??1,{blankMem:o.blank!==false,tutorial:!!o.tutorial});setPhase('play');return hashState()},
+  start(o={}){G.botOn=!!o.bot;G.botRoom=o.botRoom??null;newMatch(o.seed??1,{blankMem:o.blank!==false,tutorial:!!o.tutorial});setPhase('play');return hashState()},
   stepBy(n){G.fast=true;try{for(let i=0;i<n;i++){if(G.phase==='play')tick();else if(G.phase==='dayend'&&G.botOn)nextDay();else break}}finally{G.fast=false}return G.phase},
   fastForward(sec){return this.stepBy(Math.round(sec*60))},
   bot(on){G.botOn=!!on},
   next(){if(G.phase==='dayend')nextDay()},
   fingerprint:hashState,
-  state(){const s=G.s;return s&&{phase:G.phase,day:s.day,t:s.t,score:{...s.score},stats:{...s.stats},guess:s.guess,pranks:s.pranks.length,traps:s.traps.length,picker:picker.open,busy:!!s.player.busy,device,player:{f:s.player.f,x:s.player.x}}},
+  state(){const s=G.s;return s&&{history:s.history.map(h=>({guess:h.guess,actual:h.actual,hit:h.hit})),phase:G.phase,day:s.day,t:s.t,score:{...s.score},stats:{...s.stats},guess:s.guess,pranks:s.pranks.length,traps:s.traps.length,picker:picker.open,busy:!!s.player.busy,device,player:{f:s.player.f,x:s.player.x}}},
   spotScreen(id){const q=SP[id],r=cv.getBoundingClientRect();return{x:r.left+X(q.x),y:r.top+Y(q.f*FH+1)}},
   get phase(){return G.phase},
 };

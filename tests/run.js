@@ -168,4 +168,65 @@ async function screens(p,label){
     ok('Moss keeps its read for the next match',L.kept===2&&L.g===2,JSON.stringify({last:L.kept,nextGuess:L.g}));ok('determinism: another seed differs',r.f1!==r.f3);
     ok('sim: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
+  // 8. moods last across days, and a resident pushed far enough storms out to the park where you can follow and keep pranking
+  {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
+    const m=await p.evaluate(()=>{__prank.start({seed:2,bot:false});__prank.setWind('mum',5);__prank.setWind('gramps',3);__prank.setWind('kid',0);
+      __prank.stepBy(180*60-2);const before=__prank.state().folk.map(f=>({id:f.id,wind:f.wind,hits:f.hits}));__prank.stepBy(60);const ph=__prank.phase;
+      const after=__prank.state().folk.map(f=>f.wind);__prank.next();const day2=__prank.state().folk.map(f=>({wind:f.wind,out:f.out,x:f.x}));
+      return{before,after,ph,day2,moods:__prank.state().moods[0]}});
+    const want=m.before.map(f=>Math.max(0,f.wind-1-(f.hits?0:1)));
+    ok('moods: overnight each resident cools by 1, or 2 if left alone',m.ph==='dayend'&&want.every((w,i)=>Math.abs(w-m.after[i])<1e-9),JSON.stringify({before:m.before,after:m.after}));
+    ok('moods: the mood carries into the next day',m.day2.every((d,i)=>Math.abs(d.wind-m.after[i])<1e-9)&&m.after.some(w=>w>0),JSON.stringify(m.day2));
+    ok('moods: the day-end record names each mood change',m.moods&&m.moods.length===3&&m.moods.every(x=>x.name&&x.from!=null&&x.to!=null),JSON.stringify(m.moods));
+    ok('moods: nobody is still out in the park at the start of a day',m.day2.every(d=>!d.out&&d.x<24),JSON.stringify(m.day2));
+    const so=await p.evaluate(()=>{__prank.start({seed:5,bot:true});for(const id of['gramps','mum','kid'])__prank.setWind(id,3.5);
+      let t=0;for(;t<6000;t+=10){__prank.stepBy(10);if(__prank.state().folk.some(f=>f.out&&f.x>24))break}
+      const st=__prank.state();return{t,stormed:st.stats.stormed,out:st.folk.filter(f=>f.out).map(f=>f.id+'@'+f.x.toFixed(1))}});
+    ok('moods: a Grumpy resident storms out past the house wall',so.out.length>0&&so.stormed>0,JSON.stringify(so));
+    ok('moods: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
+  {const {p,ctx,errs}=await page(b,{viewport:{width:1280,height:720}});
+    const e=await p.evaluate(()=>{const id='kid',go=w=>{__prank.start({seed:3,bot:false});__prank.setWind(id,w)};go(0);
+      let near=null,soft=null;const n=__prank.dial(id,0,1).n;
+      for(let pi=0;pi<n;pi++)for(const lv of[1,2,3]){const d=__prank.dial(id,pi,lv),q=d.V/d.L;if(!near&&q>.82&&q<=.97)near={pi,lv};if(!soft&&q>.2&&q<.7)soft={pi,lv}}
+      const out={near,soft};
+      if(near){go(0);out.calm=__prank.land(id,near.pi,near.lv);go(7);out.fuming=__prank.land(id,near.pi,near.lv)}
+      if(soft){go(0);out.cheeryPts=__prank.land(id,soft.pi,soft.lv);go(4.5);out.grumpyPts=__prank.land(id,soft.pi,soft.lv)}
+      return out});
+    ok('moods: a prank that is a laugh on a cheery resident goes past the line of a fuming one',e.near&&e.calm.kind==='laugh'&&e.fuming.kind!=='laugh',JSON.stringify(e));
+    ok('moods: the same safe prank pays more on a grumpy resident',e.soft&&e.cheeryPts.kind==='laugh'&&e.grumpyPts.kind==='laugh'&&e.grumpyPts.pts>=1.3*e.cheeryPts.pts,JSON.stringify(e));
+    ok('moods: no console errors (dial)',!errs.length,errs.join(' | '));await ctx.close()}
+  for(const [label,opt] of [['desktop mouse',{viewport:{width:1280,height:720}}],['portrait touch',{viewport:{width:390,height:844},hasTouch:true,isMobile:true}],['landscape touch',{viewport:{width:844,height:390},hasTouch:true,isMobile:true}]]){
+    const {p,ctx,errs}=await page(b,opt);const rows=[];let landed=false,onScreen=true,cued=false;
+    for(const seed of[5,6,7,8]){
+      const set=await p.evaluate(seed=>{__prank.start({seed,bot:true});for(const id of['gramps','mum','kid'])__prank.setWind(id,3.5);
+        for(let t=0;t<6000;t+=10){__prank.stepBy(10);if(__prank.state().folk.some(f=>f.out&&f.x>24&&f.state==='walk'))break}
+        __prank.bot(false);const st=__prank.state(),r=st.folk.find(f=>f.out);if(!r)return null;
+        const plan=__prank.folkPlan(r.id),spot=plan.slice(1).find(id=>['bench','bin','swing'].includes(id));return{id:r.id,spot,park:st.stats.park}},seed);
+      if(!set||!set.spot){rows.push(seed+':nobody out');continue}
+      await p.evaluate(()=>__prank.stepBy(40));await wait(p,80);
+      const tapAt=async(x,y)=>{if(opt.hasTouch)await p.touchscreen.tap(x,y);else await p.mouse.click(x,y)};
+      const where=()=>p.evaluate(id=>{const c=document.querySelector('#cv').getBoundingClientRect(),q=__prank.spotScreen(id);return{...q,in:q.x>=c.left+20&&q.x<=c.right-20&&q.y>=c.top&&q.y<=c.bottom}},set.spot);
+      let sc=await where();
+      // a person heads that way: the edge marker if the resident is out of view, else a tap at the edge of the garden
+      for(let tries=0;tries<6&&!sc.in;tries++){const cue=(await p.evaluate(()=>__prank.cues())).find(c=>c.id===set.id);
+        if(cue){cued=true;await tapAt(cue.x,cue.y)}else{const c=await p.evaluate(()=>{const r=document.querySelector('#cv').getBoundingClientRect();return{l:r.left,r:r.right}});await tapAt(sc.x>c.r?c.r-30:c.l+30,sc.y-8)}
+        for(let i=0;i<12&&!(sc=await where()).in;i++){await p.evaluate(()=>__prank.stepBy(15));await wait(p,30)}}
+      if(!sc.in){onScreen=false;rows.push(seed+':'+set.spot+' still off screen');continue}
+      if(opt.hasTouch)await p.touchscreen.tap(sc.x,sc.y-8);else await p.mouse.click(sc.x,sc.y-8);
+      for(let i=0;i<60&&!(await p.evaluate(()=>__prank.state().picker));i++){await p.evaluate(()=>__prank.stepBy(10))}
+      const pk=await p.evaluate(()=>{const b=[...document.querySelectorAll('#pkBtns button')].find(b=>/^p\d/.test(b.dataset.o)&&b.getAttribute('aria-disabled')!=='true');return b?b.dataset.o:null});
+      if(!pk){rows.push(seed+':'+set.spot+' no prank to set');continue}
+      if(opt.hasTouch){const bx=await p.evaluate(o=>{const r=document.querySelector(`#pkBtns button[data-o="${o}"]`).getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}},pk);await p.touchscreen.tap(bx.x,bx.y)}
+      else await p.click(`#pkBtns button[data-o="${pk}"]`);
+      const res=await p.evaluate(([park0,id])=>{for(let i=0;i<60*45;i+=30){__prank.stepBy(30);const st=__prank.state();
+          if(st.stats.park>park0)return{landed:true,px:st.player.x};if(__prank.phase!=='play')break}
+        const st=__prank.state();return{landed:false,px:st.player.x,stats:st.stats,folk:st.folk.find(f=>f.id===id)}},[set.park,set.id]);
+      rows.push(`${seed}:${set.id}@${set.spot} ${res.landed?'landed':'no '+JSON.stringify(res)}`);
+      if(res.landed){landed=true;break}}
+    console.log(`     park (${label}): `+rows.join(' | '));
+    ok(`park (${label}): heading toward the park brings the spot a resident goes to on screen`,onScreen,rows.join(' | '));
+    if(label==='portrait touch')ok('park (portrait touch): the edge marker was used to follow',cued,rows.join(' | '));
+    ok(`park (${label}): follow by tapping, set a prank, and it lands in the park`,landed,rows.join(' | '));
+    ok(`park (${label}): no console errors`,!errs.length,errs.join(' | '));await ctx.close()}
+
   await b.close();console.log(fails?`${fails} FAILED`:'ALL PASSED');process.exit(fails?1:0)})();

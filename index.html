@@ -56,6 +56,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .tg .mk{inset:auto;right:-3px;bottom:-3px;width:13px;height:13px}
 .tg.hint{outline:1px dashed #9a8fc4}
 .ln{font-size:12px;color:var(--dim);white-space:nowrap}
+.card.out{border-color:#7fb8d8}
+.card .md{font-weight:700;font-size:12px;color:var(--dim);white-space:nowrap}
+.card .pips{width:22px;height:8px;margin-right:3px;vertical-align:0}
 .ln b{color:var(--ink)}
 #picker{position:absolute;inset:0;padding:5px;display:flex;flex-direction:column;gap:4px;background:var(--panel)}
 #pkInfo{font-size:13px;line-height:1.25;color:var(--dim);min-height:17px}
@@ -79,8 +82,9 @@ button[aria-disabled="true"]{opacity:.6;border-style:dashed}
 #ovp p b{color:var(--ink)}
 #ovp .row{display:flex;gap:8px;flex-wrap:wrap}
 #ovp .row button{flex:1}
+#ovp .btns{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;background:var(--panel);padding-top:6px;box-shadow:0 -10px 10px -4px var(--panel)}
 #ovp button{font-size:17px;font-weight:700}
-@media (orientation:landscape) and (max-height:520px){#ovp.wide{width:min(820px,100%)}#ovp .cols{columns:2;column-gap:20px}#ovp .cols p{break-inside:avoid;margin:0 0 8px;font-size:14px}}
+@media (orientation:landscape) and (max-height:520px){#ovp.wide{width:min(820px,100%)}#ovp .cols{columns:2;column-gap:20px}#ovp .cols p{break-inside:avoid;margin:0 0 8px;font-size:14px}#ovp .btns{flex-direction:row;flex-wrap:wrap}#ovp .btns button{flex:1 1 140px}}
 #ovp button.main{background:var(--you);color:#2a1600;border-color:#000}
 .tot{display:flex;justify-content:space-around;font-size:22px;font-weight:900;padding:4px 0}
 .env{background:#f3e6c8;color:#2b2014;border-radius:10px;padding:8px 10px;font-size:15px;line-height:1.3}
@@ -123,16 +127,19 @@ let best=store.get('best',0);
 
 /* ============ seeded random streams ============ */
 function mulberry(seed){let a=seed>>>0;return()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function streams(seed){return{world:mulberry(seed*7+1),route:mulberry(seed*17+3),moss:mulberry(seed*13+5),bot:mulberry(seed*29+11)}}
+function streams(seed){return{world:mulberry(seed*7+1),route:mulberry(seed*17+3),moss:mulberry(seed*13+5),bot:mulberry(seed*29+11),walk:mulberry(seed*31+7)}}
 const fxr=mulberry(12345);
 
 /* ============ world ============ */
 const TICK=1/60, DAY_LEN=180, DAYS=3;
 const W=24, RW=8, FH=5, ROOF=13.4, GROUND=-1.2;
 const STAIR={x0:10.4,x1:13.6};
-const ROOMS=['Kitchen','Hall','Lounge','Bathroom','Landing','Bedroom'];
+const PARK_X1=40, NROOMS=7, PARK=6;
+const ROOMS=['Kitchen','Hall','Lounge','Bathroom','Landing','Bedroom','Park'];
 const WALLS=['#cfe8d5','#f3d6b8','#f2c9c4','#c6e2ee','#efe2c0','#d9cff0'];
-const roomOf=(f,x)=>f*3+Math.max(0,Math.min(2,Math.floor(x/RW)));
+const roomOf=(f,x)=>f===0&&x>=W?PARK:f*3+Math.max(0,Math.min(2,Math.floor(x/RW)));
+const roomSpan=id=>id===PARK?[W,PARK_X1]:[(id%3)*RW,(id%3+1)*RW];
+const maxX=f=>f===0?PARK_X1-.45:W-.45;
 const SPOTS=[
  {id:'cup',  name:'Kitchen cupboard',f:0,x:1.7, kind:'cupboard',face:-1},
  {id:'stool',name:'Kitchen stool',   f:0,x:4.6, kind:'seat',face:1},
@@ -147,6 +154,11 @@ const SPOTS=[
  {id:'linen',name:'Linen cupboard',  f:1,x:9.2, kind:'cupboard',face:-1},
  {id:'rdoor',name:'Bedroom door',    f:1,x:16.6,kind:'door',pass:true},
  {id:'bed',  name:'Bed',             f:1,x:21.3,kind:'bed',face:-1},
+ {id:'gate', name:'Park gate',       f:0,x:26,  kind:'door',pass:true},
+ {id:'bench',name:'Park bench',      f:0,x:29.5,kind:'seat',face:1},
+ {id:'puddle',name:'Puddle',         f:0,x:32.2,kind:'floor',pass:true},
+ {id:'bin',  name:'Park bin',        f:0,x:35,  kind:'cupboard',face:1},
+ {id:'swing',name:'Swing',           f:0,x:38,  kind:'seat',face:-1},
 ];
 SPOTS.forEach((s,i)=>{s.i=i;s.room=roomOf(s.f,s.x)});
 const SP=Object.fromEntries(SPOTS.map(s=>[s.id,s]));
@@ -169,6 +181,13 @@ const FOLK=[
   routine:[['bed',9],['sofa',9],['cup',4],['front',3],['bath',5],['stool',5],['linen',3],['arm',6]]},
 ];
 const PLAYER_SPEED=6, MOSS_SPEED=5, REACH=1.35;
+// moods last across days: each landed prank winds a resident up, each night cools them
+const MOODS=[{name:'Cheery',line:1,pay:1},{name:'Wary',line:.93,pay:1.2},{name:'Grumpy',line:.85,pay:1.45},{name:'Fuming',line:.78,pay:1.75}];
+const WIND={laugh:.6,sour:1.2,turned:2.5}, WIND_MAX=9, STORM_STAGE=2, PARK_USE=['bench','bin','swing'];
+const stageOf=r=>r.wind<2?0:r.wind<4?1:r.wind<6?2:3;
+const moodLine=r=>MOODS[stageOf(r)].line;
+const lineOf=r=>r.Lbase*r.Lmul*moodLine(r);
+const cap=t=>t[0].toUpperCase()+t.slice(1);
 
 /* ============ icons (one path set for SVG and canvas) ============ */
 const ICON={
@@ -203,21 +222,22 @@ function setDevice(d){if(d===device)return;device=d;uiDirty=true;refreshTouch();
 /* ============ game state ============ */
 let G={phase:'title',prev:null,s:null,fast:false,tut:-1,tutT:0,msg:null,fx:[],texts:[],mem:null,blankMem:false,botOn:false,lastPhaseBeforeSettings:'title'};
 let uiDirty=true;
-function blankMemory(){return{rooms:[0,0,0,0,0,0],w:[1,1,1],last:-1,best:-1,games:0}}
+function blankMemory(){return{rooms:Array(NROOMS).fill(0),w:[1,1,1],last:-1,best:-1,games:0}}
 function newMatch(seed,opt={}){
   const rng=streams(seed);
   const s={seed,rng,day:0,t:0,tick:0,score:{you:0,moss:0},dayScore:{you:0,moss:0},folk:[],pranks:[],traps:[],
-    inv:[],player:null,moss:null,firstLanded:false,guess:-1,roomCounts:[0,0,0,0,0,0],bestLaugh:null,
+    inv:[],player:null,moss:null,firstLanded:false,guess:-1,roomCounts:Array(NROOMS).fill(0),bestLaugh:null,walkers:[],
     trapPlan:[],trapsDone:0,lastLand:{you:-99,moss:-99},history:[],
-    stats:{laugh:0,sour:0,turned:0,fizzled:0,busted:0,caught:0,defused:0,guessed:0,mossPranks:0},learn:{}};
+    stats:{laugh:0,sour:0,turned:0,fizzled:0,busted:0,caught:0,defused:0,guessed:0,mossPranks:0,stormed:0,park:0},learn:{}};
   // each resident gets one love and one hate, seeded per match
   for(const d of FOLK){
     const tags=TAGS.slice();for(let i=tags.length-1;i>0;i--){const j=Math.floor(rng.world()*(i+1));[tags[i],tags[j]]=[tags[j],tags[i]]}
     const att={};TAGS.forEach(t=>att[t]=0);att[tags[0]]=1;att[tags[1]]=-1;
-    s.folk.push({d,id:d.id,att,Lbase:Math.round(d.L*(0.88+rng.world()*0.24)*10)/10,f:0,x:0,climb:null,face:1});
+    s.folk.push({d,id:d.id,att,Lbase:Math.round(d.L*(0.88+rng.world()*0.24)*10)/10,f:0,x:0,climb:null,face:1,wind:0,outing:null,storm:false,stormed:false});
     s.learn[d.id]={att:{},hint:{},lo:0,hi:Infinity};
   }
   G.mem=opt.blankMem?blankMemory():Object.assign(blankMemory(),store.get('moss',{}));
+  if(!Array.isArray(G.mem.rooms))G.mem.rooms=[];while(G.mem.rooms.length<NROOMS)G.mem.rooms.push(0);
   G.blankMem=!!opt.blankMem;
   G.s=s;G.fx=[];G.texts=[];
   G.tut=(opt.tutorial??!settings.tutorialDone)?0:-1;G.tutT=0;
@@ -225,7 +245,7 @@ function newMatch(seed,opt={}){
 }
 function startDay(){
   const s=G.s;s.t=0;s.pranks=[];s.traps=[];s.inv=PROPS.map(p=>p.stock);s.dayScore={you:0,moss:0};
-  s.roomCounts=[0,0,0,0,0,0];s.bestLaugh=null;s.trapsDone=0;s.trapPlan=[DAY_LEN*.28,DAY_LEN*.6];s.lastLand={you:-99,moss:-99};
+  s.roomCounts=Array(NROOMS).fill(0);s.bestLaugh=null;s.trapsDone=0;s.trapPlan=[DAY_LEN*.28,DAY_LEN*.6];s.lastLand={you:-99,moss:-99};
   s.dayLog={you:[],moss:[]};
   for(const r of s.folk){
     const n=r.d.routine.length;r.route=[];
@@ -233,7 +253,11 @@ function startDay(){
     for(let i=0;i<n;i++){const [sp,dur]=r.d.routine[(i+off)%n];r.route.push({sp:SP[sp].i,dur:dur*(0.8+s.rng.route()*0.4)})}
     r.ri=0;const first=SPOTS[r.route[0].sp];r.f=first.f;r.x=first.x;r.climb=null;r.state='use';r.t=r.route[0].dur*(0.3+s.rng.route()*0.5);
     r.face=first.face||1;r.target=first.i;r.Lmul=1;r.hits=[];r.react=0;r.sulk=0;r.mood='calm';r.think=4+s.rng.world()*8;r.thought=null;r.seeT=0;
+    r.outing=null;r.storm=false;r.stormed=false;
   }
+  // two passers-by in the park: they watch (a short sight) and laugh along
+  s.walkers=[0,1].map(i=>({walker:true,d:{id:i?'mum':'gramps',name:'a passer-by',h:1.9,speed:1.6,voice:{tract:.17,sac:.08,f0:i?190:130}},
+    f:0,x:i?36:27.5,face:i?-1:1,climb:null,state:'walk',react:0,sulk:0,seeT:0,mood:'calm',sight:4.5,pause:0,walkT:0}));
   s.player={f:0,x:12,climb:null,face:1,goal:null,busy:null,stun:0,walkT:0};
   s.moss={f:1,x:11,climb:null,face:-1,goal:null,busy:null,wait:0,cool:6,think:0,walkT:0};
   s.guess=mossGuess();
@@ -245,10 +269,10 @@ function argmax(a){let b=-1,bv=-Infinity;a.forEach((v,i)=>{if(v>bv){bv=v;b=i}});
 function experts(){const m=G.mem,s=G.s;const tot=m.rooms.map((v,i)=>v+(s.history.reduce((a,h)=>a+(h.counts[i]||0),0)));
   return[argmax(tot),m.last,m.best]}
 function mossGuess(){
-  const ex=experts(),m=G.mem,votes=[0,0,0,0,0,0];
+  const ex=experts(),m=G.mem,votes=Array(NROOMS).fill(0);
   ex.forEach((r,i)=>{if(r>=0)votes[r]+=m.w[i]});
   const g=argmax(votes);
-  return g>=0?g:Math.floor(G.s.rng.moss()*6);
+  return g>=0?g:Math.floor(G.s.rng.moss()*6);// a first guess is a room of the house
 }
 
 /* ============ movement shared by every actor ============ */
@@ -268,8 +292,12 @@ const actorRoom=a=>a.climb?-1:roomOf(a.f,a.x);
 function canSee(r,a){
   if(r.climb||r.react>0||r.sulk>0||a.climb)return false;
   if(actorRoom(r)!==actorRoom(a))return false;
-  const dx=a.x-r.x;return Math.abs(dx)<0.75||r.face*dx>0;
+  const dx=a.x-r.x;if(r.sight&&Math.abs(dx)>r.sight)return false;return Math.abs(dx)<0.75||r.face*dx>0;
 }
+const watchers=()=>G.s.folk.concat(G.s.walkers);
+// where a resident goes next: their outing in the park while they are out, else their home routine
+function seqOf(r){return r.outing?{list:r.outing.route,i:r.outing.i}:{list:r.route,i:r.ri}}
+function upcoming(r,k){const q=seqOf(r);return q.list[(q.i+k)%q.list.length].sp}
 const prankAt=i=>G.s.pranks.find(p=>p.spot===i);
 const trapAt=i=>G.s.traps.find(p=>p.spot===i);
 const userOf=i=>G.s.folk.find(r=>!r.climb&&r.state==='use'&&r.target===i&&Math.abs(r.x-SPOTS[i].x)<0.3);
@@ -281,43 +309,56 @@ function trigger(p,r){
   const s=G.s,pr=PROPS[p.prop],spot=SPOTS[p.spot];
   s.pranks=s.pranks.filter(q=>q!==p);
   const V=pr.base*p.level*tagMul(r.att[pr.tag])*fedMul(r);
-  const L=r.Lbase*r.Lmul;
+  const st0=stageOf(r),ml=moodLine(r),L=r.Lbase*r.Lmul*ml;
   let kind,pts;
-  if(V<=L){kind='laugh';pts=Math.round(10*V)}
+  if(V<=L){kind='laugh';pts=Math.round(10*V*MOODS[st0].pay)}
   else if(V<=1.25*L){kind='sour';pts=Math.round(5*L)}
   else{kind='turned';pts=-Math.round(15*(V-L))}
   const combo=kind!=='turned'&&s.t-s.lastLand[p.owner]<5;
   if(combo)pts=Math.round(pts*1.5);
   let onl=0;
-  if(kind!=='turned')for(const o of s.folk){if(o!==r&&!o.climb&&o.sulk<=0&&actorRoom(o)===actorRoom(r)){onl++;pts+=Math.round(5*V);o.react=1.6;o.mood='laugh';snd.laugh(o,.6)}}
+  if(kind!=='turned')for(const o of watchers()){if(o!==r&&!o.climb&&o.sulk<=0&&actorRoom(o)===actorRoom(r)){onl++;pts+=Math.round(5*V);o.react=1.6;o.mood='laugh';snd.laugh(o,.6)}}
   s.score[p.owner]+=pts;s.dayScore[p.owner]+=pts;s.lastLand[p.owner]=s.t;
   r.hits.push(s.t);r.react=kind==='turned'?2.2:2;r.mood=kind;r.thought=null;
   if(kind==='turned'){r.Lmul*=0.85;r.sulk=15}
   // what everyone can now see about this resident
   const lr=s.learn[r.id];lr.att[pr.tag]=r.att[pr.tag];
-  const Vn=V/r.Lmul*(kind==='turned'?0.85:1);
+  const Vn=V/(r.Lmul*ml)*(kind==='turned'?0.85:1);
   if(kind==='laugh')lr.lo=Math.max(lr.lo,Vn);
   else if(kind==='sour'){lr.lo=Math.max(lr.lo,Vn/1.25);lr.hi=Math.min(lr.hi,Vn)}
   else lr.hi=Math.min(lr.hi,Vn/1.25);
   if(p.owner==='you'){
     s.stats[kind]++;if(!s.firstLanded){s.firstLanded=true}
     if(!s.bestLaugh||pts>s.bestLaugh.pts)s.bestLaugh={pts,room:spot.room,text:`${pr.short} on ${r.d.name} at the ${spot.name.toLowerCase()}`};
+    if(spot.room===PARK)s.stats.park++;
   }else s.stats.mossPranks++;
+  // the mood it leaves, which lasts into the next days
+  r.wind=Math.min(WIND_MAX,r.wind+WIND[kind]);const st1=stageOf(r);
+  if(r.outing)r.outing.stops=Math.min(6,r.outing.stops+1);
+  else if(st1>=STORM_STAGE&&!r.stormed&&s.t<DAY_LEN-25){r.storm=true;r.stormed=true}
+  if(st1>st0&&!r.storm)floatAt(r.f,r.x,`${r.d.name} is ${MOODS[st1].name.toLowerCase()} now`,p.owner,'sour',actorY(r)+r.d.h+1.5);
   s.dayLog[p.owner].push({who:r.id,kind,pts,prop:pr.id});
   const word={laugh:combo?'Combo laugh!':'Laugh!',sour:'Sour…',turned:'Too far!'}[kind];
   floatText(r,`${word} ${pts>0?'+':''}${pts}${onl?` (${onl} watching)`:''}`,p.owner,kind);
   effect(pr.id,r);
   snd.prop(pr.id,r);
   if(kind==='laugh')snd.laugh(r,1);else if(kind==='sour')snd.sour(r);else snd.grumble(r);
-  if(kind==='turned')toast(`${r.d.name} is fed up! ${p.owner==='you'?'You':'Moss'} lose${p.owner==='you'?'':'s'} ${-pts}. They sulk and their line drops for today.`,'warn');
+  if(r.storm)toast(`${r.d.name} is ${MOODS[st1].name.toLowerCase()} and storms out to the park. Follow them and keep pranking!`,'warn');
+  else if(kind==='turned')toast(`${r.d.name} is fed up! ${p.owner==='you'?'You':'Moss'} lose${p.owner==='you'?'':'s'} ${-pts}. They sulk and their line drops for today.`,'warn');
   if(!G.fast&&kind==='turned'&&!reducedMotion())shake=0.35;
   uiDirty=true;
 }
 
 /* ============ residents ============ */
+function startOuting(r){
+  const s=G.s,sp=PARK_USE.slice();for(let i=sp.length-1;i>0;i--){const j=Math.floor(s.rng.world()*(i+1));[sp[i],sp[j]]=[sp[j],sp[i]]}
+  r.outing={stops:stageOf(r)>=3?4:3,i:0,route:sp.map(id=>({sp:SP[id].i,dur:6+s.rng.world()*3}))};
+  r.storm=false;r.sulk=0;r.mood='calm';r.state='walk';r.target=r.outing.route[0].sp;r.thought=null;
+  s.stats.stormed++;snd.grumble(r);uiDirty=true;
+}
 function tickFolk(r){
   const s=G.s;
-  if(r.react>0){r.react-=TICK;if(r.react<=0)r.mood=r.sulk>0?'turned':'calm';return}
+  if(r.react>0){r.react-=TICK;if(r.react<=0){r.mood=r.sulk>0?'turned':'calm';if(r.storm)startOuting(r)}return}
   if(r.sulk>0){r.sulk-=TICK;if(r.sulk<=0)r.mood='calm';return}
   if(r.state==='use'){
     r.t-=TICK;
@@ -325,7 +366,7 @@ function tickFolk(r){
     if(r.think<=0){const pick=TAGS.filter(t=>r.att[t]!==0);const tg=pick[Math.floor(s.rng.world()*pick.length)];
       r.thought={tag:tg,att:r.att[tg],t:3};s.learn[r.id].hint[tg]=r.att[tg];r.think=10+s.rng.world()*8;uiDirty=true}
     if(r.thought){r.thought.t-=TICK;if(r.thought.t<=0)r.thought=null}
-    if(r.t<=0){r.ri=(r.ri+1)%r.route.length;r.target=r.route[r.ri].sp;r.state='walk';r.thought=null}
+    if(r.t<=0){if(r.outing){const o=r.outing;if(--o.stops<=0){r.outing=null;r.target=r.route[r.ri].sp;floatText(r,`${r.d.name} heads home`,'','calm');uiDirty=true}else{o.i=(o.i+1)%o.route.length;r.target=o.route[o.i].sp}}else{r.ri=(r.ri+1)%r.route.length;r.target=r.route[r.ri].sp}r.state='walk';r.thought=null}
     return;
   }
   const sp=SPOTS[r.target],px=r.x,pf=r.f,wasClimb=!!r.climb;
@@ -333,7 +374,17 @@ function tickFolk(r){
   if(!wasClimb&&!r.climb&&r.f===pf){
     for(const p of s.pranks){const q=SPOTS[p.spot];if(q.pass&&q.f===r.f&&p.spot!==r.target&&(px-q.x)*(r.x-q.x)<=0&&px!==r.x){trigger(p,r);return}}
   }
-  if(arrived){r.state='use';r.t=r.route[r.ri].dur;if(sp.face)r.face=sp.face;const p=prankAt(r.target);if(p)trigger(p,r)}
+  if(arrived){r.state='use';r.t=(r.outing?r.outing.route[r.outing.i]:r.route[r.ri]).dur;if(sp.face)r.face=sp.face;const p=prankAt(r.target);if(p)trigger(p,r)}
+}
+
+function tickWalkers(){
+  const s=G.s;
+  for(const w of s.walkers){if(w.seeT>0)w.seeT-=TICK;
+    if(w.react>0){w.react-=TICK;if(w.react<=0)w.mood='calm';continue}
+    if(w.pause>0){w.pause-=TICK;continue}
+    w.x+=w.face*w.d.speed*TICK;w.walkT+=TICK*w.d.speed;
+    if(w.x>PARK_X1-.7||w.x<W+1.2){w.x=Math.max(W+1.2,Math.min(PARK_X1-.7,w.x));w.face=-w.face;w.pause=1+s.rng.walk()*2.5}
+    else if(s.rng.walk()<TICK/7)w.pause=1.5+s.rng.walk()*2}
 }
 
 /* ============ player ============ */
@@ -348,7 +399,7 @@ function tickPlayer(){
     if(Math.abs(ax)>0.3){cancelBusy('You moved, so it was left unfinished.');return}
     pl.busy.t+=TICK;
     if(pl.busy.kind==='set'||pl.busy.kind==='load'){
-      const seer=s.folk.find(r=>canSee(r,pl));
+      const seer=watchers().find(r=>canSee(r,pl));
       if(seer){spotted(seer);return}
     }
     if(pl.busy.t>=pl.busy.dur)finishBusy();
@@ -357,13 +408,15 @@ function tickPlayer(){
   if(picker.open){if(Math.abs(ax)>0.3)picker.close();else return}
   const px=pl.x,pf=pl.f,wasClimb=!!pl.climb;
   if(Math.abs(ax)>0.05&&!pl.climb){
-    pl.goal=null;pl.x=Math.max(0.45,Math.min(W-0.45,pl.x+ax*PLAYER_SPEED*TICK));pl.face=Math.sign(ax);pl.walkT+=TICK*PLAYER_SPEED*Math.abs(ax);
+    pl.goal=null;pl.x=Math.max(0.45,Math.min(maxX(pl.f),pl.x+ax*PLAYER_SPEED*TICK));pl.face=Math.sign(ax);pl.walkT+=TICK*PLAYER_SPEED*Math.abs(ax);
   }else if(pl.goal){
     const g=pl.goal;
     let tx=g.x;
+    if(g.follow){const r=s.folk.find(q=>q.id===g.follow);if(!r||!(r.outing||r.storm)){pl.goal=null;return}g.f=r.f;tx=Math.max(.45,Math.min(maxX(r.f),r.x+(pl.f===r.f&&pl.x>r.x?2.2:-2.2)))}
     if(g.spot!=null){const q=SPOTS[g.spot];if(pl.f===q.f&&!pl.climb){const side=Math.sign(pl.x-q.x)||-1;tx=q.x+side*0.85}else tx=q.x+(q.x>12?-0.85:0.85)}
     const arrived=moveActor(pl,g.f,tx,PLAYER_SPEED);
-    if(arrived){pl.goal=null;if(g.spot!=null){pl.face=Math.sign(SPOTS[g.spot].x-pl.x)||1;openPicker(SPOTS[g.spot])}}
+    if(arrived&&g.follow){const r=s.folk.find(q=>q.id===g.follow);if(r.state==='use')pl.goal=null}
+    else if(arrived){pl.goal=null;if(g.spot!=null){pl.face=Math.sign(SPOTS[g.spot].x-pl.x)||1;openPicker(SPOTS[g.spot])}}
   }else if(pl.climb){moveActor(pl,pl.climb.to,pl.x,PLAYER_SPEED)}
   if(!wasClimb&&!pl.climb&&pl.f===pf){
     for(const tr of s.traps){const q=SPOTS[tr.spot];if(q.f===pl.f&&(px!==pl.x)&&((px-q.x)*(pl.x-q.x)<=0||Math.abs(pl.x-q.x)<0.3)){springTrap(tr);break}}
@@ -404,8 +457,8 @@ function tickMoss(){
   if(m.cool>0)m.cool-=TICK;
   if(m.busy){
     m.busy.t+=TICK;
-    const seer=s.folk.find(r=>canSee(r,m));
-    if(seer){m.busy=null;m.cool=5;seer.seeT=1.2;floatAt(m.f,m.x,`${seer.d.name} caught Moss`,'moss');snd.spotted(seer);return}
+    const seer=watchers().find(r=>canSee(r,m));
+    if(seer){m.busy=null;m.cool=5;seer.seeT=1.2;floatAt(m.f,m.x,`${cap(seer.d.name)} caught Moss`,'moss');snd.spotted(seer);return}
     if(m.busy.t>=m.busy.dur){const b=m.busy;m.busy=null;
       if(b.kind==='trap'){if(!prankAt(b.spot)&&!trapAt(b.spot))s.traps.push({spot:b.spot,t:s.t});s.trapsDone++}
       else if(b.kind==='load'){const p=prankAt(b.spot);if(p&&p.owner==='moss')p.level=Math.min(3,p.level+1)}
@@ -420,7 +473,7 @@ function tickMoss(){
   if(arrived){
     const g=m.goal;
     const here=prankAt(g.spot);if((g.kind==='load'?!(here&&here.owner==='moss'):here)||trapAt(g.spot)||userOf(g.spot)){m.goal=null;return}
-    if(s.folk.some(r=>canSee(r,m))){m.wait=0.6;g.tries=(g.tries||0)+1;if(g.tries>5)m.goal=null;return}
+    if(watchers().some(r=>canSee(r,m))){m.wait=0.6;g.tries=(g.tries||0)+1;if(g.tries>5)m.goal=null;return}
     if(g.kind==='trap'){const pl=s.player;if(!pl.climb&&actorRoom(pl)===q.room){m.goal=null;return}}
     m.busy={kind:g.kind,spot:g.spot,prop:g.prop,t:0,dur:0.8+(g.kind==='trap'?1.2:g.kind==='load'?0.8:PROPS[g.prop].set)};
     m.face=Math.sign(q.x-m.x)||1;
@@ -435,11 +488,11 @@ function mossChoose(){
   if(s.t<12||m.cool>0)return null;
   const cand=[];
   for(const r of s.folk){if(r.sulk>0)continue;
-    for(let k=1;k<=3;k++){const sp=r.route[(r.ri+k)%r.route.length].sp;const own=prankAt(sp);
-      if(own&&own.owner==='moss'&&own.level<2&&!userOf(sp)){const pr=PROPS[own.prop];if(pr.base*2*tagMul(r.att[pr.tag])*(fedMul(r)+0.5)<=0.85*r.Lbase*r.Lmul)cand.push({kind:'load',spot:sp,prop:own.prop})}
+    for(let k=1;k<=3;k++){const sp=upcoming(r,k);const own=prankAt(sp);
+      if(own&&own.owner==='moss'&&own.level<2&&!userOf(sp)){const pr=PROPS[own.prop];if(pr.base*2*tagMul(r.att[pr.tag])*(fedMul(r)+0.5)<=0.85*lineOf(r))cand.push({kind:'load',spot:sp,prop:own.prop})}
       if(own||trapAt(sp)||userOf(sp))continue;
       for(let pi=0;pi<PROPS.length;pi++){const pr=PROPS[pi];if(!pr.fits.includes(SPOTS[sp].kind)||r.att[pr.tag]===-1)continue;
-        const V=pr.base*tagMul(r.att[pr.tag])*(fedMul(r)+0.5);if(V<=0.85*r.Lbase*r.Lmul)cand.push({kind:'prank',spot:sp,prop:pi})}}}
+        const V=pr.base*tagMul(r.att[pr.tag])*(fedMul(r)+0.5);if(V<=0.85*lineOf(r))cand.push({kind:'prank',spot:sp,prop:pi})}}}
   if(!cand.length)return null;
   return cand[Math.floor(rng()*cand.length)];
 }
@@ -448,6 +501,7 @@ function mossChoose(){
 function tick(){
   const s=G.s;s.tick++;s.t+=TICK;
   for(const r of s.folk){tickFolk(r);if(r.seeT>0)r.seeT-=TICK}
+  tickWalkers();
   tickPlayer();
   tickMoss();
   if(G.botOn)botThink();
@@ -461,7 +515,9 @@ function endDay(){
   ex.forEach((r,i)=>{if(r>=0&&actual>=0)m.w[i]=Math.max(.2,Math.min(5,m.w[i]*(r===actual?1.3:0.85)))});
   if(actual>=0){m.last=actual}
   if(s.bestLaugh)m.best=s.bestLaugh.room;
-  s.history.push({day:s.day,guess:s.guess,actual,hit,counts:s.roomCounts.slice(),you:s.dayScore.you,moss:s.dayScore.moss,best:s.bestLaugh});
+  // overnight each resident cools by one, and by one more if nobody pranked them today
+  const moods=s.folk.map(r=>{const from=stageOf(r);r.wind=Math.max(0,r.wind-1-(r.hits.length?0:1));r.outing=null;r.storm=false;return{name:r.d.name,from,to:stageOf(r)}});
+  s.history.push({day:s.day,guess:s.guess,actual,hit,counts:s.roomCounts.slice(),you:s.dayScore.you,moss:s.dayScore.moss,best:s.bestLaugh,moods});
   if(s.day>=DAYS-1){
     for(const h of s.history)h.counts.forEach((v,i)=>m.rooms[i]+=v);m.games++;
     if(!G.blankMem)store.set('moss',m);
@@ -495,13 +551,13 @@ function pickerOptions(){
 }
 function nextVisitor(spot){
   const s=G.s;let bestR=null,bk=99;
-  for(const r of s.folk){for(let k=0;k<r.route.length;k++){const idx=(r.ri+k)%r.route.length;if(k===0&&r.state==='use')continue;if(r.route[idx].sp===spot){if(k<bk){bk=k;bestR=r}break}}}
+  for(const r of s.folk){const n=seqOf(r).list.length;for(let k=0;k<n;k++){if(k===0&&r.state==='use')continue;if(upcoming(r,k)===spot){if(k<bk){bk=k;bestR=r}break}}}
   return bestR?{r:bestR,k:bk}:null;
 }
 function estimate(r,prop,level){
   const lr=G.s.learn[r.id],pr=PROPS[prop],a=lr.att[pr.tag]??lr.hint[pr.tag];
   const V=pr.base*level*(a==null?1:tagMul(a))*fedMul(r);
-  const lo=lr.lo*r.Lmul,hi=lr.hi*r.Lmul;
+  const lo=lr.lo*r.Lmul*moodLine(r),hi=lr.hi*r.Lmul*moodLine(r);
   if(V<=lo)return'safe';if(V>hi*1.25)return'too far';if(lo===0&&hi===Infinity)return'unknown line';return'risky';
 }
 function pickerChoose(id){
@@ -527,12 +583,13 @@ function act(){
 }
 function tapWorld(px,py){
   if(G.phase!=='play')return;const s=G.s,pl=s.player;if(pl.stun>0||pl.busy)return;
+  for(const c of V.cues||[])if(px>=c.x&&px<=c.x+c.w&&py>=c.y&&py<=c.y+c.h){picker.close();pl.goal={f:c.r.f,follow:c.r.id};snd.ui(64);return}
   const wx=(px-V.ox)/V.k,wy=(V.base-py)/V.k;
-  if(wy<-1.5||wy>FH*2+0.6||wx<-0.5||wx>W+0.5)return;
-  const f=wy>=FH?1:0;picker.close();
+  if(wy<-1.5||wy>FH*2+0.6||wx<-0.5)return;
+  const f=wy>=FH?1:0;if(wx>maxX(f)+.95)return;picker.close();
   let best=null,bd=1.3;for(const q of SPOTS){if(q.f!==f)continue;const d=Math.abs(q.x-wx);if(d<bd){bd=d;best=q}}
   if(best){pl.goal={f,spot:best.i};if(pl.f===f&&!pl.climb&&Math.abs(pl.x-best.x)<=REACH){pl.goal=null;openPicker(best)}}
-  else pl.goal={f,x:Math.max(.45,Math.min(W-.45,wx))};
+  else pl.goal={f,x:Math.max(.45,Math.min(maxX(f),wx))};
   marker={f,x:best?best.x:wx,t:0.6};
 }
 
@@ -545,7 +602,7 @@ function botThink(){
   if(picker.open){
     const q=SPOTS[picker.spot];picker.opts=pickerOptions();const opts=picker.opts.filter(o=>!o.dis&&o.id!=='leave');
     if(!opts.length){pickerChoose('leave');return}
-    if(s.folk.some(r=>canSee(r,pl))){pickerChoose('leave');return}
+    if(watchers().some(r=>canSee(r,pl))){pickerChoose('leave');return}
     if(opts[0].id==='bust'||opts[0].id==='defuse'){pickerChoose(opts[0].id);return}
     const nv=nextVisitor(q.i);let pickO=null,bv=-1;
     for(const o of opts){if(o.id==='load'){const p=prankAt(q.i);if(nv&&estimate(nv.r,p.prop,p.level+1)==='safe')pickO=o;continue}
@@ -559,7 +616,7 @@ function botThink(){
   if(near){pl.goal={f:SPOTS[near.spot].f,spot:near.spot};return}
   if(here){const p=prankAt(here.i);if(p&&p.owner==='you'&&p.level<2){const nv=nextVisitor(here.i);if(nv&&estimate(nv.r,p.prop,p.level+1)==='safe'){openPicker(here);return}}}
   const cand=[];
-  for(const r of s.folk){if(r.sulk>0)continue;for(let k=1;k<=2;k++){const sp=r.route[(r.ri+k)%r.route.length].sp;const q=SPOTS[sp];
+  for(const r of s.folk){if(r.sulk>0)continue;for(let k=1;k<=2;k++){const sp=upcoming(r,k);const q=SPOTS[sp];
     if(G.botRoom!=null&&q.room!==G.botRoom)continue;
     if(prankAt(sp)&&prankAt(sp).owner==='you')continue;if(userOf(sp))continue;
     if(!PROPS.some((pr,i)=>pr.fits.includes(q.kind)&&s.inv[i]>0)&&!(prankAt(sp)))continue;
@@ -645,7 +702,7 @@ function setPhase(p){
   renderOverlay();uiDirty=true;refreshTouch();
 }
 function pause(){if(G.phase==='play')setPhase('pause')}
-function ovButtons(list){return `<div class="col" style="display:flex;flex-direction:column;gap:8px">${list.map(b=>`<button id="${b[0]}" class="${b[2]||''}"${b[3]?` aria-disabled="true" data-why="${b[3]}"`:''}>${b[1]}</button>`).join('')}</div>`}
+function ovButtons(list){return `<div class="col btns">${list.map(b=>`<button id="${b[0]}" class="${b[2]||''}"${b[3]?` aria-disabled="true" data-why="${b[3]}"`:''}>${b[1]}</button>`).join('')}</div>`}
 function hintLine(){
   if(device==='pad')return`Move with the <b>left stick</b>, climb with <b>up and down</b>, <b>A</b> to act, <b>B</b> to back out, <b>Start</b> to pause.`;
   if(device==='touch')return`<b>Tap</b> the house to walk there, tap a spot to prank it, <b>Act</b> at a spot, <b>Pause</b> at the top.`;
@@ -662,6 +719,7 @@ function renderOverlay(keepFocus){
     <p><b>Stay unseen</b> while you set up: anyone in the same room facing you spots it, and the prop is lost. Their faint light shows where they look.</p>
     <p><b>Find the line.</b> A stronger prank, a loaded-up one, or a prank on someone you just got, gets a bigger laugh, until it goes too far: then it turns sour or costs you points. Hearts mean they love that kind of prank, crosses mean they hate it.</p>
     <p><b>Moss</b> pranks the family too, with diamond badges, and lays sparkling traps where it thinks you will go. Stop beside one and bust it.</p>
+    <p><b>Moods last.</b> Each prank that lands winds that person up, and it carries into the next day, cooling each night. A crosser mood lowers their line but pays more for a laugh. Once <b>Grumpy</b>, the next prank on them sends them storming out to the park, once a day, for a few stops, one more for each prank you land there: follow them through the garden door, but passers-by there are watching too.</p>
     <p>${hintLine()}</p></div>${ovButtons([['bBack','Back','main']])}`;
   }else if(G.phase==='settings'){
     h=`<h2>Settings</h2>${ovButtons([
@@ -679,10 +737,10 @@ function renderOverlay(keepFocus){
     if(G.phase==='dayend'){
       h=`<h2>Day ${s.day+1} is over</h2><div class="tot"><span><span class="bY"></span> ${hh.you}</span><span><span class="bM"></span> ${hh.moss}</span></div>
       ${hh.best?`<p>Your best: <b>${hh.best.text}</b>, ${hh.best.pts} points.</p>`:'<p>No laughs from you today.</p>'}${env}
-      <p>Moss is changing its guess from how you played. Tomorrow it may wait where you went today.</p>${ovButtons([['bNext','Next day','main'],['bQuit','Quit to title']])}`;
+      <p>Overnight moods: ${hh.moods.map(m=>`${m.name} ${m.from===m.to?`stays ${MOODS[m.to].name.toLowerCase()}`:`cools from ${MOODS[m.from].name.toLowerCase()} to ${MOODS[m.to].name.toLowerCase()}`}`).join(', ')}. Moss is changing its guess from how you played.</p>${ovButtons([['bNext','Next day','main'],['bQuit','Quit to title']])}`;
     }else{
       const st=s.stats,win=s.score.you>s.score.moss,tie=s.score.you===s.score.moss;
-      const did=`You landed ${st.laugh+st.sour+st.turned} pranks: ${st.laugh} big laughs, ${st.sour} sour, ${st.turned} too far. You busted ${st.busted} trap${st.busted===1?'':'s'}, defused ${st.defused} of Moss's pranks, got spotted ${st.fizzled} time${st.fizzled===1?'':'s'} and walked into ${st.caught} trap${st.caught===1?'':'s'}. Moss read your room on ${st.guessed} of ${DAYS} days.`;
+      const did=`You landed ${st.laugh+st.sour+st.turned} pranks: ${st.laugh} big laughs, ${st.sour} sour, ${st.turned} too far. You busted ${st.busted} trap${st.busted===1?'':'s'}, defused ${st.defused} of Moss's pranks, got spotted ${st.fizzled} time${st.fizzled===1?'':'s'} and walked into ${st.caught} trap${st.caught===1?'':'s'}. Moss read your room on ${st.guessed} of ${DAYS} days. Someone stormed out ${st.stormed} time${st.stormed===1?'':'s'}, and ${st.park} of your pranks landed in the park.`;
       h=`<h2>${tie?'A draw':win?'You out-pranked Moss!':'Moss wins this time'}</h2><div class="tot"><span><span class="bY"></span> ${s.score.you}</span><span><span class="bM"></span> ${s.score.moss}</span></div>
       <p>${did}</p>${env}${s.score.you>=best&&s.score.you>0?'<p><b>New best score.</b></p>':''}${ovButtons([['bAgain','Play again','main'],['bQuit','Quit to title']])}`;
     }
@@ -731,7 +789,8 @@ function renderPicker(first){
   if(f&&device!=='touch')f.focus({preventScroll:true});
 }
 $('pkBtns').addEventListener('click',e=>{const b=e.target.closest('button');if(b)pickerChoose(b.dataset.o)});
-function faceSVG(id,mood){
+const pipsSVG=st=>`<svg viewBox="0 0 34 10" class="pips" aria-hidden="true">${[0,1,2,3].map(i=>`<rect x="${i*8.5+.5}" y="${8-i*2-1}" width="7" height="${i*2+2}" rx="1" fill="${i<=st?'#ff9a5a':'#211c36'}" stroke="#000" stroke-width="1"/>`).join('')}</svg>`;
+function faceSVG(id,mood,st=0){
   const skin={gramps:'#f1c9a5',mum:'#d9a07a',kid:'#f6d2b0'}[id];
   const hat={gramps:'<path d="M6 15 Q20 3 34 15 L37 17 L3 17Z" fill="#7a7a84" stroke="#000" stroke-width="1.5"/>',
     mum:'<circle cx="20" cy="6" r="6" fill="#5a3522" stroke="#000" stroke-width="1.5"/><path d="M7 19 Q20 3 33 19Z" fill="#5a3522"/>',
@@ -741,7 +800,8 @@ function faceSVG(id,mood){
     laugh:`<path d="M12.5 26 Q20 36 27.5 26Z" fill="${ink}"/>`,
     sour:`<path d="M13 29 q2.3-2.5 4.6 0 t4.6 0 t4.6 0" stroke="${ink}" stroke-width="2.2" fill="none"/><path d="M31 17c0 0-2.5 3-2.5 4.5a2.5 2.5 0 0 0 5 0C33.5 20 31 17 31 17Z" fill="#7cc8ff" stroke="#000"/>`,
     turned:`<path d="M14 31 Q20 25 26 31" stroke="${ink}" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M11 17 L18 20 M29 17 L22 20" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/>`}[mood]||'';
-  return `<svg viewBox="0 0 40 40" class="face" aria-hidden="true"><circle cx="20" cy="23" r="13" fill="${skin}" stroke="#000" stroke-width="1.5"/>${hat}<circle cx="15" cy="22" r="2" fill="${ink}"/><circle cx="25" cy="22" r="2" fill="${ink}"/>${mouth}</svg>`;
+  const brow=st>=2&&mood!=='turned'?`<path d="M11 17 L18 19.5 M29 17 L22 19.5" stroke="${ink}" stroke-width="2.2" stroke-linecap="round"/>`:st===1?`<path d="M12 18 L17.5 18 M22.5 18 L28 18" stroke="${ink}" stroke-width="2" stroke-linecap="round"/>`:'';
+  return `<svg viewBox="0 0 40 40" class="face" aria-hidden="true"><circle cx="20" cy="23" r="13" fill="${skin}" stroke="#000" stroke-width="1.5"/>${hat}<circle cx="15" cy="22" r="2" fill="${ink}"/><circle cx="25" cy="22" r="2" fill="${ink}"/>${brow}${mouth}</svg>`;
 }
 let cardsCache='';
 function renderCards(){
@@ -750,11 +810,12 @@ function renderCards(){
     const lr=s.learn[r.id];
     const tags=TAGS.map(t=>{const a=lr.att[t]??lr.hint[t];const mk=a==null?'<text x="10" y="15" font-size="15" text-anchor="middle" fill="#fff" stroke="#000" stroke-width="3" paint-order="stroke" font-weight="900">?</text>':a===1?MARK.love:a===-1?MARK.hate:MARK.meh;
       return `<span class="tg${lr.att[t]==null&&lr.hint[t]!=null?' hint':''}" title="${TAGWORD[t]}">${iconSVG(TAGICON[t])}<svg viewBox="0 0 20 20" class="mk">${mk}</svg></span>`}).join('');
-    const lo=lr.lo*r.Lmul,hi=lr.hi*r.Lmul;
+    const ml=moodLine(r),lo=lr.lo*r.Lmul*ml,hi=lr.hi*r.Lmul*ml,st=stageOf(r);
     const line=lo===0&&hi===Infinity?'Line: <b>?</b>':hi===Infinity?`Line: over <b>${lo.toFixed(0)}</b>`:`Line: <b>${lo.toFixed(0)}–${hi.toFixed(0)}</b>`;
     const fed=fedMul(r);
-    const nxt=r.sulk>0?'Sulking':r.state==='use'?`At the ${SPOTS[r.target].name.toLowerCase()}, then ${SPOTS[r.route[(r.ri+1)%r.route.length].sp].name.toLowerCase()}`:`Going to the ${SPOTS[r.target].name.toLowerCase()}`;
-    return `<div class="card${fed>1?' hot':''}"><div class="top">${faceSVG(r.id,r.mood)}<div style="min-width:0"><div class="nm">${r.d.name}</div><div class="nx">${nxt}</div></div></div><div class="tags">${tags}</div><div class="ln">${line}${fed>1?` · fed up ×${fed}`:''}</div></div>`;
+    const at=n=>SPOTS[n].name.toLowerCase();
+    const nxt=r.storm?'Storming out to the park':r.sulk>0?'Sulking':(r.outing?`In the park, ${r.outing.stops} more stop${r.outing.stops===1?'':'s'}: `:'')+(r.state==='use'?`at the ${at(r.target)}, then ${at(upcoming(r,1))}`:`going to the ${at(r.target)}`);
+    return `<div class="card${fed>1?' hot':''}${r.outing||r.storm?' out':''}"><div class="top">${faceSVG(r.id,r.mood,st)}<div style="min-width:0"><div class="nm">${r.d.name} <span class="md">${pipsSVG(st)}${MOODS[st].name}</span></div><div class="nx">${cap(nxt)}</div></div></div><div class="tags">${tags}</div><div class="ln">${line}${fed>1?` · fed up ×${fed}`:''}</div></div>`;
   }).join('');
   if(h!==cardsCache){$('cards').innerHTML=h;cardsCache=h}
 }
@@ -897,10 +958,11 @@ function fit(){
   V.dpr=dpr;V.cw=r.width;V.ch=r.height;
   const kFull=Math.min(r.width/(W+1.4),r.height/(ROOF-GROUND+0.6)),kZoom=Math.min(r.width/16.5,r.height/(ROOF-GROUND+0.6));
   V.k=Math.max(kFull,kZoom);
-  if(V.k>kFull+.01&&G.s){const pl=G.s.player,cx=pl.x+(pl.goal&&pl.goal.spot==null?0:0);
-    const want=r.width/2-cx*V.k,lo=r.width-(W+0.6)*V.k,hi=0.6*V.k,t=Math.max(lo,Math.min(hi,want));
-    V.camOx=V.camOx==null||Math.abs(V.camOx-t)>r.width?t:V.camOx+(t-V.camOx)*0.12;V.ox=V.camOx}
-  else{V.ox=(r.width-W*V.k)/2;V.camOx=null}
+  const s=G.s,park=s&&((s.player.f===0&&s.player.x>W-3)||s.folk.some(q=>q.outing||q.storm||(q.f===0&&q.x>W))),Wv=park?PARK_X1:W;
+  if(s&&(V.k>kFull+.01||park)){const cx=s.player.x;
+    const want=r.width/2-cx*V.k,lo=Math.min(0.6*V.k,r.width-(Wv+0.6)*V.k),hi=0.6*V.k,t=Math.max(lo,Math.min(hi,want));
+    if(V.camOx==null)V.camOx=V.ox??t;V.camOx=Math.abs(V.camOx-t)>r.width*1.5?t:V.camOx+(t-V.camOx)*0.12;V.ox=V.camOx}
+  else{const t=(r.width-W*V.k)/2;if(V.camOx!=null&&Math.abs(V.camOx-t)>1){V.camOx+=(t-V.camOx)*0.12;V.ox=V.camOx}else{V.ox=t;V.camOx=null}}
   V.base=r.height/2+((ROOF+GROUND)/2)*V.k;
 }
 const X=x=>V.ox+x*V.k,Y=y=>V.base-y*V.k;
@@ -927,13 +989,32 @@ function draw(time){
   for(let x=0;x<=V.cw;x+=20)ctx.lineTo(x,Y(1.6+Math.sin(x/k*.35)*0.9));ctx.lineTo(V.cw,V.ch);ctx.lineTo(0,V.ch);ctx.fill();
   ctx.fillStyle=mix('#6aa84f','#3f6a45',dayT);ctx.fillRect(0,Y(0),V.cw,V.ch-Y(0));
   ctx.fillStyle='rgba(0,0,0,.12)';for(let x=-((V.ox%(k*.8))+k*.8);x<V.cw;x+=k*.8)ctx.fillRect(x,Y(-.2),k*.08,k*.3);
-  tree(X(-2.4),Y(0),k,0);tree(X(W+2.6),Y(0),k*1.15,1);tree(X(-5.5),Y(0),k*.9,2);tree(X(W+6),Y(0),k,3);
+  tree(X(-2.4),Y(0),k,0);tree(X(PARK_X1+2.2),Y(0),k*1.15,1);tree(X(-5.5),Y(0),k*.9,2);tree(X(PARK_X1+5.6),Y(0),k,3);tree(X(33.6),Y(.2),k*.8,1);
   // fence segments
-  ctx.fillStyle='#e8dcc4';for(let i=-8;i<0;i++){ctx.fillRect(X(i*1.2-.6),Y(1.2),k*.25,k*1.2)}for(let i=0;i<8;i++){ctx.fillRect(X(W+.8+i*1.2),Y(1.2),k*.25,k*1.2)}
-  ctx.fillRect(X(-10),Y(.95),X(-.4)-X(-10),k*.18);ctx.fillRect(X(W+.4),Y(.95),X(W+10)-X(W+.4),k*.18);
+  ctx.fillStyle='#e8dcc4';for(let i=-8;i<0;i++){ctx.fillRect(X(i*1.2-.6),Y(1.2),k*.25,k*1.2)}for(let i=0;i<8;i++){ctx.fillRect(X(PARK_X1+.8+i*1.2),Y(1.2),k*.25,k*1.2)}
+  ctx.fillRect(X(-10),Y(.95),X(-.4)-X(-10),k*.18);ctx.fillRect(X(PARK_X1+.4),Y(.95),X(PARK_X1+10)-X(PARK_X1+.4),k*.18);
+  // the park: a hedge behind, a gravel path, a low railing at its far end
+  ctx.fillStyle=mix('#4f8f45','#35603c',dayT);rr(X(W+.4),Y(1.5),(PARK_X1-W-.4)*k,k*1.5,k*.5);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#d8c9a3';ctx.fillRect(X(W+.3),Y(.12),(PARK_X1-W-.3)*k,k*.3);
+  ctx.fillStyle='#3b3a44';ctx.fillRect(X(PARK_X1-.1),Y(1.6),k*.2,k*1.6);
   drawHouse(time);
   if(s)drawActorsAndProps(time);
   ctx.restore();
+  drawCues();
+}
+// a resident who stormed out of view gets a marker at the screen edge, pointing their way; tapping it follows them
+function drawCues(){
+  const s=G.s;V.cues=[];if(!s||G.phase!=='play')return;let n=0;
+  for(const r of s.folk){if(!(r.outing||r.storm))continue;const sx=X(r.x);if(sx>-4&&sx<V.cw+4)continue;
+    const right=sx>=V.cw,fs=Math.max(13,Math.min(17,V.k*.5)),t=`${r.d.name}: ${r.outing?'in the park':'storming out'}`;
+    ctx.font=`800 ${fs}px ui-rounded,system-ui,sans-serif`;const a=fs*1.1,w=ctx.measureText(t).width+fs+a+10,h=Math.max(44,fs*2.4);
+    const x=right?V.cw-w-6:6,y=Math.max(6,Y(FH*2+1.7)-h/2+n*(h+6));n++;
+    ctx.fillStyle='rgba(12,8,22,.9)';rr(x,y,w,h,h/2);ctx.fill();ctx.strokeStyle='#fff6e8';ctx.lineWidth=2;ctx.stroke();
+    const ax=right?x+w-fs*.6-a:x+fs*.6+a,cy=y+h/2;ctx.fillStyle='#ff9a5a';ctx.beginPath();
+    if(right){ctx.moveTo(ax,cy-a*.6);ctx.lineTo(ax+a,cy);ctx.lineTo(ax,cy+a*.6)}else{ctx.moveTo(ax,cy-a*.6);ctx.lineTo(ax-a,cy);ctx.lineTo(ax,cy+a*.6)}
+    ctx.closePath();ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#fff6e8';ctx.textAlign=right?'right':'left';ctx.textBaseline='middle';ctx.fillText(t,right?ax-8:ax+8,cy+1);
+    V.cues.push({x,y,w,h,r,right})}
 }
 function mix(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);const c=[16,8,0].map(sh=>Math.round(((pa>>sh)&255)*(1-t)+((pb>>sh)&255)*t));return`rgb(${c})`}
 function cloud(x,y,s){ctx.beginPath();ctx.arc(x,y,.9*s,0,7);ctx.arc(x+s,y-.3*s,1.1*s,0,7);ctx.arc(x+2.1*s,y,.8*s,0,7);ctx.fill()}
@@ -961,7 +1042,8 @@ function drawHouse(time){
   }
   // floor slabs and outer walls
   ctx.fillStyle='#6b4430';ctx.fillRect(X(-.3),Y(FH+.15),(W+.6)*k,k*.3);ctx.fillRect(X(-.3),Y(FH*2+.3),(W+.6)*k,k*.3);ctx.fillRect(X(-.3),Y(0),(W+.6)*k,k*.35);
-  ctx.fillRect(X(-.3),Y(FH*2+.3),k*.3,(FH*2+.3)*k);ctx.fillRect(X(W),Y(FH*2+.3),k*.3,(FH*2+.3)*k);
+  ctx.fillRect(X(-.3),Y(FH*2+.3),k*.3,(FH*2+.3)*k);ctx.fillRect(X(W),Y(FH*2+.3),k*.3,(FH*2+.3-3.4)*k);
+  ctx.fillStyle='#3d6fb5';ctx.fillRect(X(W+.02),Y(3.4),k*.26,k*.35);ctx.fillStyle='#6b4430';
   // partition walls with doorways
   for(const xw of[RW,RW*2])for(let f=0;f<2;f++){ctx.fillRect(X(xw-.1),Y((f+1)*FH),k*.2,k*1.4)}
   // stairs
@@ -970,7 +1052,7 @@ function drawHouse(time){
   ctx.fillStyle='#efe2c0';ctx.fillRect(X(STAIR.x1-.6),Y(FH+.15),k*1.4,k*.3);
   // room labels
   ctx.font=`700 ${Math.max(10,k*.42)}px ui-rounded,system-ui,sans-serif`;ctx.textAlign='left';ctx.textBaseline='top';
-  for(let id=0;id<6;id++){const f=Math.floor(id/3),i=id%3;const tx=X(i*RW+.25),ty=Y((f+1)*FH-.15);const t=ROOMS[id];const tw=ctx.measureText(t).width;
+  for(let id=0;id<NROOMS;id++){const f=id===PARK?0:Math.floor(id/3);const tx=X(roomSpan(id)[0]+(id===PARK?3.5:.25)),ty=Y((f+1)*FH-(id===PARK?1.1:.15));const t=ROOMS[id];const tw=ctx.measureText(t).width;
     ctx.fillStyle='rgba(20,14,30,.72)';rr(tx-3,ty-1,tw+6,Math.max(10,k*.42)+4,4);ctx.fill();ctx.fillStyle='#fff6e8';ctx.fillText(t,tx,ty+1)}
   for(const q of SPOTS)drawFurniture(q);
 }
@@ -985,6 +1067,11 @@ function drawFurniture(q){
     case'arm':box(x-.9*k,y-1.2*k,1.8*k,1.2*k,'#7a9a52');box(x-1.1*k,y-2.1*k,.5*k,2.1*k,'#6b8a46');box(x+.6*k,y-1.5*k,.4*k,1.5*k,'#6b8a46');break;
     case'sofa':box(x-1.5*k,y-1.1*k,3*k,1.1*k,'#c4506a');box(x+.9*k,y-2*k,.6*k,2*k,'#a8405a');box(x-1.7*k,y-1.5*k,.45*k,1.5*k,'#a8405a');break;
     case'bath':ctx.fillStyle='#fbfbff';ctx.beginPath();ctx.moveTo(x-1.6*k,y-1.4*k);ctx.lineTo(x+1.6*k,y-1.4*k);ctx.quadraticCurveTo(x+1.6*k,y-.2*k,x+1.1*k,y-.2*k);ctx.lineTo(x-1.1*k,y-.2*k);ctx.quadraticCurveTo(x-1.6*k,y-.2*k,x-1.6*k,y-1.4*k);ctx.fill();ctx.stroke();ctx.fillStyle='#ccc';ctx.fillRect(x-1.2*k,y-.25*k,.2*k,.25*k);ctx.fillRect(x+1*k,y-.25*k,.2*k,.25*k);ctx.fillStyle='#9fd3f0';ctx.fillRect(x-1.4*k,y-1.35*k,2.8*k,.2*k);break;
+    case'gate':box(x-1.1*k,y-2.6*k,.3*k,2.6*k,'#3b3a44');box(x+.8*k,y-2.6*k,.3*k,2.6*k,'#3b3a44');ctx.strokeStyle='#3b3a44';ctx.lineWidth=Math.max(2,k*.1);ctx.beginPath();ctx.moveTo(x-.95*k,y-2.6*k);ctx.quadraticCurveTo(x,y-3.4*k,x+.95*k,y-2.6*k);ctx.stroke();ctx.strokeStyle='#2b1d14';break;
+    case'bench':box(x-1.3*k,y-.95*k,2.6*k,.25*k,'#a0663a');box(x-1.3*k,y-1.9*k,2.6*k,.3*k,'#a0663a');box(x-1.15*k,y-.7*k,.18*k,.7*k,'#3b3a44');box(x+.97*k,y-.7*k,.18*k,.7*k,'#3b3a44');box(x-1.15*k,y-1.6*k,.18*k,.65*k,'#3b3a44');break;
+    case'puddle':ctx.fillStyle='#7fb8d8';ctx.beginPath();ctx.ellipse(x,y-.02*k,1.4*k,.2*k,0,0,7);ctx.fill();ctx.stroke();ctx.strokeStyle='rgba(255,255,255,.8)';ctx.beginPath();ctx.moveTo(x-.6*k,y-.05*k);ctx.lineTo(x-.1*k,y-.05*k);ctx.stroke();ctx.strokeStyle='#2b1d14';break;
+    case'bin':box(x-.5*k,y-1.4*k,1*k,1.4*k,'#3f7a4a');box(x-.6*k,y-1.6*k,1.2*k,.22*k,'#2f5e38');break;
+    case'swing':ctx.strokeStyle='#5a3a24';ctx.lineWidth=Math.max(2,k*.14);ctx.beginPath();ctx.moveTo(x-1.5*k,y);ctx.lineTo(x-1.1*k,y-3.4*k);ctx.lineTo(x+1.1*k,y-3.4*k);ctx.lineTo(x+1.5*k,y);ctx.stroke();ctx.lineWidth=Math.max(1,k*.05);ctx.strokeStyle='#777';ctx.beginPath();ctx.moveTo(x-.45*k,y-3.4*k);ctx.lineTo(x-.45*k,y-.85*k);ctx.moveTo(x+.45*k,y-3.4*k);ctx.lineTo(x+.45*k,y-.85*k);ctx.stroke();ctx.strokeStyle='#2b1d14';ctx.lineWidth=Math.max(1.5,k*.08);box(x-.6*k,y-.85*k,1.2*k,.18*k,'#d07a3a');break;
     case'bed':box(x-1.8*k,y-1*k,3.6*k,.6*k,'#8a5a3c');box(x-1.7*k,y-1.25*k,3.4*k,.35*k,'#6fa8dc');box(x+1.1*k,y-1.45*k,.8*k,.3*k,'#fff');box(x+1.8*k,y-2*k,.25*k,2*k,'#8a5a3c');break;
   }
 }
@@ -1005,7 +1092,7 @@ function drawActorsAndProps(time){
     const glow=(ns&&ns.i===q.i)||(G.tut===0);
     if(glow){ctx.strokeStyle=ns&&ns.i===q.i?'#ffe066':'rgba(255,224,102,.7)';ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.beginPath();ctx.ellipse(x,y,1.2*k,.35*k,0,0,7);ctx.stroke();ctx.setLineDash([])}}
   // vision cones
-  for(const r of s.folk){if(r.climb||r.sulk>0||r.react>0)continue;const room=actorRoom(r),rx=Math.floor(room%3)*RW,edge=r.face>0?rx+RW:rx;
+  for(const r of watchers()){if(r.climb||r.sulk>0||r.react>0)continue;const room=actorRoom(r),sp=roomSpan(room);let edge=r.face>0?sp[1]:sp[0];if(r.sight)edge=r.face>0?Math.min(edge,r.x+r.sight):Math.max(edge,r.x-r.sight);
     const hy=actorY(r)+r.d.h*.85,same=actorRoom(pl)===room;
     ctx.fillStyle=same?'rgba(255,90,90,.16)':'rgba(255,250,200,.13)';ctx.beginPath();ctx.moveTo(X(r.x),Y(hy));ctx.lineTo(X(edge),Y(hy+1.6));ctx.lineTo(X(edge),Y(r.f*FH+.3));ctx.lineTo(X(r.x+r.face*.5),Y(r.f*FH+.3));ctx.closePath();ctx.fill()}
   // pranks and traps
@@ -1016,6 +1103,7 @@ function drawActorsAndProps(time){
     if(a>0){star(x,y-.2*k,(.4+a*.6)*k,'#fff');star(x+.6*k,y-.8*k,a*.4*k,'#e8dcff')}}
   // people
   for(const r of s.folk)drawPerson(r.id,r,time);
+  for(const w of s.walkers)drawPerson('walker',w,time);
   drawPerson('moss',s.moss,time);
   drawPerson('you',pl,time);
   // progress rings
@@ -1046,8 +1134,8 @@ function drawPerson(kind,a,time){
   ctx.lineWidth=.07;ctx.strokeStyle='#1b120c';ctx.lineJoin='round';
   const H=kind==='gramps'?2.2:kind==='mum'?2.0:kind==='kid'?1.4:kind==='moss'?1.95:1.7;
   const legH=H*.34,bodyH=H*.4,headR=kind==='kid'?.32:.28;
-  const body={gramps:'#7d8a4a',mum:'#2f6fb0',kid:'#f2c230',you:'#ff8a3d',moss:'#3a9e8f'}[kind];
-  const skin={gramps:'#f1c9a5',mum:'#d9a07a',kid:'#f6d2b0',you:'#f0c09a',moss:'#c99a78'}[kind];
+  const body={gramps:'#7d8a4a',mum:'#2f6fb0',kid:'#f2c230',you:'#ff8a3d',moss:'#3a9e8f',walker:'#8b8f9c'}[kind];
+  const skin={gramps:'#f1c9a5',mum:'#d9a07a',kid:'#f6d2b0',you:'#f0c09a',moss:'#c99a78',walker:'#e3b48e'}[kind];
   let bob=0;
   if(r&&r.mood==='laugh'&&r.react>0&&!reducedMotion())bob=Math.abs(Math.sin(time*18))*.12;
   if(r&&r.mood==='turned'&&r.react>0&&!reducedMotion())ctx.translate(Math.sin(time*40)*.05,0);
@@ -1074,7 +1162,7 @@ function drawPerson(kind,a,time){
   ctx.stroke();ctx.lineWidth=.07;ctx.strokeStyle='#1b120c';
   if(kind==='gramps'&&!sitting&&!inBath){ctx.strokeStyle='#5a3a24';ctx.lineWidth=.08;ctx.beginPath();ctx.moveTo(.32,armY+.4);ctx.lineTo(.42,0);ctx.stroke();ctx.lineWidth=.07;ctx.strokeStyle='#1b120c'}
   // head
-  const hy=-legH-bodyH-headR+.04;
+  const hy=-legH-bodyH-headR+.04,mood=r?r.mood:(a.stun>0?'sour':'calm');
   ctx.fillStyle=skin;ctx.beginPath();ctx.arc(0,hy,headR,0,7);ctx.fill();ctx.stroke();
   // hats and hair: each silhouette differs in shape, not only colour
   if(kind==='gramps'){ctx.fillStyle='#7a7a84';ctx.beginPath();ctx.moveTo(-.3,hy-.06);ctx.quadraticCurveTo(0,hy-.42,.3,hy-.1);ctx.lineTo(.46,hy-.05);ctx.lineTo(-.3,hy-.02);ctx.closePath();ctx.fill();ctx.stroke();
@@ -1083,10 +1171,13 @@ function drawPerson(kind,a,time){
   if(kind==='kid'){ctx.fillStyle='#d8402f';ctx.beginPath();ctx.arc(0,hy-.06,headR*.98,Math.PI,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillRect(.1,hy-.1,.35,.08)}
   if(kind==='you'){ctx.fillStyle='#ff5a8a';ctx.beginPath();ctx.arc(0,hy-.08,headR*.95,Math.PI,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#1b120c';ctx.beginPath();ctx.moveTo(0,hy-.34);ctx.lineTo(0,hy-.5);ctx.stroke();
     ctx.fillStyle='#59b7ff';const sp=reducedMotion()?0:time*12;ctx.save();ctx.translate(0,hy-.52);ctx.scale(Math.cos(sp),1);ctx.fillRect(-.22,-.04,.44,.08);ctx.restore()}
+  if(kind==='walker'){ctx.fillStyle='#4a4a56';ctx.fillRect(-.32,hy-.2,.64,.1);ctx.fillRect(-.2,hy-.42,.4,.24);ctx.strokeRect(-.2,hy-.42,.4,.24)}
+  if(r&&r.d&&!r.walker&&stageOf(r)>=2&&!(mood==='laugh'&&r.react>0)){ctx.strokeStyle='#1b120c';ctx.lineWidth=.06;ctx.beginPath();ctx.moveTo(.02,hy-.13);ctx.lineTo(.22,hy-.06);ctx.stroke();
+    if(stageOf(r)>=3&&!reducedMotion()){ctx.fillStyle='rgba(235,235,245,.85)';const p=(time*1.5)%1;ctx.beginPath();ctx.arc(-.2,hy-.5-p*.4,.08+p*.1,0,7);ctx.arc(.25,hy-.55-((p+.5)%1)*.4,.07+((p+.5)%1)*.1,0,7);ctx.fill()}}
   if(kind==='moss'){ctx.fillStyle='#6a4fd0';ctx.beginPath();ctx.moveTo(-.3,hy-.08);ctx.lineTo(.05,hy-.85);ctx.lineTo(.3,hy-.08);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(.05,hy-.85,.08,0,7);ctx.fill()}
   // face
   ctx.fillStyle='#1b120c';ctx.beginPath();ctx.arc(.12,hy-.02,.04,0,7);ctx.fill();
-  const mood=r?r.mood:(a.stun>0?'sour':'calm');ctx.lineWidth=.05;ctx.beginPath();
+  ctx.lineWidth=.05;ctx.beginPath();
   if(mood==='laugh'&&r.react>0){ctx.arc(.13,hy+.1,.08,0,Math.PI);ctx.fill()}
   else if(mood==='turned'){ctx.arc(.13,hy+.16,.07,Math.PI*1.15,Math.PI*1.85);ctx.stroke();ctx.beginPath();ctx.moveTo(.05,hy-.12);ctx.lineTo(.2,hy-.07);ctx.stroke()}
   else if(mood==='sour'){ctx.moveTo(.06,hy+.12);ctx.lineTo(.1,hy+.1);ctx.lineTo(.14,hy+.13);ctx.lineTo(.19,hy+.1);ctx.stroke()}
@@ -1126,7 +1217,7 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* ============ test hook ============ */
-function hashState(){const s=G.s;const o={t:s.tick,sc:s.score,f:s.folk.map(r=>[r.f,+r.x.toFixed(3),r.ri,r.mood,+r.Lmul.toFixed(3)]),p:s.pranks.map(p=>[p.spot,p.prop,p.level,p.owner]),tr:s.traps.map(t=>t.spot),
+function hashState(){const s=G.s;const o={t:s.tick,sc:s.score,f:s.folk.map(r=>[r.f,+r.x.toFixed(3),r.ri,r.mood,+r.Lmul.toFixed(3),+r.wind.toFixed(2),r.outing?r.outing.i:-1]),w:s.walkers.map(w=>+w.x.toFixed(3)),p:s.pranks.map(p=>[p.spot,p.prop,p.level,p.owner]),tr:s.traps.map(t=>t.spot),
   pl:[s.player.f,+s.player.x.toFixed(3)],m:[s.moss.f,+s.moss.x.toFixed(3)],st:s.stats,g:s.guess};const str=JSON.stringify(o);let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return(h>>>0).toString(16)}
 window.__prank={
   start(o={}){G.botOn=!!o.bot;G.botRoom=o.botRoom??null;newMatch(o.seed??1,{blankMem:o.blank!==false,tutorial:!!o.tutorial});setPhase('play');return hashState()},
@@ -1135,7 +1226,16 @@ window.__prank={
   bot(on){G.botOn=!!on},
   next(){if(G.phase==='dayend')nextDay()},
   fingerprint:hashState,
-  state(){const s=G.s;return s&&{history:s.history.map(h=>({guess:h.guess,actual:h.actual,hit:h.hit})),phase:G.phase,day:s.day,t:s.t,score:{...s.score},stats:{...s.stats},guess:s.guess,pranks:s.pranks.length,traps:s.traps.length,picker:picker.open,busy:!!s.player.busy,device,player:{f:s.player.f,x:s.player.x}}},
+  state(){const s=G.s;return s&&{history:s.history.map(h=>({guess:h.guess,actual:h.actual,hit:h.hit})),phase:G.phase,day:s.day,t:s.t,score:{...s.score},stats:{...s.stats},guess:s.guess,pranks:s.pranks.length,traps:s.traps.length,picker:picker.open,busy:!!s.player.busy,device,player:{f:s.player.f,x:s.player.x},
+    folk:s.folk.map(r=>({id:r.id,wind:r.wind,hits:r.hits.length,stage:stageOf(r),out:!!r.outing,storm:r.storm,f:r.f,x:r.x,state:r.state,target:SPOTS[r.target].id})),walkers:s.walkers.map(w=>({x:w.x,face:w.face})),moods:s.history.map(h=>h.moods)}},
+  setWind(id,w){const r=G.s.folk.find(q=>q.id===id);r.wind=w;uiDirty=true},
+  folkTarget(id){const r=G.s.folk.find(q=>q.id===id);return SPOTS[r.target].id},
+  viewOx(){return V.ox},
+  cues(){const c=cv.getBoundingClientRect();return(V.cues||[]).map(q=>({id:q.r.id,x:c.left+q.x+q.w/2,y:c.top+q.y+q.h/2,w:q.w,h:q.h}))},
+  folkPlan(id){const r=G.s.folk.find(q=>q.id===id);return[0,1,2].map(k=>SPOTS[upcoming(r,k)].id)},
+  spotX(id){return SP[id].x},
+  dial(id,pi,lvl){const r=G.s.folk.find(q=>q.id===id),pr=PROPS[pi];return{V:pr.base*lvl*tagMul(r.att[pr.tag])*fedMul(r),L:lineOf(r),n:PROPS.length}},
+  land(id,pi,lvl){const s=G.s,r=s.folk.find(q=>q.id===id),sc=s.score.you,p={spot:r.target,prop:pi,level:lvl,owner:'you'};s.pranks.push(p);trigger(p,r);return{kind:r.mood,pts:s.score.you-sc}},
   spotScreen(id){const q=SP[id],r=cv.getBoundingClientRect();return{x:r.left+X(q.x),y:r.top+Y(q.f*FH+1)}},
   get phase(){return G.phase},
 };

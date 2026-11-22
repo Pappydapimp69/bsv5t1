@@ -61,6 +61,10 @@ async function screens(p,label){
     ok('touch: a prank set by taps alone',set);
     await p.evaluate(()=>__prank.stepBy(181*60));ok('touch: day ends',await p.evaluate(()=>__prank.phase)==='dayend');
     await tapEl('#bNext');ok('touch: Next day by tap',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===1));
+    await p.evaluate(()=>__prank.stepBy(181*60));await tapEl('#bNext');await p.evaluate(()=>__prank.stepBy(181*60));
+    ok('touch: the match plays to its end screen',await p.evaluate(()=>__prank.phase)==='matchend');
+    ok('touch: the end screen names what you did',/You landed \d+ pranks/.test(await p.textContent('#ovp')));
+    await tapEl('#bAgain');ok('touch: Play again by tap',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===0));
     ok('touch: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 
   // 3. pad only: every menu, a prank, pause, next day, then unplug pauses
@@ -87,6 +91,9 @@ async function screens(p,label){
       await tap(A);await p.evaluate(()=>__prank.stepBy(150));ok('pad: choosing with A does something',!(await p.evaluate(()=>__prank.state().picker)),'picker still open');}
     await tap(START);ok('pad: Start pauses',await ph()==='pause');await tap(A);ok('pad: A on Resume resumes',await ph()==='play');
     await p.evaluate(()=>__prank.stepBy(181*60));await tap(A);ok('pad: A on day end goes to the next day',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===1));
+    await p.evaluate(()=>__prank.stepBy(181*60));await tap(A);await p.evaluate(()=>__prank.stepBy(181*60));
+    ok('pad: the match plays to its end screen',await ph()==='matchend');
+    await tap(A);ok('pad: A on the end screen plays again',await p.evaluate(()=>__prank.phase==='play'&&__prank.state().day===0));
     await p.evaluate(()=>{__pad.connected=false;dispatchEvent(Object.assign(new Event('gamepaddisconnected'),{gamepad:__pad}))});await wait(p,100);
     ok('pad: unplugging pauses',await ph()==='pause');ok('pad: no console errors',!errs.length,errs.join(' | '));await ctx.close()}
 

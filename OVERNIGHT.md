@@ -191,3 +191,6 @@ See sections below, appended as work lands.
   follows it: 2 vs 0 and 9 vs 3 nightmares), added **a long day** (dusk at 30:00, verified), dropped generous and iron.
 - **Bug caught by hand play before commit:** an inserted `//` comment swallowed the rest of `start()`, so menu starts
   froze on the title. Fixed; tests/sleeper.js now starts giant, Corvel and first-day matches through `start()` (16 checks).
+- Bot sleeper holds its twitch in a part where those tending it (keepers, or people it regards well) outnumber hunters.
+  Seeds 51–52 to t=1000: keepers shaken 98→37 and 28→19; hunters shaken 200→163, 151→135; mean wedges in joints
+  0.18→0.23 and 0.21→0.36 (the sleep floor still caps the harm). Also: a new match clears the previous match's messages.

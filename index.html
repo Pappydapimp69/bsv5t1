@@ -1911,7 +1911,9 @@ function botShop(h){const town=townAt(h);if(h.hero){if(town)botHeroShop(h,town);
 function botSleeper(dt){const g=S.g;if(g.wind||nightLock())return;
   if(allWeak()){S.weakSince=S.weakSince??S.t;if(S.t-S.weakSince>=C.SELF_RISE&&!S.waker){g.aim=null;giantDo('strain')}return}
   // it twitches where it is being worked against, not at every touch, and strains now and then in its sleep
-  let bz=null,bs=0;for(const z in ZONES){const v=zoneFelt(z);if(v>bs){bs=v;bz=z}}
+  // it holds still where those tending it outnumber those hurting it (a keeper pulling a wedge is not shaken off)
+  const side=z=>{let f=0,e=0;for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===z){if(hunter(h))e++;else if(h.role==='keeper'||(S.reg&&S.reg[h.id]||0)>0)f++}return f>e};
+  let bz=null,bs=0;for(const z in ZONES){if(side(z))continue;const v=zoneFelt(z);if(v>bs){bs=v;bz=z}}
   if(bz&&bs>=1&&g.cd.twitch<=0&&rnd()<dt*(bs>=2.5?.4:.15)){g.aim=bz;giantDo('twitch');g.aim=null;return}
   if(g.cd.dream<=0&&dreamTarget()&&S.grudge[dreamTarget().i]>=C.DREAM_MIN*4&&rnd()<dt*.05){giantDo('dream');return}
   if(huntOpen()&&g.cd.strain<=0&&rnd()<dt*.05)giantDo('strain')}

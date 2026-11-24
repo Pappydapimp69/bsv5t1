@@ -2105,7 +2105,7 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   if(best>=0)setFocus(best)}
 function record(){const R=save.rec;return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.`+(R?` Wins for Ashville ${R.town[0]}, Brindle ${R.town[1]}, Corvel ${R.town[2]}. Highest climb ${R.climb} ft. Most giant tasks in a match ${R.tasks} of 5.`:'')+`</p>`}
 function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
-  items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant',act:()=>start('human',null,false,2)},
+  items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant. Hard: the giant turns on hunters, so lead your town or bring the giant down',act:()=>start('human',null,false,2)},
     {label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
@@ -2999,8 +2999,24 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
   if(pEl.bar.children.length!==TOWNS.length)pEl.bar.innerHTML=TOWNS.map(T=>`<i style="background:${T.col}" title="${T.name}"></i>`).join('');
   TOWNS.forEach((T,i)=>{const m=pEl.bar.children[i];m.style.left=pos[i]+'%';m.style.setProperty('--o',(i-1)*.3+'rem');m.style.opacity=factionAlive(i)?1:.3;m.style.height=(h&&h.town===i?1.4:1.1)+'rem';m.style.top=(h&&h.town===i?-.45:-.3)+'rem'});
   cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e){e.setAttribute('stroke',ring[st(c)][0]);e.setAttribute('opacity',ring[st(c)][1])}})}
+// with no job and the first day done, one line of what matters now, read from the state of the giant and your kit
+// (a pointer, not an autopilot: the player still chooses and walks)
+function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k=>h.kits[k]>0,climb=h.mode==='climb';
+  if(packCount(h)>=packCap(h))return'your pack is full: bank it at home';
+  if(g.dead)return'the giant is dead: hold your town until dusk';
+  if(h.horn&&!g.awake&&allWeak())return'sound your wake horn at the giant\u2019s head (1860 ft): it will owe '+TOWNS[h.town].name;
+  if(!g.awake&&chainsOpen()&&!allWeak())return'the chains weaken: break them at the ankles and wrists';
+  const w=wedgedJoints().filter(id=>J[id].wedges.some(x=>x.town!==h.town));
+  if(S.grudge[h.town]>=C.ANGER*.6)return'the giant is angry with '+TOWNS[h.town].name+': pull wedges or brace it to calm it, or bring it down';
+  if(kin('wedge'))return'drive your wedge into a knee ('+JOINTS.kneeL.r0*FT+' ft up) or another joint'+(g.awake?'':': asleep it bruises, it cannot be crippled');
+  if(kin('brace')||kin('cannon')||kin('ladder')||kin('platform'))return'bolt your kit onto a free build spot on the giant';
+  if(w.length&&!climb)return'rivals\u2019 wedges bleed the giant\u2019s '+JOINTS[w[0]].name.toLowerCase()+': pull them out and it will remember you';
+  if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
+  if(!climb&&h.gold>=C.COST.wedge&&huntOpen())return'buy a wedge or a brace kit in town, then climb the giant';
+  if(!climb)return'earn gold: take a job on the Board, hunt beasts or gather sky crystals';
+  return''}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
-  let a,b;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
+  let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
   paintPanel();
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
     const jf=id=>J[id].hp/J[id].max,worst=Math.min(jf('kneeL'),jf('kneeR'),jf('elbowL'),jf('elbowR'),jf('neck'));
@@ -3010,7 +3026,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Horn','ready'):'');
-    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):''}
+    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');
 

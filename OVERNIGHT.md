@@ -148,3 +148,14 @@ See sections below, appended as work lands.
 - Phone portrait (iPhone 13 emulation) checked for both roles: the body panel is large and tappable and the goal box keeps
   clear of it; touch labels truncated ("Strain le…", "Nightm…"), so chain and town names moved to the sub-line.
 - Title screen records now include wins per town, highest climb and most giant tasks in one match (saved locally).
+
+### 9. Robustness pass and a "Now" line (checkpoint 9)
+
+- 16 full headless matches (Ashville/Brindle/Corvel × seeds 21–24, plus giant × 4): no page errors, no NaN positions,
+  chronicles of 11–18 beats. Bot-led Corvel fell 4/4 (the bot "you" never leads), so Corvel's title button now says
+  it is the hard start and how to survive it.
+- With no job and the first day done, the goal line now shows **Now: …** — one pointer read from the giant's state and
+  your kit (bank a full pack; break weakened chains; sound your horn; calm the giant if it is angry with your town;
+  drive your wedge; bolt your kit; pull rivals' wedges; strike while it is down; buy a kit; earn gold). A pointer, not an
+  autopilot (GPTBS f45d5533 leaves open whether auto-walking hollows out walking). Checked seven states headless and in
+  the page (Brindle start shows "bolt your kit onto a free build spot on the giant").

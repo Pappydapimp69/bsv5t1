@@ -1995,7 +1995,11 @@ const cv=document.getElementById('cv');const ptrs=new Map();let tapDown=null,pin
 addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){device='touch';document.body.classList.add('touch')}unlockAudio();if(FILM&&S&&!S.over&&!menu&&S.t>1.5)skipFilm()},{capture:true});
 // the opening film can be skipped: the world runs ahead to the film's end, so nothing differs but the wait
 function skipFilm(){if(!S||S.t>=OPENING.len)return;while(S.t<OPENING.len&&!S.over)step(C.DT);if(S.introCam){const f=S.you||S.g;cam.yaw=Math.atan2(S.g.x-f.x,-(S.g.y-f.y))}S.introCam=false;cam.pitch=.12;S.cam.zoom=1;if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}}
-cv.addEventListener('pointerdown',e=>{cv.setPointerCapture?.(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+cv.addEventListener('pointerdown',e=>{
+  // the sleeping giant's body panel is a picker: tap or click a part of the body to aim the twitch there
+  if(S&&S.role==='giant'&&!S.g.awake&&S.panelRect){const R=cv.getBoundingClientRect(),P=S.panelRect,x=e.clientX-R.left,y=e.clientY-R.top;
+    if(x>=P.x-8&&x<=P.x+P.w+8&&y>=P.y&&y<=P.y+P.h){const c=clamp((x-P.x)/P.w*COLS,0,COLS-1),r=clamp(ROWS-1-(y-P.y)/P.h*ROWS,0,ROWS-1);S.g.aim=zoneAt(r,c);S.g.aimT=S.t;e.preventDefault();return}}
+  cv.setPointerCapture?.(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(ptrs.size===1)tapDown={x:e.clientX,y:e.clientY,moved:0};else{tapDown=null;const[a,b]=[...ptrs.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y)}});
 cv.addEventListener('pointermove',e=>{const p=ptrs.get(e.pointerId);if(!p)return;const dx=e.clientX-p.x,dy=e.clientY-p.y;p.x=e.clientX;p.y=e.clientY;if(tapDown)tapDown.moved+=Math.hypot(dx,dy);
   // one finger or the mouse dragging turns and tilts the camera on the ground
@@ -2022,7 +2026,7 @@ padEl.innerHTML=SLOTS.map(s=>`<button class="ab" data-s="${s}"><span class="k"><
 padEl.querySelectorAll('.ab').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(S&&S.fly){flyPress();return}if(!S||S.over||menu)return;presses.push(b.dataset.s)}));
 function slotInfo(){if(!S)return null;
   if(S.role==='giant'&&!S.g.awake&&!S.g.dead){const r=k=>canGiant(k),z=aimZone(),ch=strainTarget();
-    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:'Arrows pick a part'},B:{l:allWeak()?'Rise':'Strain'+(ch?' '+ch.name.replace(' chain',''):''),why:r('strain')},X:{l:'Nightmare'+((t=>t?' '+t.name:'')(dreamTarget())),why:r('dream')},Y:{l:'Swipe',why:'Asleep'}}}
+    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:device==='touch'?'Tap your body to pick a part':'Arrows or a click on your body pick a part'},B:{l:allWeak()?'Rise':'Strain'+(ch?' '+ch.name.replace(' chain',''):''),why:r('strain')},X:{l:'Nightmare'+((t=>t?' '+t.name:'')(dreamTarget())),why:r('dream')},Y:{l:'Swipe',why:'Asleep'}}}
   if(S.role==='giant'){const r=k=>canGiant(k);return{A:{l:'Stomp',why:r('stomp')},B:{l:'Smash',why:r('smash')},X:{l:'Shake',why:r('shake')},Y:{l:'Swipe',why:r('swipe')}}}
   return humanCtx(S.you)}
 let lastSig='';
@@ -2898,7 +2902,7 @@ function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UI
   // the camera's facing
   const cx=x0+S.cam.x*k,cy=y0+S.cam.y*k;ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+view.F.x*14,cy+view.F.y*14);ctx.stroke()}
 // the giant player's view of its own body: who is climbing where
-function renderBodyPanel(){const y0=UIX.top,ph=Math.min(UIX.rb-y0,440*UI),px=ph/ROWS,pw=COLS*px,x0=W-pw-12*UI;
+function renderBodyPanel(){const y0=UIX.top,ph=Math.min(UIX.rb-y0,440*UI),px=ph/ROWS,pw=COLS*px,x0=W-pw-12*UI;S.panelRect={x:x0,y:y0,w:pw,h:ph};
   ctx.fillStyle='rgba(8,10,14,.72)';ctx.fillRect(x0-6,y0-4,pw+12,ph+8);
   ctx.imageSmoothingEnabled=false;ctx.drawImage(bodyTexture(),x0,y0,pw,ph);
   for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];ctx.fillStyle=j.crip?'#555':id==='heart'?'#ff4d5e':'#ff9a4a';ctx.globalAlpha=.4+.6*(j.hp/j.max);ctx.fillRect(x0+J.c0*px,y0+(ROWS-1-J.r1)*px,(J.c1-J.c0+1)*px,(J.r1-J.r0+1)*px);ctx.globalAlpha=1}

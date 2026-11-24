@@ -118,3 +118,6 @@ See sections below, appended as work lands.
 - Comparable test (held W only, climber set at the right foot, seeds 11–13, 40 s): seed 12 old stuck at row 11 →
   new reaches row 81; seeds 11 and 13 unchanged (11 needs a lunge in both). Hand-played sleeping-giant policy, 3.5 min:
   first hunter at ~2:10, 8 twitches popped 3 wedges, knees stayed 100%, one Nightmare on Corvel at 2:58.
+- Touch/mouse: the sleeping giant's body panel is now a picker (tap or click a part to aim the twitch); before, a touch
+  giant could not aim at all because touch moves by tapping destinations. Verified with real mouse clicks: head → chest
+  and head, left arm → left side, right arm → right side, shin → legs.

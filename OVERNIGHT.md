@@ -134,3 +134,14 @@ See sections below, appended as work lands.
 - Hand-played the new first day with keys, following the goal marker: crystal at 0:26, at the ankle chain at 1:12,
   climbing at 1:14, on the knee ledge (462 ft) at 1:31.
 - Tests: barracks (incl. 8 tutorial checks), giant, heroes pass.
+
+### 8. The awake giant is never helpless (checkpoint 8)
+
+- Hand-played giant (seed from the menu): woke at 16:03 with **0 braces**: Stomp, Smash and Swipe locked and walking
+  speed 4. Brace counts at minute ~16 range 0–5 by seed even on the original build (c4be89c seed 3: 1 brace), so the
+  giant player's whole awake toolkit depended on bots.
+- Awake, the giant now always has the strength of one brace (walk 16 instead of 4, normal step time, Stomp). Smash (2)
+  and Swipe (3) still need towns to brace it, so courting keepers still matters.
+- Hand-played seed 3 awake: rose by strain at 16:34, walked on angry Corvel at full speed, right knee crippled on the
+  way (not defending), Shake knocked 9 climbers loose (4 hunters), fell at 18:04, rose at 18:22, smashed Corvel
+  4525 → 2490 in ~20 s. Test added to tests/sleeper.js (12 checks).

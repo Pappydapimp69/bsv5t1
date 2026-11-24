@@ -55,6 +55,10 @@ const {chromium} = require('playwright');
       const j = U.joints.neck, h0 = j.hp;
       for (const h of hs) damageJoint('neck', 10, h);
       out.crowding = h0 - j.hp < 60 && h0 - j.hp > 40;
+      // awake with no braces the giant still walks slowly and can stomp; smash still needs towns to brace it
+      const V = __col.newGame('giant', 4);
+      for (const c of V.chains) c.hp = 0; V.g.awake = true; V.g.cd.stomp = 0; V.g.cd.smash = 0;
+      out.ownBrace = braces() === 0 && giantSpeed() === C.G_DORMANT + C.G_PER_BRACE && canGiant('stomp') === null && canGiant('smash') === 'Needs 2 braces';
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

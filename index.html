@@ -2994,7 +2994,7 @@ const pEl={t:document.getElementById('gt'),d:document.getElementById('gd'),bar:d
 function standing(h){const sc=x=>(S.reg&&S.reg[x.id]||0)-S.grudge[x.town]*1e-4,all=S.humans.filter(x=>factionAlive(x.town)),me=sc(h),n=1+all.filter(x=>x!==h&&sc(x)>me+.5).length;if(all.every(x=>Math.abs(S.reg&&S.reg[x.id]||0)<.5))return'it has judged no one yet';return n===1?'it regards you most':'you stand '+n+' of '+all.length+' in its regard'}
 function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(c)?1:2,ring={0:['#666',.3],1:['#f0a050',1],2:['#e8e2d2',1]};
   const word=pre=>{const a=cs.filter(c=>c.id.startsWith(pre)).map(st);return a.every(x=>x===0)?'broken':a.some(x=>x===0)?'one broken':'hold'};
-  const t=S.role==='giant'?(g.awake?'You, the giant':'You sleep, chained'):g.fallen>0?'The giant is down':g.awake?'The giant is awake':'The giant sleeps';
+  const t=S.role==='giant'?(g.awake?'You, the giant':'You sleep, chained'):g.fallen>0?'The giant is down':g.awake?'The giant is awake':(g.wind||S.t-(S.windAt||-9)<3)?'The giant stirs in its sleep':'The giant sleeps';
   const ch=cs.some(c=>c.hp>0)?'ankles '+word('ankle')+', wrists '+word('wrist'):'';
   const sub=S.role==='giant'?TOWNS.map((T,i)=>T.name+' '+(factionAlive(i)?mood(i):'ruined')).join(' \u00b7 ')+(ch?' \u00b7 '+ch:''):(mood(h.town)[0].toUpperCase()+mood(h.town).slice(1)+' toward '+TOWNS[h.town].name+' \u00b7 '+standing(h)+(ch?' \u00b7 '+ch:''));
   {const key=(S.role==='giant'?'':mood(h.town)+(standing(h)==='it regards you most'))+ch;if(key!==S.gsKey){S.gsKey=key;S.gsAt=S.t}const pulse=S.t<(S.gsPulse||0),quiet=!pulse&&S.t-(S.gsAt||0)>6;pEl.s.classList.toggle('quiet',quiet);pEl.s.classList.toggle('pulse',pulse)}

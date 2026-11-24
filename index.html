@@ -567,7 +567,10 @@ const sstep=u=>u<=0?0:u>=1?1:u*u*(3-2*u);
 function landRaw(x,y){const L=S&&S.land;if(!L)return 0;const N=LAND.N,u=clamp(x/LAND.CS,0,N-1.001),v=clamp(y/LAND.CS,0,N-1.001),i=u|0,j=v|0,fu=u-i,fv=v-j,k=j*N+i,H=L.h;
   return(H[k]*(1-fu)+H[k+1]*fu)*(1-fv)+(H[k+N]*(1-fu)+H[k+N+1]*fu)*fv}
 // walking uphill is slower (down to 0.6 of full pace on a steep face); downhill and flat are full pace
-function landPace(h,vx,vy){if(!S.land)return 1;const l=Math.hypot(vx,vy)||1,s=(groundH(h.x+vx/l*30,h.y+vy/l*30)-groundH(h.x,h.y))/30;return s>0?Math.max(.6,1-1.4*s):1}
+// roads are the fast way across the wide land: on a road people walk a quarter faster (uphill still slows them)
+C.ROAD_PACE=1.25;
+const onRoad=(x,y)=>!!(S.land&&S.land.road&&S.land.road[landCell(x,y)]);
+function landPace(h,vx,vy){if(!S.land)return 1;const l=Math.hypot(vx,vy)||1,s=(groundH(h.x+vx/l*30,h.y+vy/l*30)-groundH(h.x,h.y))/30;return (s>0?Math.max(.6,1-1.4*s):1)*(onRoad(h.x,h.y)?C.ROAD_PACE:1)}
 // cheapest path on an N by N grid of 8 neighbours. cost(a,b,len) gives a step's cost (Infinity blocks); with goal it returns
 // the cells from a start to the first goal cell reached, without one the whole cost field
 function landSearch(N,cost,starts,goal){const D=new Float64Array(N*N).fill(Infinity),P=new Int32Array(N*N).fill(-1),hk=[],hv=[];
@@ -668,7 +671,7 @@ function populateLand(){for(let a=0;;a++){S.monsters=[];S.crystals=[];S.crysN=0;
 // reaches it first); and the first day's places: the house spot, the crystal ring at 520, the wolves' ring, the feet
 function checkLand(){const N=LAND.N,CS=LAND.CS,T=S.towns,g=S.g,why=[],blk=new Uint8Array(N*N),G=new Float32Array(N*N);
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){const k=j*N+i;G[k]=groundH(i*CS,j*CS);if(inSolid(i*CS,j*CS,14))blk[k]=1}
-  const cost=(a,b,L)=>{if(blk[b])return Infinity;const s=(G[b]-G[a])/(L*CS);return L*CS/C.H_SPEED/(s>0?Math.max(.6,1-1.4*s):1)};
+  const R=S.land&&S.land.road,cost=(a,b,L)=>{if(blk[b])return Infinity;const s=(G[b]-G[a])/(L*CS);return L*CS/C.H_SPEED/(s>0?Math.max(.6,1-1.4*s):1)/(R&&R[a]&&R[b]?C.ROAD_PACE:1)};
   const D=T.map(t=>landSearch(N,cost,[landCell(t.x,t.y)],null)),at=(d,x,y)=>{const i=Math.round(x/CS),j=Math.round(y/CS);let b=Infinity;for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){const a=i+di,c=j+dj;if(a>=0&&c>=0&&a<N&&c<N)b=Math.min(b,d[c*N+a])}return b};
   const P=k=>(S.places||[]).filter(p=>p.k===k),near=(d,L)=>Math.min(...L.map(o=>at(d,o.x,o.y)));
   const rows=T.map((t,i)=>({town:t.name,next:Math.max(...T.filter(o=>o!==t).map(o=>at(D[i],o.x,o.y))),foot:near(D[i],g.feet),ruin:near(D[i],S.caches),field:near(D[i],P('field')),den:near(D[i],P('den')),stone:near(D[i],P('stone')),crystals:0}));
@@ -794,7 +797,7 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
     S.anchors=S.anchors.filter(a=>{if(zoneAt(a.r,a.c)===w.zone&&rnd()<C.TWITCH_ANCHOR){lost++;return false}return true});
     for(const id in S.joints)if(JOINT_ZONE[id]===w.zone){const j=S.joints[id],b=j.wedges.length;j.wedges=j.wedges.filter(()=>rnd()>C.TWITCH_WEDGE);fell+=b-j.wedges.length}
     S.fx.push({k:'twitch',zone:w.zone,t:0,life:.7});S.twitches=(S.twitches||0)+1;
-    if(S.role==='giant'&&!S.autoplay)toast('A twitch runs through your '+ZONES[w.zone]+': '+n+' climber'+(n===1?'':'s')+' shaken, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
+    if(S.role==='giant'&&!S.autoplay)toast('A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+climbers().filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
     return}
   if(w.k==='strain'){if(allWeak()){riseFree();return}const ch=S.chains.find(c=>c.id===w.chain);shake(5);S.strains=(S.strains||0)+1;
     for(const h of climbers())h.grip-=CHAIN_ZONE[w.chain]===zoneAt(h.cl.y,h.cl.x)?5:1.5;
@@ -809,13 +812,14 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
       const d=onL?(braced?0:8):braced?C.SHAKE_BRACED:C.SHAKE_GRIP;h.grip-=d;if(h.you)toast(d<=12?'Braced. You held on.':'Shaken! Your grip slips.')}
     S.anchors=S.anchors.filter(()=>{if(rnd()<C.SHAKE_ANCHOR){lost++;return false}return true});
     for(const id in S.joints){const j=S.joints[id];j.wedges=j.wedges.filter(()=>{if(rnd()<C.SHAKE_WEDGE){fell++;return false}return true})}
-    if(S.role==='giant'&&!S.autoplay)toast('Shake! '+lost+' ropes and '+fell+' wedges fell loose.')}
+    if(S.role==='giant'&&!S.autoplay){const off=climbers().filter(h=>h.grip<=0),hn=off.filter(hunter).length;toast('Shake! '+off.length+' climber'+(off.length===1?'':'s')+' lose their grip ('+hn+' hunting you), '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.')}}
   else if(w.k==='swipe'){shake(8);const left=w.side==='L';let n=0;
     const inZone=(c,r)=>r>=30&&(left?c<COLS/2:c>=COLS/2);
     for(const h of climbers())if(inZone(h.cl.x,h.cl.y)){const onL=restful(cellT(h.cl.x,h.cl.y));h.grip-=onL?15:C.SWIPE_GRIP;n++;if(h.you)toast(onL?'You flatten on the ledge as the hand passes.':'The hand scrapes over you!')}
     S.anchors=S.anchors.filter(a=>!(inZone(a.c,a.r)&&rnd()<C.SWIPE_CLEAR));
     for(const id in S.joints){const J=JOINTS[id],j=S.joints[id];if(inZone((J.c0+J.c1)/2,J.r0))j.wedges=j.wedges.filter(()=>rnd()>C.SWIPE_CLEAR)}
-    S.fx.push({k:'swipe',side:w.side,t:0,life:.6})}}
+    S.fx.push({k:'swipe',side:w.side,t:0,life:.6});
+    if(S.role==='giant'&&!S.autoplay){const off=climbers().filter(h=>h.grip<=0),hn=off.filter(hunter).length;toast('Swipe! '+n+' scraped, '+off.length+' knocked loose ('+hn+' hunting you).')}}}
 function hurtArea(x,y,r,dmg,tdmg,why){
   S.builds=S.builds.filter(b=>{if(Math.hypot(b.x-x,b.y-y)<r+30){S.fx.push({k:'ring',x:b.x,y:b.y,r:50,t:0,life:.5,col:'#c9b48a'});destroyBuild(b,true);return false}return true});
   for(const h of S.humans)if(h.mode==='ground'&&!h.dead&&Math.hypot(h.x-x,h.y-y)<r+10)hurtHuman(h,dmg,why);
@@ -1564,7 +1568,7 @@ function stepHuman(h,dt,mv){
   if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   if(assigned&&dist(h,assigned)>Math.max(C.FORAGE_RANGE,dist(assigned,{x,y}))){h.x=x;h.y=y;h.goal=null;h.returnHome=true}
-  for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered%C.STAR_EVERY===0)startStar();
+  for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered>=(S.nextStar||C.STAR_EVERY)){S.nextStar=S.gathered+C.STAR_EVERY+4*S.evc.star;if(S.events.filter(e=>e.k==='star').length<2)startStar()};
     if(h.you){sfx('coin');toast('Sky crystal ('+packCount(h)+'/'+packCap(h)+' in pack)'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
   const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);questTick(h,'arrive',t.id);if(t.i===h.town)unloadPack(h,t);
     if(folk&&t!==assigned)return;

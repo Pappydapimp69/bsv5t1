@@ -52,3 +52,17 @@ See sections below, appended as work lands.
   the legs twitched within a second, held still → "Braced", wedge stayed. Hand-played (giant): strain/aim/twitch respond, HUD
   names the aimed part and chain; body panel shows aim outline, chain bars and red-edged hunters.
 - Tests: giant, heroes, barracks, land-fairness pass; new `tests/sleeper.js` (11 checks).
+
+### 2. Time budget, roads, stars, giant feedback (checkpoint 2)
+
+- Hand-played the awake giant (fast-forwarded a giant game to 15:30 as a test shortcut, then played by keys): tore the last
+  chain and rose at 15:34; 38–53 climbers on the body (20 Corvel hunters, 36 friendly tenders from 27 barracks). Shake
+  reported "0 ropes and 0 wedges" though 3 climbers fell; Swipe and Stomp said nothing. Crippled and fallen 70 s later.
+  → Shake, Swipe and Twitch now report how many climbers lost their grip and how many of those were hunting you.
+- Falling stars snowballed (one per 16 crystals gathered by anyone; ~10 craters on screen and 7 announcements in 35 s by
+  minute 16). Now at most 2 uncollected stars, and each needs 4 more crystals gathered than the last.
+- Time budget (GPTBS 0101#E97: log time per activity with a bot when the map grows). Autoplay hero, seeds 1–3, first
+  15 min: **walking 86–90% of the time, never climbed**, 0–4% of walking on roads.
+- Roads now speed walking. 1.5× vs 1.25× compared: 1.5× made following the road 25–40% faster to the giant on 11/15
+  town routes but 30/40 lands failed the fairness check on first lay (1 never fair) once roads were counted in it;
+  1.25× → 0 unfair, 10/40 relaid. Kept 1.25× and the fairness check now counts road pace.

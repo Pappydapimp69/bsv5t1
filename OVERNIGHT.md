@@ -74,3 +74,15 @@ See sections below, appended as work lands.
 - Bot giant now rests 25 s after 3 shakes/swipes within 40 s (L4D build-up/peak/relax, Booth 2009 pp. 79–82).
   Same 3 seeds, giant autoplay: shakes −28%, swipes −55%; still reaches dusk 3/3, falls 2–3 (was 1–2), min Heart 493–2767.
 - Re-played by hand: from 1000 ft to the chest (1345 ft) in 24 s with one shake, bracing on the warning.
+
+### 4. A chronicle at the end, and a choice of town (checkpoint 4)
+
+- Evidence: GPTBS test#E10 and film#E3 (opened): events in order are a chronicle, not a story; link beats with
+  because/therefore. Sylvester, "The Simulation Dream" (2013, Player Model Principle): "In play, the Game Model is
+  irrelevant. Players can't perceive it directly." Colossus simulates grudges, regard and armies that the player never sees.
+- End screen now shows **How it went**: timestamped turning points with causes where the game knows them (first wedge into
+  the sleeper, the four chains and whose work they were, who woke it and that it owes them, why it turned on a town,
+  each fall and whose hunters caused it, towns destroyed and why, the dusk verdict) and **Your part** (human: highest
+  climb, wedges, what you built on the giant, your standing in its regard; giant: actions used, climbers knocked loose, tasks).
+- Six sim chronicles showed Corvel destroyed in every match and the player always Ashville. Title now offers
+  **Play for Ashville / Brindle / Corvel** (first day stays Ashville's). Hand-checked a Corvel start.

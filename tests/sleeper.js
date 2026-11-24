@@ -59,6 +59,11 @@ const {chromium} = require('playwright');
       const V = __col.newGame('giant', 4);
       for (const c of V.chains) c.hp = 0; V.g.awake = true; V.g.cd.stomp = 0; V.g.cd.smash = 0;
       out.ownBrace = braces() === 0 && giantSpeed() === C.G_DORMANT + C.G_PER_BRACE && canGiant('stomp') === null && canGiant('smash') === 'Needs 2 braces';
+      // the giant player always has something to do: over the first five minutes no stretch longer than 30 s without a usable action
+      const Wg = __col.newGame('giant', 2); Wg.autoplay = true; let last = 0, gap = 0;
+      const ks = ['stomp', 'smash', 'shake', 'swipe', 'twitch', 'strain', 'dream'];
+      while (Wg.t < 300) { __col.step(30); if (ks.some(k => canGiant(k) === null)) { gap = Math.max(gap, Wg.t - last); last = Wg.t } }
+      out.neverIdle = Math.max(gap, Wg.t - last) <= 30;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

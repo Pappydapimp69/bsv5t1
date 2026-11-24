@@ -86,3 +86,8 @@ See sections below, appended as work lands.
   climb, wedges, what you built on the giant, your standing in its regard; giant: actions used, climbers knocked loose, tasks).
 - Six sim chronicles showed Corvel destroyed in every match and the player always Ashville. Title now offers
   **Play for Ashville / Brindle / Corvel** (first day stays Ashville's). Hand-checked a Corvel start.
+- The Corvel end screen exposed that the player's own town kept hunting whatever the player did. Now your town's bot
+  barracks follow your lead once your regard passes ±40 (else the town's habit). Same seeds 1–3, Corvel player autoplay:
+  habit only → Corvel fell (1) or lost settlements (2), barracks hunted ~2400 checks vs ~800 tend; with the player keeping
+  regard at 120 (simulated tending) → all 4 Corvel settlements stood 3/3 and the giant honoured the player at dusk 3/3.
+  Trade-off seen: with no Corvel hunters the giant never fell (falls 0) — the drama moves to whoever still hunts.

@@ -170,3 +170,11 @@ See sections below, appended as work lands.
   drive your wedge; bolt your kit; pull rivals' wedges; strike while it is down; buy a kit; earn gold). A pointer, not an
   autopilot (GPTBS f45d5533 leaves open whether auto-walking hollows out walking). Checked seven states headless and in
   the page (Brindle start shows "bolt your kit onto a free build spot on the giant").
+
+### 10. Struggle while fallen (checkpoint 10)
+
+- When both knees were crippled the giant player sat 18 s with every button reading "Fallen" while hunters worked the
+  Heart. Now every button is **Struggle** while down: each press takes 0.3 s off the fall and jolts climbers (−2 grip).
+- Evidence: GPTBS demo-disc#E32 (tune with human-timing profiles, not a perfect autopilot). Profiles, seeds 1–3: no
+  struggle → 18 s per fall, seed 2 min Heart 3%; casual/skilled presses → ~13 s per fall, seed 2 min Heart 44–58%; falls
+  still 0–4 per match. Hand-checked in the page: all four buttons read Struggle with the seconds left; 4 presses cut 18 → 15.1.

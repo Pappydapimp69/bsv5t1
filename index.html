@@ -478,7 +478,7 @@ function newGame(role,seed,town=0){
   const M=C.MAP,cx=M/2,cy=M/2;
   const towns=TOWNS.map((t,i)=>{const a=-Math.PI/2+i*Math.PI*2/3;return{i,id:i,name:t.name,col:t.col,shape:t.shape,x:cx+Math.cos(a)*C.TOWN_RING,y:cy+Math.sin(a)*C.TOWN_RING,r:150,hp:3600,max:3600,alive:true,crystals:0}});
   const joints={};for(const id in JOINTS)joints[id]={hp:JOINTS[id].max,max:JOINTS[id].max,crip:false,wedges:[]};
-  const g={x:cx,y:cy,ang:-Math.PI/2,v:0,tx:null,ty:null,fallen:0,dead:false,wind:null,cd:{stomp:2,smash:3,shake:5,swipe:6,twitch:0,strain:0},aim:null,
+  const g={x:cx,y:cy,ang:-Math.PI/2,v:0,tx:null,ty:null,fallen:0,dead:false,wind:null,cd:{stomp:2,smash:3,shake:5,swipe:6,twitch:0,strain:0,dream:20},aim:null,
     awake:false,feet:[{x:cx-C.FOOT_SPREAD,y:cy,air:0},{x:cx+C.FOOT_SPREAD,y:cy,air:0}],phase:0,target:null,botT:0,sway:0};
   S={role,seed,t:0,towns,g,joints,body:buildBody(seed),sites:SITES.map(s=>({...s,build:null})),anchors:[],
     humans:[],monsters:[],crystals:[],trees:[],prints:[],shots:[],fx:[],over:null,nextId:1,
@@ -496,7 +496,7 @@ function newGame(role,seed,town=0){
   return S}
 function mkHuman(ti,you,role,t=S.towns[ti],hero=you){
   return{id:S.nextId++,town:ti,you,hero,role,homeId:role==='folk'?t.id:null,x:t.x+rr(-60,60),y:t.y+rr(-60,60),hp:100,max:100,atk:10,lvl:1,xp:0,gold:hero?40:30,
-    kits:{anchor:hero?3:0,wedge:0,cannon:0,brace:0,ladder:hero?1:0,platform:0},potions:1,gloves:0,def:0,gear:{blade:0,armour:0,pack:0,gloves:0},bigPotions:0,crystals:0,horn:0,pack:{crystals:0,pelts:0,found:0},quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
+    kits:{anchor:hero?3:0,wedge:hero&&role==='warden'?1:0,cannon:0,brace:0,ladder:hero?1:0,platform:0},potions:1,gloves:0,def:0,gear:{blade:0,armour:0,pack:0,gloves:0},bigPotions:0,crystals:0,horn:0,pack:{crystals:0,pelts:0,found:0},quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
     tx:null,ty:null,goal:null,think:0,face:0,swing:0,botClimb:null,rest:false,
     name:you?'You':role==='folk'?t.name+' forager':TOWNS[ti].name+(hero?' hero':' '+role)}}
 function maxGrip(h){return C.GRIP+h.gloves*25+(h.lvl-1)*5}
@@ -726,8 +726,12 @@ function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below a third of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
-C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.5;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
+C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
 C.TWITCH_CD=6;C.TWITCH_WIND=1.1;C.TWITCH_GRIP=36;C.TWITCH_BRACED=8;C.TWITCH_WEDGE=.5;C.TWITCH_ANCHOR=.4;
+C.DREAM_CD=90;C.DREAM_WIND=1.5;C.DREAM_MIN=50;
+// the sleeper's nightmare: it dreams of the town that has hurt it most, and the beasts of the land march on that town
+function dreamTarget(){let b=-1;for(let i=0;i<3;i++)if(factionAlive(i)&&S.grudge[i]>=C.DREAM_MIN&&(b<0||S.grudge[i]>S.grudge[b]))b=i;if(b<0)return null;
+  if(S.events.some(e=>e.k==='raid'&&e.i===b))return null;return nearestOwn(b,S.g.x,S.g.y)}
 C.STRAIN_CD=3.5;C.STRAIN_WIND=.7;C.STRAIN_DMG=55;C.STRAIN_FLOOR=.4;C.STRAIN_OPEN=1.6;C.SELF_RISE=60;
 const huntOpen=()=>!!S&&(S.g.awake||S.t>=C.HUNT_OPEN);
 const ZONES={legs:'legs',left:'left side',right:'right side',top:'chest and head'};
@@ -772,6 +776,8 @@ function giantMotion(m,dt,tx,ty,vmax){let want=0,da=0;
   m.x=clamp(m.x+Math.cos(m.ang)*m.v*WS*dt,300,C.MAP-300);m.y=clamp(m.y+Math.sin(m.ang)*m.v*WS*dt,300,C.MAP-300)}
 function canGiant(k){const g=S.g,J=S.joints;
   if(g.dead)return'The giant is dead';
+  if(!g.awake&&k==='dream'){if(nightLock())return'Night: you sleep deep';if(g.wind)return'Busy';if(g.cd.dream>0)return'Ready in '+Math.ceil(g.cd.dream)+'s';
+    if(!dreamTarget())return[0,1,2].some(i=>S.grudge[i]>=C.DREAM_MIN)?'Beasts already march on them':'No town has hurt you yet';return null}
   if(!g.awake&&(k==='twitch'||k==='strain')){if(nightLock())return'Night: you sleep deep';if(g.wind)return'Busy';if(g.cd[k]>0)return'Ready in '+Math.ceil(g.cd[k])+'s';
     if(k==='strain'&&!allWeak()&&!strainTarget())return'Strained as far as they go until the chains weaken';return null}
   if(!g.awake)return'Asleep';if(g.fallen>0)return'Fallen';if(g.wind)return'Busy';if(g.cd[k]>0)return'Ready in '+Math.ceil(g.cd[k])+'s';
@@ -791,6 +797,7 @@ function giantDo(k){const why=canGiant(k);if(why){if(S.role==='giant'&&!S.autopl
     let a=g.ang,d=C.SMASH_REACH*.8;if(best){a=Math.atan2(best.y-g.y,best.x-g.x);d=Math.min(C.SMASH_REACH,bd)}w.x=g.x+Math.cos(a)*d;w.y=g.y+Math.sin(a)*d}
   if(k==='swipe')w.side=swipeSide();
   if(k==='twitch'){w.zone=aimZone();for(const h of climbers())if(h.you&&zoneAt(h.cl.y,h.cl.x)===w.zone)toast('A twitch gathers in the giant\u2019s '+ZONES[w.zone]+'! Hold still to brace.');sfx('warn')}
+  if(k==='dream'){const t=dreamTarget();w.town=t&&t.id}
   if(k==='strain'){const ch=allWeak()?null:strainTarget();w.chain=ch&&ch.id;if(!S.headless&&ch)chainClank(ch)}
   if(k==='shake'||k==='swipe'){for(const h of climbers())if(h.you)toast(k==='shake'?'The giant tenses! Hold still to brace.':'A hand is coming! Get to a ledge or the other side.');sfx('warn')}
   if(!S.headless)giantCall(k==='shake'||k==='twitch'?'rumble':k==='strain'?'pain':'bellow');
@@ -804,6 +811,9 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;S.windAt=S.t;
     S.fx.push({k:'twitch',zone:w.zone,t:0,life:.7});S.twitches=(S.twitches||0)+1;
     if(S.role==='giant'&&!S.autoplay)toast('A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+climbers().filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
     return}
+  if(w.k==='dream'){const t=S.towns.find(x=>x.id===w.town);if(!t||!t.alive)return;
+    chron('Because '+TOWNS[t.i].name+'\u2019s people had hurt it, the sleeping giant dreamed of '+t.name+' and beasts marched on it.');
+    startRaid(t,'The sleeping giant dreams of '+t.name+'. Beasts gather beyond it and march in 20 s!');S.fx.push({k:'ring',x:S.g.x,y:S.g.y,r:900,t:0,life:1.2,col:'#b48cff'});return}
   if(w.k==='strain'){if(allWeak()){riseFree();return}const ch=S.chains.find(c=>c.id===w.chain);shake(5);S.strains=(S.strains||0)+1;
     for(const h of climbers())h.grip-=CHAIN_ZONE[w.chain]===zoneAt(h.cl.y,h.cl.x)?5:1.5;
     if(ch&&ch.hp>0){const open=chainsOpen(),floor=open?0:ch.max*C.STRAIN_FLOOR;ch.hp=Math.max(floor,ch.hp-C.STRAIN_DMG*(open?C.STRAIN_OPEN:1));(S.chainFlash||(S.chainFlash={}))[ch.id]=S.t;
@@ -1351,7 +1361,7 @@ function pickGoalHero(h){
   if(!g.dead&&!nightLock()){
     const breaking=h.role==='keeper'&&!g.awake&&chainsOpen()&&!allWeak();
     const building=(g.awake||allWeak())&&heroSiteGoal(h);
-    if(readyToWake(h)||breaking||building||g.awake&&(soldierClimbReady(h)||h.quest?.k==='climb'||h.quest?.k==='tend'&&wedgedJoints().length)){
+    if(readyToWake(h)||breaking||building||(g.awake||h.role==='warden'&&huntOpen()&&h.kits.wedge>0)&&(soldierClimbReady(h)||h.quest?.k==='climb'||h.quest?.k==='tend'&&wedgedJoints().length)){
       const foot=breaking&&footGoal(h,true)||footGoal(h);if(foot)return foot;
     }
   }
@@ -1749,6 +1759,7 @@ function botGoalCells(h){const g=S.g,J=S.joints;
     const enemy=S.sites.filter(s=>s.build&&s.build.k==='cannon'&&s.build.town!==h.town);if(enemy.length&&h.lvl>=2)return{kind:'wreck',test:(r,c)=>enemy.some(s=>s.r===r&&s.c===c)};
     return{kind:'down',test:r=>r===0}}
   if(!huntOpen())return{kind:'down',test:r=>r===0};
+  if(!g.awake&&h.hero&&!h.kits.wedge)return{kind:'down',test:r=>r===0}; // a hero does not hang on a sleeper with nothing to drive in
   if(!g.awake){const k=['kneeL','kneeR','elbowL','elbowR','neck'].filter(id=>J[id].hp>J[id].max*C.SLEEP_FLOOR+5&&J[id].wedges.length<C.WEDGE_MAX).sort((a,b)=>J[b].hp-J[a].hp)[0];return k?{kind:'joint',id:k}:{kind:'down',test:r=>r===0}}
   if(g.fallen>0)return{kind:'joint',id:'heart'};
   const enemy=S.sites.filter(s=>s.build&&s.build.town!==h.town);
@@ -1880,6 +1891,7 @@ function botSleeper(dt){const g=S.g;if(g.wind||nightLock())return;
   // it twitches where it is being worked against, not at every touch, and strains now and then in its sleep
   let bz=null,bs=0;for(const z in ZONES){const v=zoneFelt(z);if(v>bs){bs=v;bz=z}}
   if(bz&&bs>=1&&g.cd.twitch<=0&&rnd()<dt*(bs>=2.5?.4:.15)){g.aim=bz;giantDo('twitch');g.aim=null;return}
+  if(g.cd.dream<=0&&dreamTarget()&&S.grudge[dreamTarget().i]>=200&&rnd()<dt*.05){giantDo('dream');return}
   if(huntOpen()&&g.cd.strain<=0&&rnd()<dt*.05)giantDo('strain')}
 function botGiant(dt){const g=S.g;if(!g.dead&&!g.awake&&S.t>=C.HUNT_OPEN){botSleeper(dt);return}if(g.dead||g.fallen>0||!g.awake)return;g.botT-=dt;
   const alive=aliveTowns();
@@ -1915,7 +1927,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
   for(const h of S.humans){let m={x:0,y:0};
     if(h.you&&!S.autoplay){if(h.mode==='climb')m=climbInput(h,mv);else m=wm}else m=botHuman(h,dt);
     stepHuman(h,dt,m)}
-  for(const a of combatPresses(takePresses(),wm)){if(S.role==='giant'){if(!S.autoplay)giantDo((S.g.awake?{A:'stomp',B:'smash',X:'shake',Y:'swipe'}:{A:'twitch',B:'strain',X:'shake',Y:'swipe'})[a])}
+  for(const a of combatPresses(takePresses(),wm)){if(S.role==='giant'){if(!S.autoplay)giantDo((S.g.awake?{A:'stomp',B:'smash',X:'shake',Y:'swipe'}:{A:'twitch',B:'strain',X:'dream',Y:'swipe'})[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?climbInput(S.you,mv):null)}
   if(S.you&&S.you.mode==='climb'&&S.you.cl)S.you.best=Math.max(S.you.best||0,S.you.cl.y);
   stepCombat(dt);stepDays(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepArmy(dt);stepCrumble(dt);stepEvents(dt);
@@ -2007,7 +2019,7 @@ padEl.innerHTML=SLOTS.map(s=>`<button class="ab" data-s="${s}"><span class="k"><
 padEl.querySelectorAll('.ab').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(S&&S.fly){flyPress();return}if(!S||S.over||menu)return;presses.push(b.dataset.s)}));
 function slotInfo(){if(!S)return null;
   if(S.role==='giant'&&!S.g.awake&&!S.g.dead){const r=k=>canGiant(k),z=aimZone(),ch=strainTarget();
-    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:'Arrows pick a part'},B:{l:allWeak()?'Rise':'Strain'+(ch?' '+ch.name.replace(' chain',''):''),why:r('strain')},X:{l:'Shake',why:'Asleep'},Y:{l:'Swipe',why:'Asleep'}}}
+    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:'Arrows pick a part'},B:{l:allWeak()?'Rise':'Strain'+(ch?' '+ch.name.replace(' chain',''):''),why:r('strain')},X:{l:'Nightmare'+((t=>t?' '+t.name:'')(dreamTarget())),why:r('dream')},Y:{l:'Swipe',why:'Asleep'}}}
   if(S.role==='giant'){const r=k=>canGiant(k);return{A:{l:'Stomp',why:r('stomp')},B:{l:'Smash',why:r('smash')},X:{l:'Shake',why:r('shake')},Y:{l:'Swipe',why:r('swipe')}}}
   return humanCtx(S.you)}
 let lastSig='';
@@ -2095,14 +2107,14 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Ruins.</b> The old giants lying across the land are ruins, guarded by trolls. Search their ribs for gold, sky crystals and kits; each fills again after a few minutes.</p>
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Houses extend the dashed build area for houses, watchtowers, and barracks. Each completed house makes room for one more forager, up to ${FORAGER_CAP} per settlement. Nearby friendly foragers and soldiers recover ${HOUSE_RECOVERY} health per second after five seconds without taking damage. The bonus is the same near one house or several. Found an outpost away from other settlements, then raise it into a town with sky crystals. A promoted outpost helps keep your people in the game if their other towns fall. Settle beside the giant's footprint lakes to earn gold, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
-<p><b>Building on the giant.</b> Twenty-one build spots lie across its shoulders, crown, chest, hips, forearms, wrists and thighs. A ladder fixes firm holds for three hundred feet below its spot, for anyone; a platform is a resting place that catches your people when they fall; cannons and braces as before. Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes half again as much damage. Only three people's blows count on one joint at a time, and a town's soldiers strike stone at half strength. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
+<p><b>Building on the giant.</b> Twenty-one build spots lie across its shoulders, crown, chest, hips, forearms, wrists and thighs. A ladder fixes firm holds for three hundred feet below its spot, for anyone; a platform is a resting place that catches your people when they fall; cannons and braces as before. Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes half again as much damage. Only three people's blows count on one joint at a time, and a town's soldiers strike stone at seven-tenths strength. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
 <p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashville is of two minds. You can play for any of the three: as Ashville you make its way yourself; as Brindle or Corvel you start with your people's habit, but your town's barracks follow your lead: once the giant clearly likes (or hates) what you do, they tend (or hunt) it too. At the end a chronicle tells how the match turned and why. At dusk the giant lies down as a mountain beside the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
 <p><b>Foragers and barracks.</b> Heroes build. Foragers use their settlement’s crystals to raise its hero-built houses and spend their own gold to train and equip soldiers at its hero-built barracks. Each barracks trains up to three soldiers. A settlement allows one barracks per level. Beside your barracks you can give orders. The soldiers hold for twenty seconds, then return and set out again until you change the order or choose Stand down.</p>
 <p><b>The giant judges you.</b> Beside each town's grudge it keeps a regard for every person. Blows and wedges lower yours; breaking its chains, pulling wedges, bracing it, mounting cannons, waking it and soldiers guarding its feet raise it. At the first dusk after it wakes it honours the one person it regards best, and you win only if that is you. The panel at the top shows where you stand.</p>
 <p><b>Days and nights.</b> Each day ends at dusk in a short night. While it is chained, no one can touch the giant at night, and the dusk storm grows as its chains wear.</p>
 <p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Every blow wears a chain, and worn through it breaks; once all four are broken, a wake horn, forged in town from twenty sky crystals and sounded at its head for ten seconds, wakes it, and the town that wakes it earns its favour; and only then can it move. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
 <p><b>Playing the giant.</b> You win by surviving until dusk with your Heart-stone whole and completing three of five tasks: be Freed (all four chains broken), be Braced (three braces), be Avenged (a town that angered you brought below half its walls), be Befriended (a town friendly to you), and be a Wanderer (six thousand paces walked). The HUD shows each. You cannot build: court the towns that brace you and leave the hunters to rue it. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
-<p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: before minute 15 it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. </p>
+<p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: before minute 15 it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. Once a town has hurt you, Nightmare (X) sends the beasts of the land against it; its people must go home to fight them. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
 function openPause(){if(!S||S.over)return;const h=S.you;

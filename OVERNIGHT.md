@@ -91,3 +91,21 @@ See sections below, appended as work lands.
   habit only → Corvel fell (1) or lost settlements (2), barracks hunted ~2400 checks vs ~800 tend; with the player keeping
   regard at 120 (simulated tending) → all 4 Corvel settlements stood 3/3 and the giant honoured the player at dusk 3/3.
   Trade-off seen: with no Corvel hunters the giant never fell (falls 0) — the drama moves to whoever still hunts.
+
+## Window extended (owner: "Continue for another 4 hours", received 21:53Z)
+
+- New cutoff 2026-11-25T01:53:40Z; final 20 minutes from 01:33Z.
+
+### 5. Nightmare, earlier hunters, retuned danger (checkpoint 5)
+
+- Hand-played the first 4 min as the giant: eight Strain presses and nothing else; no climber arrived before ~4 min.
+  Strain alone is busywork (answers the open question in GPTBS de27cde1 partly: yes, early).
+- **Nightmare** (X while asleep): once a town has hurt the giant (grudge ≥ 50), the sleeper dreams of it and a beast raid
+  marches on that town (90 s cooldown; bot sleeper uses it at grudge ≥ 200). Same seeds 1–3: used 1–5 times per match;
+  giant still reaches dusk 3/3.
+- Corvel's hero now starts with a wedge and hunts the sleeper while it carries one. First hunter on the body moved from
+  2:08–6:04 to 1:29–2:21 (seeds 1–4). **Regression caught by sweep:** the first version let a level-3 hero hang on the
+  sleeper forever (0 wedges, 3 gold, one barracks all game) and the giant never fell in 6 matches. Heroes now climb down
+  when their wedges are spent.
+- Retuned conscript stone damage 0.5 → 0.7 after the Nightmare made the giant comfortable (min Heart 64–96%).
+  At 0.7, 6 matches: 1 giant death, falls 0–3, min Heart 8–100%.

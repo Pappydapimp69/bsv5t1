@@ -222,3 +222,13 @@ Fixed all seven real findings:
 Plus two stale texts (sleep floor 60%; strain wording under the restless omen).
 Balance after the zone change, giant autoplay seeds 1–3: dusk 3/3, falls 1–3, min Heart 71–87% (variance across seeds is
 large; earlier 6-seed set at the same tuning had one giant death).
+
+### 14. A full keys-only giant match
+
+- A 30-minute match (omen: a long day) played by a simple key-press policy through the real page (twitch hunted parts,
+  strain, Nightmare; walk on angry towns; shake/swipe at ≥3 hunters; smash in reach; stomp; struggle when down):
+  **won at dusk with 4 of 5 tasks** (not Befriended), 3 falls, 74 twitches, 46 strains, 6 nightmares, 147 climbers
+  knocked loose. Chronicle: first wedge 1:52 → nightmare on Corvel 6:44 → rose on its own 15:24 → Corvelmere, Corvel and
+  Corvel Rest destroyed → honoured Brindle.
+- Its message log showed a twitch report every ~7 s even when nothing came loose; the giant now hears about a twitch only
+  when it shook something loose (or hit an empty part).

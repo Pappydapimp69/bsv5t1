@@ -827,7 +827,7 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;S.windAt=S.t;
     S.anchors=S.anchors.filter(a=>{if(zoneAt(a.r,a.c)===w.zone&&rnd()<C.TWITCH_ANCHOR){lost++;return false}return true});
     for(const id in S.joints)if(JOINT_ZONE[id]===w.zone){const j=S.joints[id],b=j.wedges.length;j.wedges=j.wedges.filter(()=>rnd()>C.TWITCH_WEDGE);fell+=b-j.wedges.length}
     S.fx.push({k:'twitch',zone:w.zone,t:0,life:.7});S.twitches=(S.twitches||0)+1;
-    if(S.role==='giant'&&!S.autoplay)toast('A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+climbers().filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
+    if(S.role==='giant'&&!S.autoplay&&(climbers().some(h=>h.grip<=0)||fell||lost||!n))toast(!n?'A twitch runs through your '+ZONES[w.zone]+', but no one is there.':'A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+climbers().filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
     return}
   if(w.k==='dream'){const t=S.towns.find(x=>x.id===w.town);if(!t||!t.alive)return;
     chron('Because '+TOWNS[t.i].name+'\u2019s people had hurt it, the sleeping giant dreamed of '+t.name+' and beasts marched on it.');

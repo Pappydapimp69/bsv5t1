@@ -2192,7 +2192,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
     items=[{label:(t.outpost?'Raise outpost to town':'Raise '+t.name)+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:t.outpost?'Becomes a level 2 town with stronger walls and a wider build area':'+600 walls and a wider build area',why:canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
       ...(t.i===h.town?[{label:'Withdraw crystals',sub:t.crystals+' in '+t.name+'’s stockpile',why:t.crystals?null:'Stockpile is empty',act:()=>{if(t.alive&&townAt(h)===t){h.crystals+=t.crystals;t.crystals=0;sfx('coin')}openTown(t)}},{label:'Build here',act:openBuild}]:[]),...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:t.outpost?'Leave outpost':'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
-function start(role,seed,first,town=0){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;
+function start(role,seed,first,town=0){feed=[];document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;
   if(!(role==='human'&&!town&&(first||!save.firstDay)))applyOmen(drawOmen(S.seed)); /* the guided first day runs without an omen */
   cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
   if(S.omen&&S.omen.id!=='clear')toast('Omen: '+S.omen.name+'. '+S.omen.text.replace(/^./,c=>c.toUpperCase())+'.');

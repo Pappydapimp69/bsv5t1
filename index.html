@@ -725,7 +725,7 @@ function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below a third of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
-C.JOINT_HANDS=3;C.SOL_JOINT=.5;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
+C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.5;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
 C.TWITCH_CD=6;C.TWITCH_WIND=1.1;C.TWITCH_GRIP=36;C.TWITCH_BRACED=8;C.TWITCH_WEDGE=.5;C.TWITCH_ANCHOR=.4;
 C.STRAIN_CD=3.5;C.STRAIN_WIND=.7;C.STRAIN_DMG=55;C.STRAIN_FLOOR=.4;C.STRAIN_OPEN=1.6;C.SELF_RISE=60;
 const huntOpen=()=>!!S&&(S.g.awake||S.t>=C.HUNT_OPEN);
@@ -789,7 +789,7 @@ function giantDo(k){const why=canGiant(k);if(why){if(S.role==='giant'&&!S.autopl
   if(k==='strain'){const ch=allWeak()?null:strainTarget();w.chain=ch&&ch.id;if(!S.headless&&ch)chainClank(ch)}
   if(k==='shake'||k==='swipe'){for(const h of climbers())if(h.you)toast(k==='shake'?'The giant tenses! Hold still to brace.':'A hand is coming! Get to a ledge or the other side.');sfx('warn')}
   if(!S.headless)giantCall(k==='shake'||k==='twitch'?'rumble':k==='strain'?'pain':'bellow');
-  g.wind=w;g.cd[k]=C[k.toUpperCase()+'_CD'];return true}
+  g.wind=w;g.cd[k]=C[k.toUpperCase()+'_CD'];(S.acts||(S.acts={}))[k]=(S.acts[k]||0)+1;return true}
 function resolveWind(){const g=S.g,w=g.wind;g.wind=null;
   if(w.k==='twitch'){shake(7);let n=0,fell=0,lost=0;
     for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===w.zone){const braced=S.t-h.lastMove>w.dur*.8&&!h.cl.move,onL=restful(cellT(h.cl.x,h.cl.y));
@@ -1884,8 +1884,13 @@ function botGiant(dt){const g=S.g;if(!g.dead&&!g.awake&&S.t>=C.HUNT_OPEN){botSle
   const cl=climbers().filter(h=>h.cl.y>8);
   const t=g.target;if(t){const d=dist(g,t);if(d>t.r+200){g.tx=t.x;g.ty=t.y}else{g.tx=t.x+Math.cos(S.t*.15)*250;g.ty=t.y+Math.sin(S.t*.15)*250}if(d<C.SMASH_REACH+t.r)giantDo('smash')}
   const threat=cl.filter(h=>h.role==='warden'||h.role==='you').length;
-  if(threat>=2||(threat>=1&&rnd()<dt*.12))giantDo('shake');
-  const side=swipeSide();if(side){let n=0;for(const h of cl)if(h.cl.y>=30&&(side==='L'?h.cl.x<COLS/2:h.cl.x>=COLS/2))n++;if(n>=2||(n>=1&&rnd()<dt*.08))giantDo('swipe')}
+  // it fights in bursts, then rests: after a few shakes and swipes close together it takes a breather (Left 4 Dead's
+  // build-up / peak / relax), so climbers get windows to move instead of an endless wall of shakes
+  g.def=(g.def||[]).filter(t=>S.t-t<C.G_BURST_WIN);const resting=S.t<(g.restUntil||0);
+  const defend=k=>{if(giantDo(k)){g.def.push(S.t);if(g.def.length>=C.G_BURST){g.restUntil=S.t+C.G_REST;g.def=[]}}};
+  if(!resting){
+    if(threat>=2||(threat>=1&&rnd()<dt*.12))defend('shake');
+    const side=swipeSide();if(side){let n=0;for(const h of cl)if(h.cl.y>=30&&(side==='L'?h.cl.x<COLS/2:h.cl.x>=COLS/2))n++;if(n>=2||(n>=1&&rnd()<dt*.08))defend('swipe')}}
   let near=0;for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&S.grudge[h.town]>100)for(const f of g.feet)if(Math.hypot(f.x-h.x,f.y-h.y)<C.STOMP_R*.9)near++;
   if(near>=2)giantDo('stomp')}
 function trackGiantTarget(){const g=S.g;if(g.tx==null)return;let b=null,bd=1e9;for(const t of aliveTowns()){const d=Math.hypot(t.x-g.tx,t.y-g.ty);if(d<bd){bd=d;b=t}}g.target=b&&bd<900?b:null}

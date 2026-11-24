@@ -66,3 +66,11 @@ See sections below, appended as work lands.
 - Roads now speed walking. 1.5× vs 1.25× compared: 1.5× made following the road 25–40% faster to the giant on 11/15
   town routes but 30/40 lands failed the fairness check on first lay (1 never fair) once roads were counted in it;
   1.25× → 0 unfair, 10/40 relaid. Kept 1.25× and the fairness check now counts road pace.
+
+### 3. The awake giant fights in bursts (checkpoint 3)
+
+- Hand-played human, minute 15–18: chains broke at 15:42, Brindle woke the giant at 16:47 while I was at ~460 ft; the bot
+  giant then Shook every 12 s and Swiped every ~14 s on cooldown (it always saw ≥2 hunters); I fell three times, no progress.
+- Bot giant now rests 25 s after 3 shakes/swipes within 40 s (L4D build-up/peak/relax, Booth 2009 pp. 79–82).
+  Same 3 seeds, giant autoplay: shakes −28%, swipes −55%; still reaches dusk 3/3, falls 2–3 (was 1–2), min Heart 493–2767.
+- Re-played by hand: from 1000 ft to the chest (1345 ft) in 24 s with one shake, bracing on the warning.

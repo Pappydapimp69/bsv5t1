@@ -1,7 +1,7 @@
 # Colossus overnight expansion — working log
 
 - Start commit: `c4be89c` (origin/colossus, "Update Colossus heroes, settlements, and giant gameplay")
-- Window: 2026-11-24 20:30:41Z → cutoff 23:30:41Z (final 20 min from 23:10Z: playtest, fix, GPTBS finish, push)
+- Window: 2026-11-24 20:30:41Z → original cutoff 23:30:41Z; extended by the owner at 21:53Z by 4 h → cutoff 2026-11-25 01:53:40Z (final 20 min from 01:33Z)
 - Branch: `codex/colossus-overnight-expansion`
 - GPTBS: `Pappydapimp69/BS@GPTBS` 065c7e3 — `brief` ran fine (access OK). No Colossus entries existed.
 
@@ -25,6 +25,17 @@ Human
 - Do: gather and gear up, then climb a giant that fights back from minute one.
 - Care about: your town, your grip, and whether your work on the body survives the giant's shudders.
 - Come back for: the climb as a skill test against a reacting body; the dusk verdict.
+
+### Goals revised by play (22:45Z)
+
+- Giant: "every 10–20 s a decision" was wrong for minutes 0–2: no one is on you yet, and Strain alone is busywork.
+  Revised: something to *react to* by ~2 min (Corvel's hero now arrives 1:29–2:21) and a way to *answer the towns*
+  while asleep (Nightmare). Also: the giant must never be stripped of its kit by bots (one-brace floor).
+- Human: "climb a giant that fights back" was right, but the bigger miss was that a new player didn't meet the giant at
+  all until the end of the first day, and that the player's choices didn't steer their own town. Revised: meet the giant
+  in the first two minutes; your town follows your lead; the end tells you why it went the way it did.
+- Both: the simulation was rich but invisible (Sylvester's Player Model Principle). Making causes visible (feedback
+  counts, chronicle, Now line, red-edged hunters) did more per hour than adding systems.
 
 ## Changes (each follows the GPTBS evidence loop; details in GPTBS queue)
 

@@ -204,3 +204,21 @@ See sections below, appended as work lands.
   drag, stick) holds it off for 3 s. Tested by keys: held D 12 s (the giant steers round, camera follows), then held W 5 s:
   movement projected on the camera's forward = 1.00; max camera yaw rate 13.8°/s.
 - Help text: the body panel can be tapped/clicked; omens listed.
+
+### 13. Independent review fixes (checkpoint 13)
+
+A fresh reviewer read the full diff and ran probes (tests pass; 5 full matches; omen resets; browser interactions).
+Fixed all seven real findings:
+1. Body-panel boxes and the twitch zones disagreed on 22% of body cells (hips, lower arms, upper arms); zones are now
+   exactly the four drawn boxes, so what you outline is what you twitch.
+2. Chase camera could swing the long way after ~2 full turns (unwrapped angle with `%`); now `atan2(sin, cos)`.
+3. The camera's manual-override timer leaked into the next match; reset in `start()`.
+4. The bot giant could self-rise 60 s after the last chain broke while a horn carrier was still climbing the ~52 s to the
+   head; it now waits up to 3 min while anyone carrying a horn is on the body.
+5. Skipping the film left the 22 s fanfare playing over play (timers ignored the skip); timers now check the match and skip.
+6. The chronicle blamed the giant for towns lost to raids, soldiers or cannons; it now credits the giant only for
+   stomp/smash/crush.
+7. The twitch warning sound played map-wide; now only for the giant player or a climber on the body.
+Plus two stale texts (sleep floor 60%; strain wording under the restless omen).
+Balance after the zone change, giant autoplay seeds 1–3: dusk 3/3, falls 1–3, min Heart 71–87% (variance across seeds is
+large; earlier 6-seed set at the same tuning had one giant death).

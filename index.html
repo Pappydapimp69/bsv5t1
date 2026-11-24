@@ -1949,7 +1949,10 @@ function checkEnd(){const alive=TOWNS.map((_,i)=>standingTown(i)).filter(Boolean
   if(!over)return;S.over=over;chron(over.dusk?'Dusk. '+over.text.split(' It becomes')[0]:over.text);
   // the giant wins by being alive at dusk
   if(S.role==='giant'){const n=giantTasks().filter(x=>x.done).length;over.win=!!over.dusk&&n>=C.GIANT_TASKS;if(over.dusk)over.text+=' You completed '+n+' of the tasks; '+C.GIANT_TASKS+' were needed.'}else over.win=factionAlive(S.you.town)&&(!(over.dusk||over.left)||S.favoredH===S.you.id);
-  if(S.role==='giant'){if(over.win)save.giantWins++;else save.giantLosses++}else{if(over.win)save.humanWins++;else save.humanLosses++}persist();
+  if(S.role==='giant'){if(over.win)save.giantWins++;else save.giantLosses++}else{if(over.win)save.humanWins++;else save.humanLosses++}
+  // records worth coming back for: wins for each town, the highest climb, the most giant tasks in one match
+  {const R=save.rec=save.rec||{town:[0,0,0],climb:0,tasks:0};if(S.role==='giant')R.tasks=Math.max(R.tasks,giantTasks().filter(x=>x.done).length);
+    else if(S.you){if(over.win)R.town[S.you.town]++;R.climb=Math.max(R.climb,Math.round((S.you.best||0)*FT))}}persist();
   if(!S.headless)setTimeout(openEnd,900)}
 function nearPlayer(p){if(!S)return false;const c=S.cam;return Math.hypot(p.x-c.x,p.y-c.y)<1600}
 
@@ -2029,7 +2032,7 @@ padEl.innerHTML=SLOTS.map(s=>`<button class="ab" data-s="${s}"><span class="k"><
 padEl.querySelectorAll('.ab').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();if(S&&S.fly){flyPress();return}if(!S||S.over||menu)return;presses.push(b.dataset.s)}));
 function slotInfo(){if(!S)return null;
   if(S.role==='giant'&&!S.g.awake&&!S.g.dead){const r=k=>canGiant(k),z=aimZone(),ch=strainTarget();
-    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:device==='touch'?'Tap your body to pick a part':'Arrows or a click on your body pick a part'},B:{l:allWeak()?'Rise':'Strain'+(ch?' '+ch.name.replace(' chain',''):''),why:r('strain')},X:{l:'Nightmare'+((t=>t?' '+t.name:'')(dreamTarget())),why:r('dream')},Y:{l:'Swipe',why:'Asleep'}}}
+    return{A:{l:'Twitch '+ZONES[z],why:r('twitch'),sub:S.g.aim?null:device==='touch'?'Tap your body to pick a part':'Arrows or a click on your body pick a part'},B:{l:allWeak()?'Rise':'Strain',sub:ch&&!allWeak()?ch.name.replace(' chain',''):null,why:r('strain')},X:{l:'Nightmare',sub:(t=>t?'on '+t.name:null)(dreamTarget()),why:r('dream')},Y:{l:'Swipe',why:'Asleep'}}}
   if(S.role==='giant'){const r=k=>canGiant(k);return{A:{l:'Stomp',why:r('stomp')},B:{l:'Smash',why:r('smash')},X:{l:'Shake',why:r('shake')},Y:{l:'Swipe',why:r('swipe')}}}
   return humanCtx(S.you)}
 let lastSig='';
@@ -2100,7 +2103,7 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   const cur=bs[focusI].getBoundingClientRect(),cx=cur.left+cur.width/2,cy=cur.top+cur.height/2;let best=-1,bd=1e9;
   bs.forEach((b,i)=>{if(i===focusI)return;const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,dx=x-cx,dy=y-cy;const along=dx*d[0]+dy*d[1];if(along<=4)return;const off=Math.abs(dx*d[1])+Math.abs(dy*d[0]);const s=along+off*2.5;if(s<bd){bd=s;best=i}});
   if(best>=0)setFocus(best)}
-function record(){return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.</p>`}
+function record(){const R=save.rec;return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.`+(R?` Wins for Ashville ${R.town[0]}, Brindle ${R.town[1]}, Corvel ${R.town[2]}. Highest climb ${R.climb} ft. Most giant tasks in a match ${R.tasks} of 5.`:'')+`</p>`}
 function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
   items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant',act:()=>start('human',null,false,2)},
     {label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},

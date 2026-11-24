@@ -145,3 +145,6 @@ See sections below, appended as work lands.
 - Hand-played seed 3 awake: rose by strain at 16:34, walked on angry Corvel at full speed, right knee crippled on the
   way (not defending), Shake knocked 9 climbers loose (4 hunters), fell at 18:04, rose at 18:22, smashed Corvel
   4525 → 2490 in ~20 s. Test added to tests/sleeper.js (12 checks).
+- Phone portrait (iPhone 13 emulation) checked for both roles: the body panel is large and tappable and the goal box keeps
+  clear of it; touch labels truncated ("Strain le…", "Nightm…"), so chain and town names moved to the sub-line.
+- Title screen records now include wins per town, highest climb and most giant tasks in one match (saved locally).

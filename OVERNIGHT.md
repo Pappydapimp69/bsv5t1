@@ -109,3 +109,12 @@ See sections below, appended as work lands.
   when their wedges are spent.
 - Retuned conscript stone damage 0.5 → 0.7 after the Nightmare made the giant comfortable (min Heart 64–96%).
   At 0.7, 6 matches: 1 giant death, falls 0–3, min Heart 8–100%.
+
+### 6. Reaching for holds (checkpoint 6)
+
+- By hand I repeatedly stalled pushing up on bare stone: a reach only takes holds within ±57° of the push, else nothing
+  happens and nothing is said. Now an ordinary reach falls back to the nearest hold within ±80°, the aim preview shows the
+  same choice, and if there is still none a hint says to lunge (K) or go round (at most every 4 s).
+- Comparable test (held W only, climber set at the right foot, seeds 11–13, 40 s): seed 12 old stuck at row 11 →
+  new reaches row 81; seeds 11 and 13 unchanged (11 needs a lunge in both). Hand-played sleeping-giant policy, 3.5 min:
+  first hunter at ~2:10, 8 twitches popped 3 wedges, knees stayed 100%, one Nightmare on Corvel at 2:58.

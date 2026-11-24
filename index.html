@@ -260,10 +260,13 @@ function cellT(x,y){const c=Math.floor(x),r=Math.floor(y);if(r<0||r>=ROWS||c<0||
 const holdAt=(x,y)=>{const c=Math.floor(x),r=Math.floor(y);return r<0||r>=ROWS||c<0||c>=COLS?0:S.body.h[r*COLS+c]};
 const climbable=(x,y)=>holdAt(x,y)>0;
 // the best hold in a direction within reach: closest to the line, then nearest
-function pickHold(cl,dx,dy,reach,min){const r0=Math.floor(cl.y),c0=Math.floor(cl.x),l=Math.hypot(dx,dy)||1;dx/=l;dy/=l;let best=null,bs=-1e9;
+function pickHold(cl,dx,dy,reach,min,cmin=.55){const r0=Math.floor(cl.y),c0=Math.floor(cl.x),l=Math.hypot(dx,dy)||1;dx/=l;dy/=l;let best=null,bs=-1e9;
   for(let dr=-4;dr<=4;dr++)for(let dc=-4;dc<=4;dc++){const d=Math.hypot(dr,dc);if(!d||d>reach||d<(min||0))continue;const r=r0+dr,c=c0+dc;if(!holdAt(c,r))continue;
-    const cos=(dc*dx+dr*dy)/d;if(cos<.55)continue;const sc=cos*1.4-d*.12-(S.body.h[r*COLS+c]===3?.15:0);if(sc>bs){bs=sc;best=[r,c]}}
+    const cos=(dc*dx+dr*dy)/d;if(cos<cmin)continue;const sc=cos*1.4-d*.12-(S.body.h[r*COLS+c]===3?.15:0);if(sc>bs){bs=sc;best=[r,c]}}
   return best}
+// an ordinary reach that finds nothing straight that way takes the nearest hold within eighty degrees of it, so pushing up
+// on bare stone moves you up and sideways instead of doing nothing
+function reachHold(cl,dx,dy){return pickHold(cl,dx,dy,C.REACH)||pickHold(cl,dx,dy,C.REACH,0,.17)}
 const restful=t=>t===LEDGE||t===SITE;
 function restRope(h,r,c){return S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<=1&&Math.abs(a.c-c)<=1)}
 function jointAt(x,y){const r=Math.floor(y),c=Math.floor(x);for(const id in JOINTS){const j=JOINTS[id];if(r>=j.r0&&r<=j.r1&&c>=j.c0&&c<=j.c1)return id}return null}
@@ -1615,7 +1618,7 @@ function stepClimb(h,dt,mv){const cl=h.cl,g=S.g,mg=maxGrip(h);
   if(cl.move){const M=cl.move;M.t+=dt/M.dur;h.lastMove=S.t;const k=Math.min(1,M.t);cl.x=M.sx+(M.tx-M.sx)*k;cl.y=M.sy+(M.ty-M.sy)*k+(M.lunge?Math.sin(k*Math.PI)*.6:0);
     if(k>=1){cl.x=M.tx;cl.y=M.ty;cl.move=null;const i=Math.floor(cl.y)*COLS+Math.floor(cl.x);if(S.body.h[i]===3&&!S.crumble.some(q=>q.i===i)){S.crumble.push({i,t:C.CRUMBLE});sayTo(h,'Loose stone! Move on before it gives.')}}}
   else{let target=null;const dx=mv.x,dy=mv.y;
-    if(dx||dy){cl.path=null;if(dy<0&&cl.y<2.5&&Math.abs(dy)>Math.abs(dx)){dismount(h,0);sayTo(h,'You step down onto the ground.');return}target=pickHold(cl,dx,dy,C.REACH)}
+    if(dx||dy){cl.path=null;if(dy<0&&cl.y<2.5&&Math.abs(dy)>Math.abs(dx)){dismount(h,0);sayTo(h,'You step down onto the ground.');return}target=reachHold(cl,dx,dy);if(!target&&h.you&&S.t-(h.noHoldT||-9)>4){h.noHoldT=S.t;toast('No hold within reach that way: lunge (K) across the bare stone, or go round.')}}
     else if(cl.path){target=cl.path.shift();if(!cl.path.length)cl.path=null}
     if(target){
       const gap=Math.hypot(target[0]-Math.floor(cl.y),target[1]-Math.floor(cl.x))>C.REACH;
@@ -2593,7 +2596,7 @@ function climbViewPoint(c,r){return bodyWorld(c,r,climbing3D()?.face)}
 function cellScreen(c,r){const a=climbViewPoint(c,r);return p3(a.x,a.y,a.z)}
 function climbOverlay3D(){const h=S.you,cl=h.cl,g=S.g,me=[Math.floor(cl.y),Math.floor(cl.x)],hb=S.body.h;
   if(!cl.fall)for(const[dr,dc]of OFFS){const r=me[0]+dr,c=me[1]+dc;if(r<0||r>=ROWS||c<0||c>=COLS||!hb[r*COLS+c])continue;const q=cellScreen(c+.5,r+.5);if(!q)continue;ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(5,q.s*11),0,7);ctx.stroke()}
-  const aimV=climbInput(h,readMove()),aim=!cl.grab&&!cl.move&&!cl.fall&&(aimV.x||aimV.y)?pickHold(cl,aimV.x,aimV.y,C.REACH):null;if(aim){const q=cellScreen(aim[1]+.5,aim[0]+.5);if(q){ctx.strokeStyle='#ffcf6a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(8,q.s*15),0,7);ctx.stroke()}}
+  const aimV=climbInput(h,readMove()),aim=!cl.grab&&!cl.move&&!cl.fall&&(aimV.x||aimV.y)?reachHold(cl,aimV.x,aimV.y):null;if(aim){const q=cellScreen(aim[1]+.5,aim[0]+.5);if(q){ctx.strokeStyle='#ffcf6a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(8,q.s*15),0,7);ctx.stroke()}}
   {const rt=cl.fall?null:reachT(h);if(rt&&(rt.ch||rt.s||rt.j)){const q=cellScreen(rt.x,rt.y);if(q){ctx.strokeStyle='#6fe3ff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,Math.max(11,q.s*19),0,7);ctx.stroke()}}}
   if(cl.path){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();let first=true;for(const[r,c]of[[cl.y-.5,cl.x-.5],...cl.path]){const q=cellScreen(c+.5,r+.5);if(!q)continue;first?ctx.moveTo(q.x,q.y):ctx.lineTo(q.x,q.y);first=false}ctx.stroke();ctx.setLineDash([])}
   for(const q of S.crumble){const r=Math.floor(q.i/COLS),c=q.i%COLS,p=cellScreen(c+.5,r+.5);if(p){ctx.strokeStyle='#ff5a3c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(6,p.s*13),0,7);ctx.stroke()}}
@@ -2937,7 +2940,7 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
     if(Math.abs(J.r0-climbCam.y)<40){ctx.font=`600 ${12*UI}px system-ui`;ctx.textAlign='left';ctx.fillStyle='#fff';ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=3;const tx=x+w+4,ty=y+hh/2+4;ctx.strokeText(JOINTS[id].name,tx,ty);ctx.fillText(JOINTS[id].name,tx,ty)}}
   // the holds: firm cracks, green moss that drains grip, orange loose stones; your reach and the hold you are aiming at
   {const r0=Math.max(0,Math.floor(climbCam.y-H/px*.6)),r1=Math.min(ROWS-1,Math.ceil(climbCam.y+H/px*.6)),hb=S.body.h,me=[Math.floor(cl.y),Math.floor(cl.x)];
-    const aimV=readMove(),aim=!cl.move&&!cl.fall&&(aimV.x||aimV.y)?pickHold(cl,aimV.x,-aimV.y,C.REACH):null;
+    const aimV=readMove(),aim=!cl.move&&!cl.fall&&(aimV.x||aimV.y)?reachHold(cl,aimV.x,-aimV.y):null;
     for(let r=r0;r<=r1;r++)for(let c=0;c<COLS;c++){const k=hb[r*COLS+c];if(!k)continue;const t=S.body.g[r*COLS+c];if(t===LEDGE||t===SITE||t===JOINT||t===HEART)continue;const x=toX(c+.5),y=Y(c,r+.5);
       ctx.fillStyle=k===2?'#5f8a3a':k===3?'#d08a4a':'#2e2a24';ctx.beginPath();ctx.ellipse(x,y,px*.32,px*.2,0,0,7);ctx.fill();
       ctx.fillStyle=k===2?'#9cc76a':k===3?'#f4c08a':'#d9cdb2';ctx.beginPath();ctx.ellipse(x,y-px*.12,px*.3,px*.08,0,0,7);ctx.fill();

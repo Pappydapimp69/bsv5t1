@@ -64,6 +64,13 @@ const {chromium} = require('playwright');
       const ks = ['stomp', 'smash', 'shake', 'swipe', 'twitch', 'strain', 'dream'];
       while (Wg.t < 300) { __col.step(30); if (ks.some(k => canGiant(k) === null)) { gap = Math.max(gap, Wg.t - last); last = Wg.t } }
       out.neverIdle = Math.max(gap, Wg.t - last) <= 30;
+      // the real entry point: starting from the menu closes it, sets up the opening camera, and applies an omen (none on the guided first day)
+      save.firstDay = 1; start('giant', 2);
+      out.startGiant = !menu && __col.S.introCam === true && __col.S.omen && __col.S.omen.id === drawOmen(2).id;
+      start('human', 3, false, 2);
+      out.startCorvel = !menu && __col.S.you.town === 2 && !!__col.S.omen && !__col.S.tut;
+      save.firstDay = 0; start('human', 4, true);
+      out.startFirstDay = !menu && !!__col.S.tut && !__col.S.omen && C.CHAIN_OPEN === 900;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

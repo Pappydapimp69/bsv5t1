@@ -476,7 +476,20 @@ function sfx(k,near){if(near===false||sndBudget>6)return;sndBudget++;
 
 // ================= state =================
 let S=null;
-function newGame(role,seed,town=0){
+// omens: each match started from the menu draws one rule twist, told at the start and in the chronicle, so days differ
+// in shape. Drawn from their own generator (the land is untouched) and undone at every new game.
+const OMENS=[{id:'clear',name:'A clear sky',text:'no omen: the day runs as it always does',w:2,c:{}},
+  {id:'restless',name:'A restless giant',text:'its chains weaken from minute 10, not 15',w:1,c:{CHAIN_OPEN:600,CHAIN_HOLD_MAX:900}},
+  {id:'blood',name:'A blood moon',text:'wedges bleed joints half again as fast',w:1,c:{WEDGE_DPS:6}},
+  {id:'long',name:'A long day',text:'dusk comes at minute 30, not 25',w:1,c:{DUSK:1800}},
+  {id:'dark',name:'Dark dreams',text:'the sleeper dreams of those who hurt it sooner and more often',w:1,c:{DREAM_MIN:25,DREAM_CD:60}}];
+let OMEN_BASE=null;
+function resetOmen(){if(OMEN_BASE)Object.assign(C,OMEN_BASE)}
+function applyOmen(o){resetOmen();OMEN_BASE={};for(const o2 of OMENS)for(const k in o2.c)OMEN_BASE[k]=C[k];Object.assign(C,o.c);S.omen=o;
+  if(o.c.CHAIN_HP)for(const ch of S.chains){ch.hp=ch.max=C.CHAIN_HP}
+  chron('The omen of the day: '+o.name.toLowerCase()+' ('+o.text+').')}
+function drawOmen(seed){const R=mulberry32((seed^0x5eed0)>>>0),tot=OMENS.reduce((a,o)=>a+o.w,0);let x=R()*tot;for(const o of OMENS){x-=o.w;if(x<0)return o}return OMENS[0]}
+function newGame(role,seed,town=0){resetOmen();
   seed=seed>>>0;rnd=mulberry32(seed);
   const M=C.MAP,cx=M/2,cy=M/2;
   const towns=TOWNS.map((t,i)=>{const a=-Math.PI/2+i*Math.PI*2/3;return{i,id:i,name:t.name,col:t.col,shape:t.shape,x:cx+Math.cos(a)*C.TOWN_RING,y:cy+Math.sin(a)*C.TOWN_RING,r:150,hp:3600,max:3600,alive:true,crystals:0}});
@@ -1900,7 +1913,7 @@ function botSleeper(dt){const g=S.g;if(g.wind||nightLock())return;
   // it twitches where it is being worked against, not at every touch, and strains now and then in its sleep
   let bz=null,bs=0;for(const z in ZONES){const v=zoneFelt(z);if(v>bs){bs=v;bz=z}}
   if(bz&&bs>=1&&g.cd.twitch<=0&&rnd()<dt*(bs>=2.5?.4:.15)){g.aim=bz;giantDo('twitch');g.aim=null;return}
-  if(g.cd.dream<=0&&dreamTarget()&&S.grudge[dreamTarget().i]>=200&&rnd()<dt*.05){giantDo('dream');return}
+  if(g.cd.dream<=0&&dreamTarget()&&S.grudge[dreamTarget().i]>=C.DREAM_MIN*4&&rnd()<dt*.05){giantDo('dream');return}
   if(huntOpen()&&g.cd.strain<=0&&rnd()<dt*.05)giantDo('strain')}
 function botGiant(dt){const g=S.g;if(!g.dead&&!g.awake&&S.t>=C.HUNT_OPEN){botSleeper(dt);return}
   if(!g.dead&&g.fallen>0){if(rnd()<dt*C.BOT_STRUGGLE)giantDo('struggle');return}if(g.dead||g.fallen>0||!g.awake)return;g.botT-=dt;
@@ -2179,7 +2192,10 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
     items=[{label:(t.outpost?'Raise outpost to town':'Raise '+t.name)+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:t.outpost?'Becomes a level 2 town with stronger walls and a wider build area':'+600 walls and a wider build area',why:canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
       ...(t.i===h.town?[{label:'Withdraw crystals',sub:t.crystals+' in '+t.name+'’s stockpile',why:t.crystals?null:'Stockpile is empty',act:()=>{if(t.alive&&townAt(h)===t){h.crystals+=t.crystals;t.crystals=0;sfx('coin')}openTown(t)}},{label:'Build here',act:openBuild}]:[]),...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:t.outpost?'Leave outpost':'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
-function start(role,seed,first,town=0){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
+function start(role,seed,first,town=0){document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;
+  if(!(role==='human'&&!town&&(first||!save.firstDay)))applyOmen(drawOmen(S.seed)); /* the guided first day runs without an omen */
+  cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
+  if(S.omen&&S.omen.id!=='clear')toast('Omen: '+S.omen.name+'. '+S.omen.text.replace(/^./,c=>c.toUpperCase())+'.');
   toast(role==='giant'?'You are the giant, asleep in chains. Survive to dusk and complete three of five tasks.':'You are of '+TOWNS[S.you.town].name+'.')}
 
 // ================= camera and render =================

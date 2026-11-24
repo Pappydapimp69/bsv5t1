@@ -178,3 +178,16 @@ See sections below, appended as work lands.
 - Evidence: GPTBS demo-disc#E32 (tune with human-timing profiles, not a perfect autopilot). Profiles, seeds 1–3: no
   struggle → 18 s per fall, seed 2 min Heart 3%; casual/skilled presses → ~13 s per fall, seed 2 min Heart 44–58%; falls
   still 0–4 per match. Hand-checked in the page: all four buttons read Struggle with the seconds left; 4 presses cut 18 → 15.1.
+
+### 11. Omens (checkpoint 11)
+
+- Each match started from the menu draws an omen (own random stream; land untouched; undone at every new game; none on the
+  guided first day), announced at the start and recorded first in the chronicle.
+- Evidence: GPTBS vary-engine-not-label (judge variety by what changes, not labels); Derek Yu, *Spelunky* (extract via
+  Game Developer): randomization gives "free value" but needs rules "worth understanding" to be more than a slot machine.
+- First set measured on seeds 41–42: **restless giant** woke ~12:10 vs ~16:55 ✓; **generous sky** produced *fewer*
+  stars (2-active cap dominates) ✗; **iron chains** barely moved waking ✗; **dark dreams** did nothing with a bot giant
+  because the bot's trigger ignored it ✗; **blood moon** noisy. Kept restless, blood moon, dark dreams (bot trigger now
+  follows it: 2 vs 0 and 9 vs 3 nightmares), added **a long day** (dusk at 30:00, verified), dropped generous and iron.
+- **Bug caught by hand play before commit:** an inserted `//` comment swallowed the rest of `start()`, so menu starts
+  froze on the title. Fixed; tests/sleeper.js now starts giant, Corvel and first-day matches through `start()` (16 checks).

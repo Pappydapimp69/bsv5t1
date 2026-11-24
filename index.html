@@ -1407,7 +1407,9 @@ function eventSay(s){if(!S.headless)announce(s)}
 function startRaid(town,why,from){const a=rnd()*6.28,x=from?from.x:town.x+Math.cos(a)*1900,y=from?from.y:town.y+Math.sin(a)*1900,ev={k:'raid',town:town.id,i:town.i,x,y,t:S.t,go:S.t+20};
   const n=from?3:5+Math.floor(rnd()*3);for(let k=0;k<n;k++){const px=x+rr(-80,80),py=y+rr(-80,80),troll=(from||k===0)&&canSpawnTroll(px,py);
     S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x:px,y:py,hx:x,hy:y,hp:troll?110:36,max:troll?110:36,atk:troll?14:7,gold:troll?26:10,xp:troll?34:14,r:troll?22:13,cd:0,raid:ev})}
-  S.events.push(ev);S.evc.raid++;eventSay(why)}
+  S.events.push(ev);S.evc.raid++;ev.say=raidConcerns(town);if(ev.say)eventSay(why)}
+// a raid is news to you when it falls on your own people or near you; the giant hears of every raid it set off itself
+function raidConcerns(t){if(!S.you)return true;return t.i===S.you.town||Math.hypot(t.x-S.you.x,t.y-S.you.y)<2500}
 // a falling star: set off by how many sky crystals people have gathered between them
 function startStar(){let x,y;for(let k=0;k<30;k++){x=rr(800,C.MAP-800);y=rr(800,C.MAP-800);if(aliveTowns().every(t=>Math.hypot(t.x-x,t.y-y)>1200)&&!inSolid(x,y,260))break}
   const ev={k:'star',x,y,t:S.t,left:10};S.events.push(ev);S.evc.star++;for(let k=0;k<10;k++){const a=rnd()*6.28,d=rr(30,180);const c={id:S.nextId++,x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,star:ev};solidPush(c,40);S.crystals.push(c)}
@@ -1430,7 +1432,7 @@ function caravanEscort(e){let soldier=null;for(const h of S.humans){if(!canEscor
 function stepEvents(dt){
   for(let i=0;i<3;i++){const n=S.raided[i];if(n<C.RAID_AT.length&&wealth(i)>=C.RAID_AT[n]&&factionAlive(i)){S.raided[i]++;const t=nearestOwn(i,C.MAP/2,C.MAP/2);if(t)startRaid(t,'Beasts are gathering beyond '+t.name+', drawn by its wealth. They march in 20 s!')}}
   for(let k=S.events.length-1;k>=0;k--){const e=S.events[k];
-    if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length)eventSay('The raid on '+town.name+' is beaten off.');continue}
+    if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length&&e.say)eventSay('The raid on '+town.name+' is beaten off.');continue}
       e.x=left[0].x;e.y=left[0].y}
     if(e.k==='star'){e.left=S.crystals.filter(c=>c.star===e).length;if(!e.left){S.events.splice(k,1);continue}}
     if(e.k==='caravan'){const to=e.site?{x:e.site.x,y:e.site.y,r:60}:S.towns.find(t=>t.id===e.to);if(!to||e.site==null&&!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);

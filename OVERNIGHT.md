@@ -232,3 +232,5 @@ large; earlier 6-seed set at the same tuning had one giant death).
   Corvel Rest destroyed → honoured Brindle.
 - Its message log showed a twitch report every ~7 s even when nothing came loose; the giant now hears about a twitch only
   when it shook something loose (or hit an empty part).
+- Raid news filtered for humans: a raid is announced (with its "beaten off") only if it falls on your own people or within
+  2500 of you; the giant player still hears all. Seeds 71–72: raids 21 → 12 announced, 25 → 7 announced.

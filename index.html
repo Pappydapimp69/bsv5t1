@@ -1487,6 +1487,10 @@ const FIRST_DAY=[
    setup(h){const t=S.towns[h.town];if(!S.crystals.some(c=>c.tut)){let a=rnd()*6.28;for(let k=0;k<12&&inSolid(t.x+Math.cos(a)*520,t.y+Math.sin(a)*520,60);k++)a+=.5;S.crystals.push({id:S.nextId++,x:t.x+Math.cos(a)*520,y:t.y+Math.sin(a)*520,tut:1})}S.tut.base=h.pack.crystals+h.crystals}, // the player's own crystal: bots leave it
    target(h){const t=S.towns[h.town];const own=S.crystals.find(c=>c.tut);if(own)return own;let b=null,bd=1e9;for(const c of S.crystals){const d=Math.hypot(c.x-h.x,c.y-h.y)+.5*Math.hypot(c.x-t.x,c.y-t.y);if(d<bd){bd=d;b=c}}return b},
    check(h){return h.pack.crystals+h.crystals>S.tut.base}},
+  {id:'chain',name:'Strike the ankle chain',text:'The giant is why the towns are here. Follow the road to its feet and press Attack beside an ankle chain: every blow wears it toward breaking.',
+   setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
+  {id:'climb',name:'Climb the giant',text:'Now climb it: beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
+  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip; if nothing is in reach, lunge. Then head home with your crystal.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}},
   {id:'home',name:'Bank it in Ashville',text:'Walk home into Ashville. Your pack’s crystals go into your own store.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
   {id:'board',name:'Take the job',text:'In Ashville, press Town and take the job on the Board.',setup(h){if(h.quest&&!h.quest.tut)h.quest=null},target(h){return S.towns[h.town]},check(h){return!!(h.quest&&h.quest.tut)}},
   {id:'strike',name:'Strike down a wolf',text:'Walk up to a wolf and press Attack. It hits the weakest beast in reach.',
@@ -1510,11 +1514,7 @@ const FIRST_DAY=[
   {id:'attack',name:'Order an attack',text:'Beside your barracks, press Barracks and choose Attack Brindle or Attack Corvel. Your soldiers march there to fight defenders and damage buildings and walls. Choose Stand down to stop repeat attacks.',optional:true,
    target:tutBarracks,check(h){const b=tutBarracks(h);return !b||!tutRival(h)||!trainedCount(b)||b.order?.k==='attack'}},
   {id:'order',name:'Send it to the giant',text:'At the barracks, choose Defend giant. Your soldier walks to the giant’s foot and guards it.',
-   target:tutBarracks,check(h){return tutBarracks(h)?.order?.k==='giant'}},
-  {id:'chain',name:'Strike the ankle chain',text:'Walk to the giant’s foot and press Attack beside its chain. Every blow wears the chain toward breaking.',
-   setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
-  {id:'climb',name:'Climb the giant',text:'Beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}}];
+   target:tutBarracks,check(h){return tutBarracks(h)?.order?.k==='giant'}}];
 function tutWolfNear(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t}
 function tutCount(h){const q=h.quest;return q&&q.tut&&!q.done?Math.min(q.n,q.need)+'/'+q.need:''}
 function tutBarracks(h){return S.builds.find(b=>b.k==='barracks'&&b.owner===h.id&&b.town===h.town)||null}
@@ -1530,6 +1530,8 @@ function tutWolves(h){const t=S.towns[h.town],q=h.quest,st=tutStep(),want=Math.m
     S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:x,hy:y,hp:30,max:30,atk:5,gold:8,xp:12,r:13,cd:0,tut:1})}}
 function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
 function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
+  // a step already done on the way (the crystal banked while walking out to the giant) passes without its card
+  if(!S.tut.shown&&st.id==='home'&&st.check(h)){S.tut.i++;S.tut.t=0;return}
   if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
   S.tut.t+=dt;if(TUT_HUNT.includes(st.id)&&S.t%2<dt)tutWolves(h);const done=st.check(h);
   if(done||S.tut.skipped||(S.tut.t>150&&!st.hold)){if(!done)toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;S.tut.skipped=false;
@@ -1537,6 +1539,7 @@ function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPE
 const TUT_HUNT=['strike','dodge','heavy','reward'];
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
   openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+    ...(last||st.info?[]:[{label:'Got it',sub:'No camera flight; the goal line and map marker keep pointing the way',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0}}]),
     ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker

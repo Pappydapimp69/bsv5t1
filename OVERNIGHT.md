@@ -121,3 +121,16 @@ See sections below, appended as work lands.
 - Touch/mouse: the sleeping giant's body panel is now a picker (tap or click a part to aim the twitch); before, a touch
   giant could not aim at all because touch moves by tapping destinations. Verified with real mouse clicks: head → chest
   and head, left arm → left side, right arm → right side, shin → legs.
+
+### 7. The first day leads with the giant (checkpoint 7)
+
+- The first day had 17 steps and the giant — the premise — only at steps 15–17 (chain, climb, knee), after crystals,
+  jobs, wolves, a house, a barracks and orders. Evidence: GPTBS sevin#E12 (a core mechanic must be met inside the flow
+  the player already goes through), dbh#E5 (don't reshuffle indexes other code relies on — here every lookup is by id,
+  checked), idea:65c1e2ca9702 (short sessions can't afford a slow ramp).
+- New order: pick up a crystal → follow the road to the giant and strike an ankle chain → climb → reach the knee → home,
+  jobs, wolves, building, barracks, orders. Card texts reworded; the "bank it" step passes silently if the crystal was
+  banked on the way out; every card now has a plain **Got it** besides "Show me" (camera flight).
+- Hand-played the new first day with keys, following the goal marker: crystal at 0:26, at the ankle chain at 1:12,
+  climbing at 1:14, on the knee ledge (462 ft) at 1:31.
+- Tests: barracks (incl. 8 tutorial checks), giant, heroes pass.

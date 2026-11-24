@@ -115,7 +115,7 @@ async function main() {
     ok(/Dawn.*climb again: press Climb \(K\)/.test(await goal()), 'dawn goal line', await goal());
     await page.waitForTimeout(3000);
     ok(/climb again/.test(await goal()), 'dawn prompt stays while idle', await goal());
-    ok(/^Dusk 2\d:\d\d$/.test(await panelClock()), 'panel clock back to dusk', await panelClock());
+    ok(/^Dusk 1\d:\d\d$/.test(await panelClock()), 'panel clock back to dusk', await panelClock());
     await page.keyboard.press('KeyK');
     await until(async () => (await mode()) === 'climb', 2000, 'climbing again at dawn');
     await page.waitForTimeout(300);

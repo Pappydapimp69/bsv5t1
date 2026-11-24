@@ -194,3 +194,13 @@ See sections below, appended as work lands.
 - Bot sleeper holds its twitch in a part where those tending it (keepers, or people it regards well) outnumber hunters.
   Seeds 51–52 to t=1000: keepers shaken 98→37 and 28→19; hunters shaken 200→163, 151→135; mean wedges in joints
   0.18→0.23 and 0.21→0.36 (the sleep floor still caps the harm). Also: a new match clears the previous match's messages.
+
+### 12. A chase camera for the walking giant (checkpoint 12)
+
+- Hand play: walking the giant toward Corvel I lost sight of where I was going; the camera never turned with the giant.
+- Evidence: GPTBS flood#E62 (dead zone + gain; compare yaw rate with the ~60°/s sickness peak), opticon#E24 (test
+  camera-relative movement by the sign of the projection on the camera basis).
+- The awake, walking giant's camera eases behind its heading (12° dead zone, 0.8/s gain, ≤30°/s); any manual turn (Q/E,
+  drag, stick) holds it off for 3 s. Tested by keys: held D 12 s (the giant steers round, camera follows), then held W 5 s:
+  movement projected on the camera's forward = 1.00; max camera yaw rate 13.8°/s.
+- Help text: the body panel can be tapped/clicked; omens listed.

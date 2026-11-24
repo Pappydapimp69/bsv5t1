@@ -485,6 +485,12 @@ const OMENS=[{id:'clear',name:'A clear sky',text:'no omen: the day runs as it al
   {id:'dark',name:'Dark dreams',text:'the sleeper dreams of those who hurt it sooner and more often',w:1,c:{DREAM_MIN:25,DREAM_CD:60}}];
 let OMEN_BASE=null;
 function resetOmen(){if(OMEN_BASE)Object.assign(C,OMEN_BASE)}
+// what the giant remembers of the last day becomes a lasting baseline its feelings settle back to
+C.MEM_FRIEND=-40;C.MEM_WARY=150;
+function applyMemory(){const m=save.memory;if(!m||m.v!==1)return;const ok=i=>Number.isInteger(i)&&i>=0&&i<3;S.grudgeBase=[0,0,0];const parts=[];
+  if(ok(m.honoured)){S.grudgeBase[m.honoured]=C.MEM_FRIEND;parts.push('it lay down beside '+TOWNS[m.honoured].name+' at the last dusk')}
+  if(ok(m.hurt)&&m.hurt!==m.honoured){S.grudgeBase[m.hurt]=C.MEM_WARY;parts.push((m.slain?TOWNS[m.hurt].name+'\u2019s people slew it':TOWNS[m.hurt].name+'\u2019s people hurt it most')+', and it is wary of them')}
+  for(let i=0;i<3;i++)S.grudge[i]=S.grudgeBase[i];S.memoryText=parts.length?'The giant remembers: '+parts.join('; ')+'.':null;if(S.memoryText)chron(S.memoryText)}
 function applyOmen(o){resetOmen();OMEN_BASE={};for(const o2 of OMENS)for(const k in o2.c)OMEN_BASE[k]=C[k];Object.assign(C,o.c);S.omen=o;
   if(o.c.CHAIN_HP)for(const ch of S.chains){ch.hp=ch.max=C.CHAIN_HP}
   chron('The omen of the day: '+o.name.toLowerCase()+' ('+o.text+').')}
@@ -870,7 +876,7 @@ function killHuman(h,why){leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=nu
 function stepGiant(dt){const g=S.g;if(g.dead)return;
   for(const k in g.cd)g.cd[k]=Math.max(0,g.cd[k]-dt);
   if(g.wind){g.wind.t-=dt;if(g.wind.t<=0)resolveWind()}
-  if(S.reg)for(const k in S.reg)S.reg[k]*=Math.exp(-dt/C.GRUDGE_FADE);for(let i=0;i<3;i++){S.grudge[i]*=Math.exp(-dt/C.GRUDGE_FADE);for(let j=0;j<3;j++)S.feud[i][j]*=Math.exp(-dt/300)}
+  if(S.reg)for(const k in S.reg)S.reg[k]*=Math.exp(-dt/C.GRUDGE_FADE);for(let i=0;i<3;i++){{const b=S.grudgeBase?S.grudgeBase[i]:0;S.grudge[i]=b+(S.grudge[i]-b)*Math.exp(-dt/C.GRUDGE_FADE)};for(let j=0;j<3;j++)S.feud[i][j]*=Math.exp(-dt/300)}
   for(const id in S.joints){const j=S.joints[id];
     for(const w of j.wedges)damageJoint(id,C.WEDGE_DPS*dt,w);
     // a wedge in a joint halves its healing
@@ -1974,6 +1980,9 @@ function checkEnd(){const alive=TOWNS.map((_,i)=>standingTown(i)).filter(Boolean
   // the giant wins by being alive at dusk
   if(S.role==='giant'){const n=giantTasks().filter(x=>x.done).length;over.win=!!over.dusk&&n>=C.GIANT_TASKS;if(over.dusk)over.text+=' You completed '+n+' of the tasks; '+C.GIANT_TASKS+' were needed.'}else over.win=factionAlive(S.you.town)&&(!(over.dusk||over.left)||S.favoredH===S.you.id);
   if(S.role==='giant'){if(over.win)save.giantWins++;else save.giantLosses++}else{if(over.win)save.humanWins++;else save.humanLosses++}
+  // the giant remembers the day: whom it honoured at dusk and which town hurt it most (a discrete, named memory, not a score)
+  {let worst=-1;for(let i=0;i<3;i++)if(S.grudge[i]>0&&(worst<0||S.grudge[i]>S.grudge[worst]))worst=i;
+    save.memory={v:1,honoured:over.dusk&&S.favored!=null?S.favored:null,hurt:worst>=0&&S.grudge[worst]>=C.DREAM_MIN*2?worst:null,slain:!!S.g.dead}}
   // records worth coming back for: wins for each town, the highest climb, the most giant tasks in one match
   {const R=save.rec=save.rec||{town:[0,0,0],climb:0,tasks:0};if(S.role==='giant')R.tasks=Math.max(R.tasks,giantTasks().filter(x=>x.done).length);
     else if(S.you){if(over.win)R.town[S.you.town]++;R.climb=Math.max(R.climb,Math.round((S.you.best||0)*FT))}}persist();
@@ -2146,7 +2155,7 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Quests.</b> Each town's board shows three jobs and changes every minute: fetch sky crystals, carry parcels to other settlements, hunt beasts, put up buildings. Later boards add climbing the giant and pulling wedges from it. None of them asks you to attack the giant: that is your own choice.</p>
 <p><b>Building the world.</b> Houses extend the dashed build area for houses, watchtowers, and barracks. Each completed house makes room for one more forager, up to ${FORAGER_CAP} per settlement. Nearby friendly foragers and soldiers recover ${HOUSE_RECOVERY} health per second after five seconds without taking damage. The bonus is the same near one house or several. Found an outpost away from other settlements, then raise it into a town with sky crystals. A promoted outpost helps keep your people in the game if their other towns fall. Settle beside the giant's footprint lakes to earn gold, but its feet flatten whatever stands in their path. Old giants lie across the land as mountains.</p>
 <p><b>Building on the giant.</b> Twenty-one build spots lie across its shoulders, crown, chest, hips, forearms, wrists and thighs. A ladder fixes firm holds for three hundred feet below its spot, for anyone; a platform is a resting place that catches your people when they fall; cannons and braces as before. Cannons on the shoulders, forearms and crown fire at every town but yours. Wedges in a joint bleed it and halve its healing. Cripple both knees and the giant falls to its knees: no grip is lost and the Heart-stone in its chest takes half again as much damage. Only three people's blows count on one joint at a time, and a town's soldiers strike stone at seven-tenths strength. Shatter the Heart-stone to win, or arm the giant until your town is the last one standing.</p>
-<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashville is of two minds. You can play for any of the three: as Ashville you make its way yourself; as Brindle or Corvel you start with your people's habit, but your town's barracks follow your lead: once the giant clearly likes (or hates) what you do, they tend (or hunt) it too. At the end a chronicle tells how the match turned and why. Each match started from the menu also draws an omen (a restless giant, a blood moon, a long day, dark dreams, or a clear sky), told at the start. At dusk the giant lies down as a mountain beside the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
+<p><b>How the giant treats a town.</b> It wanders in peace until a town's people hurt it: every blow and wedge is remembered against their town, and past bearing it walks to that town and smashes it. Pulling out a wedge or mounting a cannon earns a town its favour, and grudges fade with time. Brindle tends and arms it, Corvel hunts it, and Ashville is of two minds. You can play for any of the three: as Ashville you make its way yourself; as Brindle or Corvel you start with your people's habit, but your town's barracks follow your lead: once the giant clearly likes (or hates) what you do, they tend (or hunt) it too. At the end a chronicle tells how the match turned and why. The giant also remembers the last day: the town it lay down beside starts in its favour, and the town that hurt it most starts with a grudge it never quite lets go. Each match started from the menu also draws an omen (a restless giant, a blood moon, a long day, dark dreams, or a clear sky), told at the start. At dusk the giant lies down as a mountain beside the town that treated it best: be that town, or shatter its Heart-stone, or be the last town standing.</p>
 <p><b>Foragers and barracks.</b> Heroes build. Foragers use their settlement’s crystals to raise its hero-built houses and spend their own gold to train and equip soldiers at its hero-built barracks. Each barracks trains up to three soldiers. A settlement allows one barracks per level. Beside your barracks you can give orders. The soldiers hold for twenty seconds, then return and set out again until you change the order or choose Stand down.</p>
 <p><b>The giant judges you.</b> Beside each town's grudge it keeps a regard for every person. Blows and wedges lower yours; breaking its chains, pulling wedges, bracing it, mounting cannons, waking it and soldiers guarding its feet raise it. At the first dusk after it wakes it honours the one person it regards best, and you win only if that is you. The panel at the top shows where you stand.</p>
 <p><b>Days and nights.</b> Each day ends at dusk in a short night. While it is chained, no one can touch the giant at night, and the dusk storm grows as its chains wear.</p>
@@ -2200,8 +2209,9 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
       ...(t.i===h.town?[{label:'Withdraw crystals',sub:t.crystals+' in '+t.name+'’s stockpile',why:t.crystals?null:'Stockpile is empty',act:()=>{if(t.alive&&townAt(h)===t){h.crystals+=t.crystals;t.crystals=0;sfx('coin')}openTown(t)}},{label:'Build here',act:openBuild}]:[]),...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:t.outpost?'Leave outpost':'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
 function start(role,seed,first,town=0){feed=[];cam.manualT=-99;document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;
-  if(!(role==='human'&&!town&&(first||!save.firstDay)))applyOmen(drawOmen(S.seed)); /* the guided first day runs without an omen */
+  if(!(role==='human'&&!town&&(first||!save.firstDay))){applyOmen(drawOmen(S.seed));applyMemory()} /* the guided first day runs without an omen or memory */
   cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
+  if(S.memoryText)toast(S.memoryText);
   if(S.omen&&S.omen.id!=='clear')toast('Omen: '+S.omen.name+'. '+S.omen.text.replace(/^./,c=>c.toUpperCase())+'.');
   toast(role==='giant'?'You are the giant, asleep in chains. Survive to dusk and complete three of five tasks.':'You are of '+TOWNS[S.you.town].name+'.')}
 

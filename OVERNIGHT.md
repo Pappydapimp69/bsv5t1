@@ -242,3 +242,14 @@ large; earlier 6-seed set at the same tuning had one giant death).
 - The container restarted mid-session; queued records survived but live only locally, so batch 1 was finished, verified
   and committed to `Pappydapimp69/BS` branch `claude/compassionate-faraday-hkztpc` (40 records; acceptance passes after two
   fixes: links to Brain entries moved into text, and one record reworded that outranked the snapshot stress query).
+
+### 15. The giant remembers (checkpoint 15)
+
+- Evidence: GPTBS idea:c17e5a580107 and idea:a6058144f94f (Nemesis-style memory: discrete, attributable, visible, not
+  silently decaying), collective#E9 (guard and validate saved state).
+- At each match end the game saves which town the giant honoured and which hurt it most (or slew it). The next menu-started
+  match (not the guided first day) gives those towns a lasting grudge **baseline** that feelings settle back to (honoured
+  −40, hurt +150), announced at the start and as the chronicle's first line.
+- Same seeds 81–82, giant autoplay, memory (Brindle honoured, Corvel hurt) vs none: first Nightmare 9:02/10:39 vs
+  15:19/15:25; nightmares 5/3 vs 1/1; tasks unchanged (5/5). In the page: "The giant remembers: it lay down beside
+  Brindle at the last dusk; Corvel's people hurt it most, and it is wary of them." and Nightmare on Corvel available at once.

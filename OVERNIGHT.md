@@ -234,3 +234,5 @@ large; earlier 6-seed set at the same tuning had one giant death).
   when it shook something loose (or hit an empty part).
 - Raid news filtered for humans: a raid is announced (with its "beaten off") only if it falls on your own people or within
   2500 of you; the giant player still hears all. Seeds 71–72: raids 21 → 12 announced, 25 → 7 announced.
+- When your lead turns your own town's soldiers (tend or hunt), you are told and the chronicle records it ("Following
+  your lead, Corvel's soldiers turned to tending the giant." — Corvel player, regard injected at 5:00, line at 7:10).

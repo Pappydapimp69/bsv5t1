@@ -1222,6 +1222,10 @@ function botOrders(b){const rs=readySoldiers(b);if(!rs.length)return;const home=
   if(home&&S.t-(home.hitT||-99)<6){giveOrder(b,'town');return}
   if(rs.some(readyToWake)){giveOrder(b,'tend');return}
   b.way=townWay(b.town);
+  // when your lead turns your own town's soldiers, you are told, and the chronicle remembers
+  if(S.you&&S.role==='human'&&b.town===S.you.town){const lead=b.way!==townHabit(b.town)?b.way:null;if(lead!==S.leadWay){S.leadWay=lead;
+    if(lead){toast('Your lead: '+TOWNS[b.town].name+'\u2019s soldiers now '+(lead==='tend'?'tend':'hunt')+' the giant, as you do.');chron('Following your lead, '+TOWNS[b.town].name+'\u2019s soldiers turned to '+(lead==='tend'?'tending':'hunting')+' the giant.')}
+    else toast(TOWNS[b.town].name+'\u2019s soldiers go back to their old habit.')}}
   if(S.t<(S.revT[b.town]||0))return;for(let j=0;j<3;j++)if(j!==b.town&&factionAlive(j)&&S.feud[b.town][j]>ARMY.REVENGE&&S.towns[j].hp>S.towns[j].max*.6){S.revT[b.town]=S.t+ARMY.REVENGE_CD;giveOrder(b,'attack',j);
     if(S.you&&S.role==='human'&&j===S.you.town)announce(TOWNS[b.town].name+' soldiers march on '+TOWNS[j].name+'!');return}
   giveOrder(b,b.way)}

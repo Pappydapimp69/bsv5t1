@@ -22,6 +22,7 @@ body.titling #top,body.titling #stats,body.titling #pad{visibility:hidden}
 #hud .gi{flex:1;min-width:0;display:flex;flex-direction:column;gap:.35rem}
 #hud .gr{display:flex;justify-content:space-between;gap:.6rem;font-size:.95rem;font-weight:700}
 #hud .gr #gd{color:#f0a050;white-space:nowrap}
+#hud .gr #gd.soon{color:#ff6a4a;font-weight:700}
 #gbar{position:relative;height:.5rem;border-radius:.3rem;background:linear-gradient(90deg,#4a7a54,#b9a35a 60%,#b04a3a);margin:.15rem 0}
 #gbar i{margin-left:var(--o,0);position:absolute;top:-.3rem;width:.28rem;height:1.1rem;border-radius:.1rem;border:1px solid rgba(0,0,0,.6);transform:translateX(-50%)}
 #hud .gs{font-size:.8rem;color:rgba(251,246,234,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -276,7 +277,7 @@ function bfs(r0,c0,isGoal,maxN,offsets=OFFS){const hh=S.body.h,prev=new Int32Arr
 
 // ================= save =================
 const SAVE_KEY='colossus.v1';
-let save={v:1,giantWins:0,giantLosses:0,humanWins:0,humanLosses:0,sound:true,firstDay:0};
+let save={v:1,giantWins:0,giantLosses:0,humanWins:0,humanLosses:0,sound:true,firstDay:0,nightSeen:0};
 try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(s&&s.v===1)save=Object.assign(save,s)}catch(e){}
 function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(save))}catch(e){}}
 const reducedMotion=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}})();
@@ -830,8 +831,27 @@ function nearFoot(h){const g=S.g;if(g.dead)return -1;let best=-1,bd=1e9;g.feet.f
 function nearMonster(h,r,allowed){let best=null,bd=r;for(const m of S.monsters){const limit=bd+m.r,d2=distSq(m,h);
   if(limit>0&&d2<limit*limit&&(!allowed||allowed(m))){bd=Math.sqrt(d2)-m.r;best=m}}return best}
 const dayLen=()=>C.DUSK+C.NIGHT,phase=()=>S.t%dayLen(),isNight=()=>phase()>=C.DUSK,nightLock=()=>isNight()&&!S.g.awake;
-function stepDays(dt){const n=isNight();if(n&&!S.night){S.night=true;S.duskAt=S.t;if(S.g.awake)S.verdictDue=true;else{for(const h of S.humans)if(h.mode==='climb'){const f=S.g.feet[h.leg?1:0];leaveClimb(h);h.x=f.x+60;h.y=f.y+60}announce('Dusk. Until morning no one can touch the chained giant.')}}
-  if(!n&&S.night){S.night=false;S.day=(S.day||1)+1;announce('Day '+S.day+' begins.')}}
+// seconds left before dusk, and before dawn while it is night
+const toDusk=()=>Math.max(0,C.DUSK-phase()),toDawn=()=>Math.max(0,dayLen()-phase());
+const mmss=t=>{const s=Math.ceil(t);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+// the first climb's day: a climber hears dusk coming, sees what nightfall took and is called back at dawn
+function duskWarn(){const h=S.you;if(!h||S.g.awake||S.role==='giant'||!(h.mode==='climb'||h.job))return;const left=toDusk();S.warned=S.warned||{};
+  const w=left<=20?20:left<=60?60:0;if(!w||S.warned[S.day+':'+w])return;S.warned[S.day+':20']=w===20;S.warned[S.day+':60']=true;
+  toast(w===60?'Dusk in a minute. At nightfall the chained giant shakes every climber off, and a build still in progress is lost with its kit.':'Dusk in '+Math.ceil(left)+' s: finish your build now or it is lost.')}
+// a player who has not climbed yet and walks up to a planted foot hears how to grab on (the first day says so itself)
+function footHint(){const h=S.you;if(!h||S.role==='giant'||S.climbedOnce||S.footHinted||nightLock()||h.mode!=='ground'||h.dead||tutStep()?.id==='climb'||nearFoot(h)<0)return;
+  S.footHinted=true;toast('The giant\u2019s foot. Press Climb to grab on, then push a direction to reach for the next hold.')}
+function stepDays(dt){const n=isNight();S.day=S.day||1;if(!n)duskWarn();footHint();
+  if(n&&!S.night){S.night=true;S.duskAt=S.t;if(S.g.awake)S.verdictDue=true;else{const y=S.you,lost=y&&y.job&&y.job.kind==='site'?y.job.k:null,was=y&&y.mode==='climb'?Math.round(y.cl.y*FT):null;
+      for(const h of S.humans)if(h.mode==='climb'){const f=S.g.feet[h.leg?1:0];leaveClimb(h);h.x=f.x+60;h.y=f.y+60}
+      S.nightfall=y&&(was!=null||lost)?{was,lost}:null;if(S.nightfall)S.retry=true;
+      announce('Dusk. Until morning no one can touch the chained giant.');
+      if(S.nightfall){if(lost)toast('Your unfinished '+lost+' is lost, and its kit with it.');if(!save.nightSeen&&!S.headless)S.nightCardDue=true}}}
+  if(!n&&S.night){S.night=false;S.day++;announce('Day '+S.day+' begins.');if(S.retry&&S.you&&S.you.mode!=='climb')toast('Dawn. The giant can be climbed again: walk to a planted foot and press Climb.')}}
+// the first time nightfall throws you off: what it took, what it left, and how to try again
+function openNightCard(){S.nightCardDue=false;save.nightSeen=1;persist();const nf=S.nightfall||{},kn=(KEYNAMES[device]||KEYNAMES.keys).B;
+  openMenu({holdUntil:performance.now()+700,title:'Nightfall',body:`<p>At dusk the chained giant shook you off${nf.was!=null?' from '+nf.was+' ft':''}.${nf.lost?' Your '+nf.lost+' was not finished, so it is lost with its kit.':' Work still in progress at dusk is lost with its kit.'}</p><p>What you finished stays: broken chain links, anchors and built works. You start again from the foot.</p><p>At dawn, in ${Math.ceil(toDawn())} s, walk to a planted foot and press Climb${kn?' (<kbd>'+kn+'</kbd>)':''}.</p>`,
+    items:[{label:'Wait for dawn',act:closeMenu}],back:closeMenu})}
 function duskStorm(){if(!S.night)return 0;const tot=S.chains.reduce((a,c)=>a+c.max,0),left=S.chains.reduce((a,c)=>a+Math.max(0,c.hp),0),w=.15+.85*(1-left/tot),u=S.t-S.duskAt;return w*Math.min(1,u/12)*Math.min(1,(C.NIGHT-u)/10)}
 const GRAB_TIME=.24;
 function footHold(h,leg,face){const middle=leg?21.5:10.5;
@@ -846,7 +866,7 @@ function mount(h,leg){if(nightLock()||S.g.dead)return false;
   const face=h.you&&front>=-1?1:-1,x=footHold(h,leg,face);
   const grab=h.you&&!reducedMotion?{x:h.x,y:h.y,t:S.t}:null;
   h.mode='climb';h.leg=leg;h.cl={x,y:1.5,face,grab,vy:0,fall:false,from:0,move:null,path:null};h.grip=maxGrip(h);h.tx=h.ty=null;h.rest=false;
-  if(h.you){S.introCam=false;climbCam.x=x;climbCam.y=1.5}
+  if(h.you){S.introCam=false;climbCam.x=x;climbCam.y=1.5;S.retry=false;S.climbedOnce=true}
   sayTo(h,'You grab the '+(leg?'right':'left')+' foot. Climb with care: grip drains, ledges refill it.');return true}
 function interruptWake(h){h.waking=false;if(S.waker===h){S.waker=null;if(!S.g.awake)S.wakeT=Math.max(0,S.wakeT-3)}}
 function leaveClimb(h){interruptWake(h);dropJob(h);h.mode='ground';h.cl=null;h.botClimb=null}
@@ -887,7 +907,7 @@ function humanCtx(h){
     else Y={l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions||h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
   const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
-  return{A:(fc=>fc?{l:'Attack the '+fc.name,why:chainWeak(fc)?'Already broken':null}:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()})(m||foe?null:footChain(h)),B:foot>=0||!up?{l:'Climb',why:foot>=0?(nightLock()?'Night: the chained giant cannot be touched':null):S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
+  return{A:(fc=>fc?{l:'Attack the '+fc.name,why:chainWeak(fc)?'Already broken':null}:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()})(m||foe?null:footChain(h)),B:foot>=0||!up?{l:'Climb',why:foot>=0?(nightLock()?'Night: climb again at dawn, in '+Math.ceil(toDawn())+' s':null):S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
     X:t?{l:t.outpost?'Outpost':'Town',why:null}:h.hero&&cacheNear(h)?{l:'Search ruins',why:null}:barracksNear(h)?{l:'Barracks',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
 function drinkPotion(h){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.')}
   else{h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.')}return true}
@@ -1375,7 +1395,7 @@ function siteBuildWhy(h,s,k){if(nightLock())return'Night: the chained giant cann
   if(siteCapReached(h,k))return k==='brace'?'The giant has '+BRACES_MAX+' braces built or underway':TOWNS[h.town].name+' has '+CANNONS_PER_TOWN+' cannons built or underway';
   return null}
 function placeOnSite(h,s,k){const why=siteBuildWhy(h,s,k);if(why){sayTo(h,why);return false}
-  h.kits[k]--;s.pending=h.id;startJob(h,{kind:'site',k,s});return true}
+  h.kits[k]--;s.pending=h.id;startJob(h,{kind:'site',k,s});if(!S.g.awake&&toDusk()<BUILD_TIME[k])sayTo(h,'Dusk falls before this '+k+' is done: nightfall will take it and its kit.');return true}
 function finishSite(h,s,k){if(s.pending!==h.id||s.build)return false;
   s.pending=null;s.build={k,town:h.town,owner:h.id,face:h.cl?.face,hp:C.CANNON_HP,cd:k==='cannon'?1:0};sfx('build',h.you);gainXp(h,20);
   if(k==='cannon'){S.grudge[h.town]-=C.CANNON_FAVOR;regard(h,C.CANNON_FAVOR)}if(k==='brace'){S.grudge[h.town]-=C.BRACE_FAVOR;regard(h,C.BRACE_FAVOR)}
@@ -1434,7 +1454,8 @@ const FIRST_DAY=[
   {id:'chain',name:'Strike the ankle chain',text:'Walk to the giant’s foot and press Attack beside its chain. Every blow wears the chain toward breaking.',
    setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
   {id:'climb',name:'Climb the giant',text:'Beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}}];
+  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}},
+  {id:'night',name:'Mind the dusk',info:true,text:'The clock at the top counts down to dusk. At nightfall the chained giant shakes every climber off, and a build still in progress is lost with its kit; at dawn walk back to a foot and climb again.',target(){return null},check(){return true}}];
 function tutWolfNear(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t}
 function tutCount(h){const q=h.quest;return q&&q.tut&&!q.done?Math.min(q.n,q.need)+'/'+q.need:''}
 function tutBarracks(h){return S.builds.find(b=>b.k==='barracks'&&b.owner===h.id&&b.town===h.town)||null}
@@ -2841,7 +2862,7 @@ function renderClimb(){const h=S.you,cl=h.cl,g=S.g;
 
 // ================= HUD =================
 const hud1=document.getElementById('hud1'),hud2=document.getElementById('hud2');let hudSig='';
-function clock(){if(S.night)return'Night';const s=Math.max(0,C.DUSK-phase());return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')}
+function clock(){return S.night?mmss(toDawn()):mmss(toDusk())}
 function mood(i){const v=S.grudge[i];return v>=C.ANGER?'ANGRY':v>=C.ANGER*.5?'wary':v<-60?'friendly':'calm'}
 const pEl={t:document.getElementById('gt'),d:document.getElementById('gd'),bar:document.getElementById('gbar'),s:document.getElementById('gs')};let pSig='';
 // where you stand among everyone the giant judges: your place in its regard, as the verdict at dusk will count it
@@ -2854,7 +2875,7 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
   {const key=(S.role==='giant'?'':mood(h.town)+(standing(h)==='it regards you most'))+ch;if(key!==S.gsKey){S.gsKey=key;S.gsAt=S.t}const pulse=S.t<(S.gsPulse||0),quiet=!pulse&&S.t-(S.gsAt||0)>6;pEl.s.classList.toggle('quiet',quiet);pEl.s.classList.toggle('pulse',pulse)}
   cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e)e.classList.toggle('flash',S.t-((S.chainFlash||{})[c.id]??-99)<3)});
   const pos=TOWNS.map((T,i)=>Math.round(clamp((S.grudge[i]+100)/(C.ANGER+100),0,1)*100)),sig=t+clock()+sub+pos.join()+cs.map(st).join('');if(sig===pSig)return;pSig=sig;
-  pEl.t.textContent=t;pEl.d.textContent='Dusk '+clock();pEl.s.textContent=sub;
+  pEl.t.textContent=t;pEl.d.textContent=(S.night?'Night \u00b7 dawn in ':'Dusk ')+clock();pEl.d.classList.toggle('soon',!S.night&&!S.g.awake&&toDusk()<=60);pEl.s.textContent=sub;
   if(pEl.bar.children.length!==TOWNS.length)pEl.bar.innerHTML=TOWNS.map(T=>`<i style="background:${T.col}" title="${T.name}"></i>`).join('');
   TOWNS.forEach((T,i)=>{const m=pEl.bar.children[i];m.style.left=pos[i]+'%';m.style.setProperty('--o',(i-1)*.3+'rem');m.style.opacity=factionAlive(i)?1:.3;m.style.height=(h&&h.town===i?1.4:1.1)+'rem';m.style.top=(h&&h.town===i?-.45:-.3)+'rem'});
   cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e){e.setAttribute('stroke',ring[st(c)][0]);e.setAttribute('opacity',ring[st(c)][1])}})}
@@ -2869,7 +2890,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Horn','ready'):'');
-    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):''}
+    const st=tutStep(),q=h.quest;b=nightLock()&&(S.nightfall||S.climbedOnce)?'<span class="k">Night</span> the giant cannot be climbed; dawn in '+Math.ceil(toDawn())+' s':S.retry&&!S.night?'<span class="k">Dawn</span> walk to a planted foot and press Climb':st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):''}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');
 
@@ -2887,6 +2908,7 @@ let FILM=false;
 function frameWork(now){{const f=!!S&&S.t<OPENING.len;if(f!==FILM){FILM=f;document.body.classList.toggle('film',f)}}introCamera();if(S&&S.trumpetsDue&&S.t>.3&&((se&&se!=='starting')||(actx&&!se)||S.t>2.5)){S.trumpetsDue=false;trumpets()}const dt=Math.min(.1,(now-last)/1000);last=now;pollPad();
   paintFeed(dt);
   if(S&&S.tut&&S.tut.cardDue&&!menu&&!S.fly)openTutorialCard();
+  if(S&&S.nightCardDue&&!menu&&!S.fly&&!S.over)openNightCard();
   const fl=S&&S.fly?stepFly(dt):null;
   if(S&&!menu&&!S.over&&!S.fly){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
   if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);if(z)zoomBy(Math.exp(z*dt*1.2));S.cam.czoom+=(S.cam.zoom-S.cam.czoom)*Math.min(1,dt*8);

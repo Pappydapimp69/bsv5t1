@@ -352,17 +352,12 @@ async function main() {
       trainSoldier(barracks);
       state.t = OPENING.len + 2;
       state.tut = {i: FIRST_DAY.findIndex(step => step.id === 'rivals'), t: 0, shown: false};
-      openTutorialCard();
-      const namesBothRivals = menu.body.includes('Brindle') && menu.body.includes('Corvel');
-      menu.holdUntil = 0;
-      activate(0);
-      const showsRivalOnMap = state.fly?.to.x === state.towns[1].x;
-      state.fly = null;
       stepTutorial(C.DT);
-      openTutorialCard();
-      const teachesAttack = menu.body.includes('Attack Brindle') && menu.body.includes('Stand down');
-      menu.holdUntil = 0;
-      activate(0);
+      const namesBothRivals = !menu && goalBanner().includes('Brindle') && goalBanner().includes('Corvel');
+      const showsRivalOnMap = tutStep().target(player) === state.towns[1];
+      for (let i = 0; i < 9 / C.DT && tutStep().id === 'rivals'; i++) stepTutorial(C.DT);
+      stepTutorial(C.DT);
+      const teachesAttack = !menu && tutStep().id === 'attack' && goalBanner().includes('Attack Brindle') && goalBanner().includes('Stand down');
       openBarracks(barracks);
       activate(menu.items.findIndex(item => item.label === 'Attack Brindle'));
       stepTutorial(C.DT);
@@ -371,9 +366,10 @@ async function main() {
       activate(menu.items.findIndex(item => item.label === 'Defend giant'));
       const acceptsQueuedDefense = tutStep().check(player);
       state.tut.i--;
-      openTutorialCard();
-      menu.holdUntil = 0;
-      activate(menu.items.findIndex(item => item.label === 'Skip this order'));
+      state.tut.shown = false;
+      stepTutorial(C.DT);
+      openPause();
+      activate(menu.items.findIndex(item => item.label === 'Skip this goal'));
       stepTutorial(C.DT);
       const attackCanBeSkipped = tutStep().id === 'order' && barracks.order.k === 'giant';
 

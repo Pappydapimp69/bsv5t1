@@ -1463,8 +1463,8 @@ const FIRST_DAY=[
    setup(h){if(h.gold<C.COST.barracks+ARMY.SOLDIER+10)h.gold=C.COST.barracks+ARMY.SOLDIER+10},target(h){const t=S.towns[h.town];return{x:t.x-t.r-150,y:t.y+40}},check(h){return!!tutBarracks(h)}},
   {id:'soldier',name:'Train a soldier',text:'Beside your barracks, press Barracks, then Train a soldier.',
    setup(h){S.tut.base=h.trained||0;if(h.gold<ARMY.SOLDIER+10)h.gold=ARMY.SOLDIER+10},target(h){return tutBarracks(h)},check(h){const b=tutBarracks(h);return(h.trained||0)>S.tut.base&&!!b&&b.sol.length>0}},
-  {id:'rivals',name:'Meet the rival cities',text:'Brindle and Corvel are rival cities. Brindle tends the giant and Corvel hunts it. Look for the orange square and purple diamond on the map.',target:tutRival,check(){return true}},
-  {id:'attack',name:'Order an attack',text:'Beside your barracks, press Barracks and choose Attack Brindle or Attack Corvel. Your soldiers march there to fight defenders and damage buildings and walls. Choose Stand down to stop repeat attacks.',optional:true,
+  {id:'rivals',name:'Meet the rival cities',text:'Brindle and Corvel are rival cities. Brindle tends the giant and Corvel hunts it. Look for the orange square and purple diamond on the map.',target:tutRival,check(){return S.tut.t>=8}},
+  {id:'attack',name:'Order an attack',text:'Beside your barracks, press Barracks and choose Attack Brindle or Attack Corvel. Your soldiers march there to fight defenders and damage buildings and walls. Choose Stand down to stop repeat attacks. Optional: it moves on by itself.',optional:true,
    target:tutBarracks,check(h){const b=tutBarracks(h);return !b||!tutRival(h)||!trainedCount(b)||b.order?.k==='attack'}},
   {id:'order',name:'Send it to the giant',text:'At the barracks, choose Defend giant. Your soldier walks to the giant’s foot and guards it.',
    target:tutBarracks,check(h){return tutBarracks(h)?.order?.k==='giant'}},
@@ -1487,15 +1487,19 @@ function tutWolves(h){const t=S.towns[h.town],q=h.quest,st=tutStep(),want=Math.m
     S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:x,hy:y,hp:30,max:30,atk:5,gold:8,xp:12,r:13,cd:0,tut:1})}}
 function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
 function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
-  if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
+  if(!S.tut.shown){if(S.tut.i>0)showGoal(st);else if(!S.tut.cardDue&&!menu)S.tut.cardDue=true;return}
   S.tut.t+=dt;if(TUT_HUNT.includes(st.id)&&S.t%2<dt)tutWolves(h);const done=st.check(h);
-  if(done||S.tut.skipped||(S.tut.t>150&&!st.hold)){if(!done)toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;S.tut.skipped=false;
+  if(done||S.tut.skipped||(S.tut.t>(st.optional?45:150)&&!st.hold)){if(!done)toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;S.tut.skipped=false;
     if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}}}
 const TUT_HUNT=['strike','dodge','heavy','reward'];
-function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
-  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
-    ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
-    ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
+// one card opens the first day; every goal after it arrives in a banner under the panel while play goes on, then
+// shrinks to the goal line (a card per goal stopped play 17 times, and its camera flight waited for a second press)
+function showGoal(st){if(st.setup)st.setup(S.you);S.tut.shown=true;S.tut.t=0;S.tut.goalAt=S.t}
+function goalBanner(){const st=tutStep();if(!st||!S.tut.shown||S.tut.goalAt==null||!S.you||S.you.dead)return'';const words=st.text.split(' ').length;
+  if(S.t-S.tut.goalAt>Math.min(14,Math.max(6,3+words/3)))return'';return'<span class="k">First day '+(S.tut.i+1)+'/'+FIRST_DAY.length+'</span> '+st.text}
+function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(S.tut.i>0){showGoal(st);return}if(st.setup)st.setup(S.you);
+  openMenu({holdUntil:performance.now()+700,title:'The first day',body:`<p>${st.text}</p><p class="dim">Each goal after this appears at the top while you play, and a gold marker shows where to go. Skip the rest any time from the pause menu.</p>`,
+    items:[{label:'Begin',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;S.tut.goalAt=null}},{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
 function flyPress(){const f=S.fly;if(!f)return;if(f.phase==='out'){f.phase='back';f.t=f.dur*.7*(1-Math.min(1,f.t/f.dur));f.dur*=.7}else if(f.phase==='hold'){f.phase='back';f.t=0;f.dur*=.7}}
@@ -2052,8 +2056,9 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
 function openPause(){if(!S||S.over)return;const h=S.you;
   const kits=h&&Object.entries(h.kits).filter(([,count])=>count>0).map(([name,count])=>count+' '+name+(count===1?'':'s')).join(', ');
-  const body=(h?`<p class="dim"><b>Equipment</b> · ${kits||'No kits'}${h.horn?' · Wake horn':''}</p>`:'')+`<p class="dim controls-hint">${hintText()}</p>`;
-  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
+  const st=tutStep(),goal=st&&S.tut.shown?`<p><b>First day ${S.tut.i+1}/${FIRST_DAY.length}:</b> ${st.text}</p>`:'';
+  const body=goal+(h?`<p class="dim"><b>Equipment</b> · ${kits||'No kits'}${h.horn?' · Wake horn':''}</p>`:'')+`<p class="dim controls-hint">${hintText()}</p>`;
+  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(st&&st.optional&&S.tut.shown?[{label:'Skip this goal',act:()=>{S.tut.skipped=true;closeMenu()}}]:[]),...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
   {label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();openPause()}},{label:'Quit to title',act:openTitle}],back:closeMenu})}
 function openEnd(){if(!S||!S.over)return;const o=S.over;openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+record(),items:[{label:'Play again',act:()=>start(S.role)},{label:'Title',act:openTitle}],back:openTitle})}
 function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub,placement)=>({label:label+' \u2013 '+C.COST[k]+' gold',sub,why:canBuild(h,k,placement),act:()=>{if(build(h,k))closeMenu();else openBuild()}});
@@ -2907,6 +2912,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Horn','ready'):'');
     const st=tutStep(),q=h.quest,cc=climbCoach(h);b=cc?cc:st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):''}
+  const gb=S.role==='human'?goalBanner():'';if(gb!==hud2._h){hud2._h=gb;hud2.innerHTML=gb;hud2.hidden=!gb}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');
 

@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.138 · 5f9a620 · 2026-11-25 06:17 UTC</div>
+  <div id="ver">v1.139 · def4fb5 · 2026-11-25 06:19 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1134,7 +1134,7 @@ function finishBuild0(h,k){
     const from=firstTown(h.town);if(!from){h.gold+=C.COST.outpost;return false}startCaravan(from,{x:h.x,y:h.y},h);gainXp(h,10);return true}
   const b={k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0};S.builds.push(b);
   questTick(h,'build');
-  if(CIVIC[k]){const t=nearestOwn(h.town,h.x,h.y);if(t)b.settlementId=t.id;gainXp(h,12);if(h.you)toast(CIVIC[k].n+' built in '+(t?t.name:'your town')+'. Prosperity '+prosperity(t)+'.');return true}
+  if(CIVIC[k]){const t=nearestOwn(h.town,h.x,h.y);if(t)b.settlementId=t.id;(h.stat=h.stat||{}).civic=(h.stat.civic||0)+1;gainXp(h,12);if(h.you)toast(CIVIC[k].n+' built in '+(t?t.name:'your town')+'. Prosperity '+prosperity(t)+'.');return true}
   let housed=false;
   if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){if(h.hero)t.heroHouse=true;b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t);
     if(housed&&!h.you&&S.you?.town===t.i)toast(t.name+' gained a forager from a new house.')}}
@@ -1580,7 +1580,7 @@ function stepWaves(){S.waves=S.waves||[0,1,2].map(i=>({n:0,next:C.WAVE_FIRST+i*1
     if(W.ev){if(S.events.includes(W.ev))continue;W.ev=null;W.next=S.t+rr(C.WAVE_REST[0],C.WAVE_REST[1])*(S.g.awake?1.5:1);continue}
     if(S.t<W.next||nightLock())continue;W.n++;const size=Math.min(9,2+W.n),trolls=W.n>=3?Math.min(3,Math.floor((W.n-1)/2)):0;
     startRaid(t,'Wave '+W.n+': beasts gather beyond '+t.name+' and march in 20 s!',null,size,trolls);W.ev=S.events[S.events.length-1];W.ev.wave=W.n}}
-function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);
+function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();
   for(let i=0;i<3;i++){const n=S.raided[i];if(n<C.RAID_AT.length&&wealth(i)>=C.RAID_AT[n]&&factionAlive(i)){S.raided[i]++;const t=nearestOwn(i,C.MAP/2,C.MAP/2);if(t)startRaid(t,'Beasts are gathering beyond '+t.name+', drawn by its wealth. They march in 20 s!')}}
   for(let k=S.events.length-1;k>=0;k--){const e=S.events[k];
     if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length){if(e.say)eventSay('The raid on '+town.name+' is beaten off.');
@@ -1864,7 +1864,7 @@ const CHARMS={tooth:{n:'Wolf-tooth charm',t:'+10% chance to crit'},hide:{n:'Boar
 const charmSlots=h=>2+(h.lvl>=4?1:0)+(h.lvl>=7?1:0)+(h.extraSlot||0);
 const charm=(h,id)=>h.charms&&h.charms.includes(id)?1:0;
 function giveCharm(h,id){if(!id){const pool=Object.keys(CHARMS).filter(k=>!CHARMS[k].rare&&!(h.charms||[]).includes(k)&&!(h.bag||[]).includes(k));if(!pool.length){h.gold+=40;return null}id=pool[Math.floor(rnd()*pool.length)]}
-  h.bag=h.bag||[];h.charms=h.charms||[];if(h.charms.length<charmSlots(h))equipCharm(h,id);else h.bag.push(id);
+  (h.stat=h.stat||{}).charm=(h.stat.charm||0)+1;h.bag=h.bag||[];h.charms=h.charms||[];if(h.charms.length<charmSlots(h))equipCharm(h,id);else h.bag.push(id);
   if(h.you){announce('Charm found: '+CHARMS[id].n+' ('+CHARMS[id].t.toLowerCase()+').'+(h.charms.includes(id)?' Worn.':' In your bag: wear it from your hero sheet (I).'));sfx('coin')}return id}
 function equipCharm(h,id){h.charms=h.charms||[];h.bag=(h.bag||[]).filter(k=>k!==id);if(h.charms.length>=charmSlots(h)||h.charms.includes(id))return false;h.charms.push(id);const o=CHARMS[id].on;if(o){h.atk+=o[0];h.max+=o[1];h.hp+=o[1]}return true}
 function removeCharm(h,id){if(!charm(h,id))return false;h.charms=h.charms.filter(k=>k!==id);(h.bag=h.bag||[]).push(id);const o=CHARMS[id].on;if(o){h.atk-=o[0];h.max-=o[1];h.hp=Math.min(h.hp,h.max)}return true}
@@ -1876,6 +1876,7 @@ function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i];
   openMenu({title:'Your hero \u00b7 level '+h.lvl,body:`<p><b>Health</b> ${Math.ceil(h.hp)}/${h.max} \u00b7 <b>Damage</b> ${h.atk} \u00b7 <b>Armour</b> ${h.def||0} \u00b7 <b>XP</b> ${h.xp}/${h.lvl*50}</p>
     <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?'level '+(h.horse.lv||1)+', '+Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}. <b>Hound</b> ${h.hound?(h.hound.rest>0?'resting':'at your heel'):'none (a stable or the merchant)'}.</p>
+    <p><b>Today\u2019s goals</b> (5 renown each)<br>${matchGoals().map(g=>(g.done?'\u2713 ':'\u25cb ')+g.t+(g.done?'':' '+goalProg(h,g)+'/'+g.n)).join('<br>')}</p>
     <p class="dim"><b>Charms</b> (${(h.charms||[]).length}/${charmSlots(h)} worn)<br>${(h.charms||[]).map(k=>'<b>'+CHARMS[k].n+'</b> '+CHARMS[k].t.toLowerCase()).join('<br>')||'None: alphas, camp chests and the merchant have them'}</p>
     <p class="dim"><b>Talents</b><br>${tal}</p><p class="dim"><b>Skills</b><br>${sk}</p>
     <p class="dim"><b>Job</b> ${h.quest?h.quest.text+' '+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need:'none (the board in town)'}. <b>Tale</b> ${h.saga?h.saga.done?'told':g.text.replace(/^The elders\u2019 tale: /,''):'offered after two jobs'}. <b>Stones read</b> ${Object.keys(h.lore||{}).length}/${LORE.length}.</p>`,
@@ -1952,7 +1953,7 @@ function questTarget(h){if(!h)return null;const near=xs=>xs.sort((a,b)=>Math.hyp
   return null}
 function freshQuest(h,shown){for(let k=0;k<20;k++){const q=newQuest(h);if(!shown.some(o=>o.k===q.k))return q}return newQuest(h)}
 function board(t){const h=S.you||S.humans[0];if(!t.board||S.t-t.boardT>60){t.boardT=S.t;t.board=[];for(let i=0;i<3;i++)t.board.push(freshQuest(h,t.board.concat(h.quest?[h.quest]:[])))}return t.board}
-function questTick(h,k,v){sagaTick(h,k,v);const q=h.quest;if(!q||q.done)return;if(q.k==='bounty'&&k==='bounty'&&v!==q.elite)return;
+function questTick(h,k,v){sagaTick(h,k,v);(h.stat=h.stat||{})[k]=(h.stat[k]||0)+1;const q=h.quest;if(!q||q.done)return;if(q.k==='bounty'&&k==='bounty'&&v!==q.elite)return;
   if(q.k==='climb'&&k==='height'){if(v>=q.need){q.n=q.need}else return}else if(q.k==='deliver'&&k==='arrive'){if(v!==q.to)return;q.n=1}else if(q.k===k)q.n+=(k==='tend'&&v)?v:1;else return;
   if(q.n>=q.need){q.done=true;sayTo(h,'Quest done! Return to town for '+q.gold+' gold.')}}
 function stepHuman(h,dt,mv){
@@ -2581,12 +2582,19 @@ function nextTime(){const o=S.over;if(!o)return'';
   if(S.g.dead)return'The giant is dead and '+t+' stands. Next time try the other way: tend it and earn its favour at dusk.';
   if(o.dusk&&S.favoredH!==y.id){const fp=S.humans.find(x=>x.id===S.favoredH);return'The giant honoured '+(fp?whoOf(fp):'someone else')+'. Brace it, pull wedges and Tend hurt joints to stand first in its regard, or join the hunt and bring it down.'}
   return'Play for another town, or as the giant.'}
+// this match's three goals for you (drawn from the seed), each worth 5 renown: a short reason to try something new each day
+const GOALS=[{id:'camp',t:'Break a camp',n:1,k:'camp'},{id:'alpha',t:'Slay a named alpha or chief',n:1,k:'bounty'},{id:'hunt',t:'Hunt 3 deer',n:3,k:'hunt'},{id:'pray',t:'Pray at 2 shrines',n:2,k:'pray'},
+  {id:'lore',t:'Read 2 standing stones',n:2,k:'lore'},{id:'escort',t:'Walk a traveller home',n:1,k:'escort'},{id:'lvl',t:'Reach level 5',n:5,f:h=>h.lvl},{id:'perfect',t:'Make 3 perfect dodges',n:3,f:h=>h.perfects||0},
+  {id:'civic',t:'Build 2 town buildings',n:2,k:'civic'},{id:'charm',t:'Find a charm',n:1,k:'charm'}];
+function matchGoals(){if(!S.goals){const R=mulberry32((S.seed^0x60A1)>>>0),pool=GOALS.slice(),g=[];while(g.length<3)g.push(pool.splice(Math.floor(R()*pool.length),1)[0]);S.goals=g.map(x=>({...x,done:false}))}return S.goals}
+const goalProg=(h,g)=>Math.min(g.n,g.f?g.f(h):(h.stat&&h.stat[g.k])||0);
+function stepGoals(){const h=S.you;if(!h||S.role!=='human'||S.t%1>C.DT*1.5)return;for(const g of matchGoals())if(!g.done&&goalProg(h,g)>=g.n){g.done=true;if(!S.headless){announce('Goal done: '+g.t+' (+5 renown).');sfx('coin')}}}
 // renown: what a human match earns toward lasting starting perks, bought on the title screen (a light roguelite layer)
 const RENOWN=[{id:'purse',n:'A full purse',t:'Start with 60 more gold',c:15},{id:'seasoned',n:'Seasoned',t:'Start at level 2 with a talent to choose',c:20},
   {id:'mare',n:'An old mare',t:'Start with a horse',c:25},{id:'heirloom',n:'An heirloom',t:'Start wearing a random charm',c:30},{id:'pockets',n:'Wide pockets',t:'One more charm slot',c:40}];
 function applyRenown(h){const u=save.unlocks||{};if(u.purse)h.gold+=60;if(u.seasoned)gainXp(h,50);if(u.mare)h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};if(u.pockets)h.extraSlot=1;if(u.heirloom){const quiet=h.you;h.you=false;giveCharm(h);h.you=quiet}}
 function renownEarned(h,o){if(!h)return null;const camps=h.campsBroken||0,tale=h.saga?h.saga.i+(h.saga.done?1:0):0,ch=(h.charms||[]).length+(h.bag||[]).length,win=o&&!o.giantWon&&S.favoredH===h.id?10:0;
-  return{n:2*h.lvl+3*camps+4*tale+ch+win,parts:'level '+h.lvl+' (+'+2*h.lvl+'), camps '+camps+' (+'+3*camps+'), tale steps '+tale+' (+'+4*tale+'), charms '+ch+' (+'+ch+')'+(win?', honoured by the giant (+10)':'')}}
+  const gd=(S.goals||[]).filter(g=>g.done).length;return{n:2*h.lvl+3*camps+4*tale+ch+win+5*gd,parts:(gd?'goals '+gd+'/3 (+'+5*gd+'), ':'')+'level '+h.lvl+' (+'+2*h.lvl+'), camps '+camps+' (+'+3*camps+'), tale steps '+tale+' (+'+4*tale+'), charms '+ch+' (+'+ch+')'+(win?', honoured by the giant (+10)':'')}}
 function openRenown(){const pts=save.renown||0,u=save.unlocks||{};openMenu({title:'Renown \u00b7 '+pts,body:'<p class="dim">Every match as a human earns renown: levels, camps broken, steps of the elders\u2019 tale, charms found, and the giant\u2019s honour. Spend it on perks you keep for every match.</p>',
   items:[...RENOWN.map(r=>({label:(u[r.id]?'\u2713 ':'')+r.n+(u[r.id]?'':' \u2013 '+r.c+' renown'),sub:r.t,why:u[r.id]?'Yours':pts<r.c?'Need '+(r.c-pts)+' more':null,act:()=>{save.renown=pts-r.c;save.unlocks={...u,[r.id]:1};persist();sfx('coin');openRenown()}})),{label:'Back',act:openTitle}],back:openTitle})}
 function openEnd(){if(!S||!S.over)return;const o=S.over;if(S.role==='human'&&S.you&&o.renown==null){const r=renownEarned(S.you,o);o.renown=r.n;o.renownParts=r.parts;save.renown=(save.renown||0)+r.n;persist()}
@@ -2626,6 +2634,7 @@ function start(role,seed,first,town=0){feed=[];cam.manualT=-99;document.body.cla
   cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
   if(S.memoryText)toast(S.memoryText);
   if(role==='human'&&S.you&&!S.tut)applyRenown(S.you);
+  if(role==='human'&&S.you&&!S.tut)setTimeout(()=>{if(S&&S.you&&!S.over)toast('Today\u2019s goals (I to see them): '+matchGoals().map(g=>g.t.toLowerCase()).join('; ')+'.')},9000);
   if(S.omen&&S.omen.id!=='clear')toast('Omen: '+S.omen.name+'. '+S.omen.text.replace(/^./,c=>c.toUpperCase())+'.');
   toast(role==='giant'?'You are the giant, asleep in chains. Survive to dusk and complete three of five tasks.':'You are of '+TOWNS[S.you.town].name+'.')}
 

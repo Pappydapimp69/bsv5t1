@@ -311,3 +311,6 @@ Six findings since the first review, all fixed:
    and the memory cutoff is a fixed constant.
 6. Twitch reports counted climbers already falling elsewhere; now only those in the twitched part.
 tests/sleeper.js 22 checks; all suites pass.
+- End screen **Next time**: one suggestion read from how the match ended (your town fell to the giant → lead it by
+  tending; someone else was honoured → how to stand first in its regard, or join the hunt; giant missed tasks → how to get
+  the first two; Heart broken → shake, swipe, struggle). Checked on three finished matches.

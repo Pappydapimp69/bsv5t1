@@ -2207,7 +2207,18 @@ function chronicleHtml(){const L=[];
     h+=`<p class="dim" style="margin-top:.6rem">Your part</p><div style="font-size:.85rem">${(a.twitch||0)} twitches, ${(a.strain||0)} strains, ${(a.shake||0)} shakes, ${(a.swipe||0)} swipes, ${(a.stomp||0)} stomps, ${(a.smash||0)} smashes; ${S.loosed||0} climbers knocked loose. Tasks: ${ts.map(x=>(x.done?'\u2713 ':'\u2717 ')+x.name).join(', ')}.</div>`}
   else if(S.you){const y=S.you,b=y.built||{},bl=Object.keys(b).map(k=>b[k]+' '+k+(b[k]>1?'s':'')).join(', ');
     h+=`<p class="dim" style="margin-top:.6rem">Your part</p><div style="font-size:.85rem">Highest climb ${Math.round((y.best||0)*FT)} ft; ${y.wedged||0} wedge${y.wedged===1?'':'s'} driven; ${bl||'nothing'} built on the giant; level ${y.lvl}. In the giant\u2019s eyes: ${standing(y)}.</div>`}
+  const nt=nextTime();if(nt)h+=`<p class="dim" style="margin-top:.6rem">Next time</p><div style="font-size:.85rem">${nt}</div>`;
   return h}
+// one suggestion for the next match, read from how this one ended
+function nextTime(){const o=S.over;if(!o)return'';
+  if(S.role==='giant'){const miss=giantTasks().filter(x=>!x.done).map(x=>x.name),tip={Freed:'strain at your chains from the start and tear them loose once they weaken',Braced:'twitch only where hunters are, so the keepers who brace you stay on',Avenged:'walk on the town that angers you and Smash its walls below half',Befriended:'leave Brindle\u2019s and Ashville\u2019s keepers in peace; their braces and pulled wedges make a friend',Wanderer:'walk more: six thousand paces'};
+    if(S.g.dead)return'Your Heart-stone broke. Shake and Swipe when hunters crowd you, and Struggle the moment you fall.';
+    return miss.length?'For '+miss.slice(0,2).join(' and ')+': '+miss.slice(0,2).map(m=>tip[m]).join('; ')+'.':'Try another omen, or let a different town earn your favour.'}
+  const y=S.you;if(!y)return'';const t=TOWNS[y.town].name;
+  if(!factionAlive(y.town))return S.grudge[y.town]>=C.ANGER?t+' fell because the giant turned on it. Lead '+t+' by Tending the giant and pulling wedges, or be ready to bring the giant down once it wakes.':t+' fell. Raise its walls with crystals and keep soldiers home.';
+  if(S.g.dead)return'The giant is dead and '+t+' stands. Next time try the other way: tend it and earn its favour at dusk.';
+  if(o.dusk&&S.favoredH!==y.id){const fp=S.humans.find(x=>x.id===S.favoredH);return'The giant honoured '+(fp?whoOf(fp):'someone else')+'. Brace it, pull wedges and Tend hurt joints to stand first in its regard, or join the hunt and bring it down.'}
+  return'Play for another town, or as the giant.'}
 function openEnd(){if(!S||!S.over)return;const o=S.over;openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+chronicleHtml()+record(),items:[{label:'Play again',act:()=>start(S.role,null,false,S.you?S.you.town:0)},{label:'Title',act:openTitle}],back:openTitle})}
 function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub,placement)=>({label:label+' \u2013 '+C.COST[k]+' gold',sub,why:canBuild(h,k,placement),act:()=>{if(build(h,k))closeMenu();else openBuild()}});
   const lk=lakesNear(h.x,h.y,500),near=buildNear(h),placement=barracksPlacement(h);

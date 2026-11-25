@@ -481,8 +481,8 @@ function tone(f,dur,type,vol,slide){if(!actx||!save.sound)return;const t=actx.cu
 function sfx(k,near){if(near===false||sndBudget>6)return;sndBudget++;
   if(se&&se!=='starting'){if(!save.sound)return;const u=seSrc.ui,b=seSrc.boom;
     try{({step:()=>b.sfx('explosion',{midi:21,duration:.9,velocity:.7}),stomp:()=>b.sfx('explosion',{midi:24,velocity:.95}),smash:()=>b.sfx('explosion',{midi:28,velocity:1}),
-      hit:()=>u.sfx('hit'),hurt:()=>{b.sfx('crunch',{velocity:.7});u.sfx('hit',{midi:43})},heavy:()=>{u.sfx('hit');b.sfx('explosion',{midi:40,duration:.35,velocity:.55})},kill:()=>{u.sfx('hit',{midi:50});b.sfx('crunch',{velocity:.45})},thud:()=>b.sfx('crunch',{velocity:.5}),coin:()=>u.sfx('coin'),cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))()}catch(e){}return}
-  ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),hurt:()=>tone(160,.18,'sawtooth',.16,70),heavy:()=>tone(200,.22,'square',.14,60),kill:()=>tone(260,.25,'triangle',.14,90),thud:()=>tone(110,.18,'triangle',.14,55),
+      hit:()=>u.sfx('hit'),hoof:()=>b.sfx('crunch',{velocity:.12}),whoosh:()=>u.sfx('hit',{midi:62}),cry:()=>{b.sfx('explosion',{midi:33,duration:.5,velocity:.5});u.sfx('hit',{midi:38})},hurt:()=>{b.sfx('crunch',{velocity:.7});u.sfx('hit',{midi:43})},heavy:()=>{u.sfx('hit');b.sfx('explosion',{midi:40,duration:.35,velocity:.55})},kill:()=>{u.sfx('hit',{midi:50});b.sfx('crunch',{velocity:.45})},thud:()=>b.sfx('crunch',{velocity:.5}),coin:()=>u.sfx('coin'),cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))()}catch(e){}return}
+  ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),hoof:()=>tone(130,.05,'triangle',.07,90),whoosh:()=>tone(700,.22,'sawtooth',.05,180),cry:()=>tone(180,.5,'sawtooth',.14,110),hurt:()=>tone(160,.18,'sawtooth',.16,70),heavy:()=>tone(200,.22,'square',.14,60),kill:()=>tone(260,.25,'triangle',.14,90),thud:()=>tone(110,.18,'triangle',.14,55),
     coin:()=>tone(880,.12,'sine',.12,1320),cannon:()=>tone(140,.25,'square',.12,60),warn:()=>tone(440,.3,'triangle',.16,300),build:()=>tone(600,.15,'triangle',.15,900),
     fall:()=>tone(500,.6,'sine',.12,120),grip:()=>tone(240,.12,'square',.06,200)}[k]||(()=>{}))()}
 
@@ -1095,7 +1095,7 @@ function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
   if(!perk(h,'rider')&&!charm(h,'bell')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
-function stepHorse(h,dt){if(!h.horse)return;if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
+function stepHorse(h,dt){if(!h.horse)return;if(h.riding&&!S.headless&&(h.you||nearPlayer(h))){const w=Math.hypot(h.x-(h.px??h.x),h.y-(h.py??h.y));h.px=h.x;h.py=h.y;if(w>.5){h.hoofT=(h.hoofT||0)+dt;if(h.hoofT>.22){h.hoofT=0;if(h.you)sfx('hoof',true);S.fx.push({k:'dust',x:h.x-Math.cos(h.face||0)*26,y:h.y-Math.sin(h.face||0)*26,t:0,life:.9})}}}if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
 function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
@@ -1868,8 +1868,8 @@ function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){
   (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'))*(1-.15*charm(h,'moon'));h.swing=.2;
   const near=r=>S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<r+m.r);
   if(id==='cry'){for(const m of near(220)){hitBeast(h,m,Math.round(h.atk*.8));m.wind=null;m.rec=Math.max(m.rec||0,1.2);m.cd=Math.max(m.cd||0,1.2)}
-    for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('heavy',h.you)}
-  if(id==='whirl'){for(const m of near(95))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:95,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('hit',h.you)}
+    for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('cry',h.you||nearPlayer(h))}
+  if(id==='whirl'){for(const m of near(95))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:95,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('whoosh',h.you||nearPlayer(h))}
   if(id==='mend'){const a=Math.round(h.max*.4);h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
@@ -1914,6 +1914,7 @@ function spawnWarlord(h){const M=C.MAP,R=mulberry32((S.seed^0xBADA55)>>>0);let x
 function goalTarget(){const st=tutStep();if(st&&S.tut.shown&&S.you)return st.target(S.you);return questTarget(S.you)}
 function questTarget(h){if(!h)return null;const near=xs=>xs.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]||null;
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i],q=h.quest&&!h.quest.done?h.quest:null,k=q?q.k:g?g.k:null;
+  if(!k){const p=h.aimPoi;return p&&S.pois.includes(p)&&Math.hypot(p.x-h.x,p.y-h.y)>140?{x:p.x,y:p.y}:null}
   if(k==='warlord'){const w=S.monsters.find(m=>m.warlord);return w?{x:w.x,y:w.y}:null}
   if(k==='bounty'){const a=S.monsters.find(m=>m.elite&&(!q||q.k!=='bounty'||m.elite===q.elite));return a?{x:a.x,y:a.y}:null}
   if(k==='camp')return near((S.pois||[]).filter(p=>p.k==='camp'&&campBeasts(p).length));
@@ -2783,7 +2784,8 @@ function g3Update(){const g=S.g,t=S.t;
       B(hx,hy,z+hh/2,w,hh,w*.8,tw.alive?'#ddd1b6':'#4e4740',a);if(tw.alive)RF(hx,hy,z+hh+8,w*.78,16,roof)}
     if(tw.alive){B(tw.x,tw.y,z+55,10,110,10,'#cfc3aa');RF(tw.x,tw.y,z+125,10,30,'#cfc3aa');B(tw.x,tw.y,z+150,14,14,14,tw.col,t)}}
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,f=j.t/j.dur;if(j.kind==='ground'){const z=groundH(j.x,j.y),hh=(j.k==='tower'?95:j.k==='outpost'?60:34)*Math.max(.08,f);B(j.x+30,j.y,z+hh/2,j.k==='outpost'?90:40,hh,j.k==='outpost'?90:32,'#9a7a4e');B(j.x+30,j.y,z+hh+4,j.k==='outpost'?100:48,4,j.k==='outpost'?100:40,'#6b5236')}else{const a=bodyWorld(j.s.c+.5,j.s.r+.5,climbing3D()?.face??o.cl?.face),z=groundH(a.x,a.y)+a.z;B(a.x,a.y,z,50*f+8,10,30,'#9a7a4e',g.ang)}}
-  for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
+  for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'&&Math.hypot(b.x-S.cam.x,b.y-S.cam.y)<3500){const hh=18+8*L;for(let k=0;k<2;k++){const ph=(t*.35+k*.5+b.x*.001)%1;B(b.x+8+ph*10,b.y-6,z+hh+34+ph*50,6+ph*10,6+ph*10,6+ph*10,ph<.5?'#d8d8d8':'#eeeeee')}}
+    if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
     else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
     else if(b.k==='farm'){for(let r=0;r<4;r++)B(b.x-36+r*24,b.y,z+5,16,10,90,r%2?'#c9b458':'#a8963e');B(b.x+60,b.y-30,z+14,26,28,22,'#9a7a4e');RF(b.x+60,b.y-30,z+34,20,16,'#7a4e38')}
     else if(b.k==='market'){for(const[dx,c]of[[-40,'#d07a4a'],[0,'#4a8ad0'],[40,'#d0c04a']]){B(b.x+dx,b.y,z+14,28,28,24,'#9a8a72');B(b.x+dx,b.y,z+32,34,6,30,c)}B(b.x,b.y+30,z+30,6,60,6,'#6b5a44');B(b.x+10,b.y+30,z+56,22,14,3,col)}
@@ -2791,6 +2793,7 @@ function g3Update(){const g=S.g,t=S.t;
     else if(b.k==='stable'){B(b.x,b.y,z+18,70,36,40,'#8a6a44');RF(b.x,b.y,z+46,44,22,'#5a3f2a');for(let k=0;k<4;k++)B(b.x-45+k*30,b.y+36,z+10,4,20,4,'#6b5a44');B(b.x,b.y+36,z+16,96,4,4,'#6b5a44')}
     else if(b.k==='well'){B(b.x,b.y,z+10,34,20,34,'#8d8f94');B(b.x,b.y,z+21,24,2,24,'#4f86a8');B(b.x-15,b.y,z+34,4,30,4,'#6b5a44');B(b.x+15,b.y,z+34,4,30,4,'#6b5a44');RF(b.x,b.y,z+54,26,14,'#7a4e38')}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
+  for(const tw of S.towns){if(!tw.alive||Math.hypot(tw.x-S.cam.x,tw.y-S.cam.y)>9000)continue;const z=groundH(tw.x,tw.y),hh=tw.outpost?150:230;B(tw.x+tw.r*.35,tw.y,z+hh/2,7,hh,7,'#5a4a36');for(let k=0;k<4;k++)B(tw.x+tw.r*.35+10+k*13,tw.y,z+hh-22+Math.sin(t*3+k*.9)*4,13,34-k*3,3,tw.col,Math.sin(t*2+k)*.25)}
   for(const p of S.pois||[]){if(Math.hypot(p.x-S.cam.x,p.y-S.cam.y)>9000)continue;const z=groundH(p.x,p.y),rd=S.t>=p.ready;
     if(p.k==='shrine'){const c=SHRINES[p.sub].col;B(p.x,p.y,z+6,70,12,70,'#8f8a80');B(p.x-24,p.y,z+40,12,70,12,'#a39d92');B(p.x+24,p.y,z+40,12,70,12,'#a39d92');B(p.x,p.y,z+80,70,10,16,'#6b665e');B(p.x,p.y,z+48+(rd?Math.sin(t*2)*6:0),16,16,16,rd?c:'#555',t*1.5)}
     else if(p.k==='spring'){B(p.x,p.y,z+2,150,4,110,'#7fb8c9');B(p.x,p.y,z+3,110,4,150,'#8fc8d8');for(let k=0;k<6;k++){const a=k*1.05;B(p.x+Math.cos(a)*85,p.y+Math.sin(a)*85,z+10,26,20,22,'#8a8478')}if(rd)for(let k=0;k<3;k++)B(p.x+Math.sin(t+k*2)*20,p.y+Math.cos(t*.7+k)*20,z+30+((t*30+k*25)%60),8,8,8,'#e8eef0')}
@@ -3014,6 +3017,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
   for(const m of S.monsters)if(m.kind==='archer'&&m.wind){const a=p3(m.x,m.y,40),b=p3(m.wind.x,m.wind.y,20);if(a&&b){const k=m.wind.t/m.wind.dur;ctx.globalAlpha=.35+.5*k;ctx.strokeStyle='#ff5a4a';ctx.setLineDash([6,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}}
   for(const e of S.fx){if(e.k!=='arrow')continue;const a=p3(e.x,e.y,40),b=p3(e.x2,e.y2,20);if(a&&b){const k=e.t/e.life,mx=a.x+(b.x-a.x)*k,my=a.y+(b.y-a.y)*k;ctx.strokeStyle='#f2e6c8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-(b.x-a.x)*.12,my-(b.y-a.y)*.12);ctx.stroke()}}
+  for(const e of S.fx){if(e.k!=='dust')continue;const p=e.t/e.life,q=p3(e.x,e.y,8+p*20);if(!q)continue;ctx.globalAlpha=.35*(1-p);ctx.fillStyle='#cdbb94';ctx.beginPath();ctx.arc(q.x,q.y,(8+p*22)*UI,0,7);ctx.fill()}ctx.globalAlpha=1;
   for(const e of S.fx){if(e.k!=='spark'&&e.k!=='lvl')continue;const p=e.t/e.life,q=p3(e.x,e.y,e.z||40);if(!q)continue;ctx.globalAlpha=1-p;
     if(e.k==='spark'){ctx.strokeStyle=e.col||'#ffe6a0';ctx.lineWidth=2.5*UI;ctx.beginPath();for(let i=0;i<9;i++){const a=i*0.698+e.x,r0=(6+p*34)*UI,r1=r0+(10-p*8)*UI;ctx.moveTo(q.x+Math.cos(a)*r0,q.y+Math.sin(a)*r0*.7);ctx.lineTo(q.x+Math.cos(a)*r1,q.y+Math.sin(a)*r1*.7)}ctx.stroke()}
     else{const top=p3(e.x,e.y,(e.z||40)+260);if(top){const g=ctx.createLinearGradient(0,q.y,0,top.y);g.addColorStop(0,'rgba(255,220,120,.75)');g.addColorStop(1,'rgba(255,220,120,0)');ctx.fillStyle=g;ctx.fillRect(q.x-22*UI*(1-p*.5),top.y,44*UI*(1-p*.5),q.y-top.y)}
@@ -3442,7 +3446,7 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
   cs.forEach(c=>{const e=document.getElementById('c_'+c.id);if(e){e.setAttribute('stroke',ring[st(c)][0]);e.setAttribute('opacity',ring[st(c)][1])}})}
 // with no job and the first day done, one line of what matters now, read from the state of the giant and your kit
 // (a pointer, not an autopilot: the player still chooses and walks)
-function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k=>h.kits[k]>0,climb=h.mode==='climb';
+function nextAim(h){const g=S.g,J=S.joints;h.aimPoi=null;if(h.dead||h.job)return'';const kin=k=>h.kits[k]>0,climb=h.mode==='climb';
   if(packCount(h)>=packCap(h))return'your pack is full: bank it at home';
   if(g.dead)return'the giant is dead: hold your town until dusk';
   // the horn race: whoever sounds a horn at the head first wakes the giant and earns its thanks for their town
@@ -3472,9 +3476,9 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   return!climb?'earn gold: take a job on the Board, hunt beasts or gather sky crystals':''}
 // the nearest worthwhile place within reach: a ready shrine, an unread stone, an unsoaked spring, a camp to break, a traveller
 function poiAim(h){const near=(S.pois||[]).filter(p=>Math.hypot(p.x-h.x,p.y-h.y)<(h.riding?4200:2800)&&(p.k==='shrine'&&S.t>=p.ready&&!buffOf(h,p.sub)||p.k==='stones'&&!(h.lore||{})[p.lore]||p.k==='spring'&&!(p.used||{})[h.id]||p.k==='camp'&&(campBeasts(p).length?h.lvl>=2:S.t>=p.ready)||p.k==='traveller'&&!p.follow))
-    .sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];if(!near)return'';const d=Math.round(Math.hypot(near.x-h.x,near.y-h.y)/100)*10,dir=['east','south-east','south','south-west','west','north-west','north','north-east'][Math.round(Math.atan2(near.y-h.y,near.x-h.x)/(Math.PI/4)+8)%8];
+    .sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];h.aimPoi=near||null;if(!near)return'';const d=Math.round(Math.hypot(near.x-h.x,near.y-h.y)/100)*10,dir='(the light marks it)';
   const what={shrine:SHRINES[near.sub]&&SHRINES[near.sub].n+' ('+SHRINES[near.sub].t.toLowerCase()+')',stones:'standing stones to read (lore and XP)',spring:'a hot spring (+10 most health)',camp:near.name+'\u2019s camp'+(campBeasts(near).length?' (an alpha guards a chest)':' (its chest is ready)'),traveller:'a lost traveller to walk home (50 gold)'}[near.k];
-  return what+', '+d+' paces '+dir}
+  return what+', '+d+' paces away '+dir}
 function outpostAim(h){const g=S.g,climb=h.mode==='climb';
   {const near=nearestOwn(h.town,g.x,g.y),site=()=>{for(let k=0;k<12;k++){const a=k/12*6.283,x=g.x+Math.cos(a)*1400,y=g.y+Math.sin(a)*1400;if(outpostSiteOpen(x,y)&&!inSolid(x,y,60)&&!S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))return true}return false};
     if(!climb&&!g.awake&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000)&&site())return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}

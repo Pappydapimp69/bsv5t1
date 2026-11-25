@@ -555,7 +555,10 @@ function spawnMonster(forceWolf=false){const M=C.MAP,dens=(S.places||[]).filter(
   for(let k=0;k<30&&!ok;k++){if(lair){const m=S.marks[Math.floor(rnd()*S.marks.length)],a=rr(0,6.28),d=rr(250,600);home={x:m.x,y:m.y,r:700};x=clamp(m.x+Math.cos(a)*d,150,M-150);y=clamp(m.y+Math.sin(a)*d,150,M-150)}
     else if(den){const p=dens[Math.floor(rnd()*dens.length)],a=rr(0,6.28),d=rr(60,360);home={x:p.x,y:p.y,r:420};x=clamp(p.x+Math.cos(a)*d,150,M-150);y=clamp(p.y+Math.sin(a)*d,150,M-150)}
     else{x=rr(150,M-150);y=rr(150,M-150)}ok=S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>520)&&!inSolid(x,y,40)}
-  const troll=!forceWolf&&(lair?rnd()<.8:den?false:rnd()<.2)&&canSpawnTroll(x,y);S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',wild:true,x,y,hx:x,hy:y,home,hp:troll?90:30,max:troll?90:30,atk:troll?13:6,gold:troll?22:8,xp:troll?30:12,r:troll?22:13,cd:0})}
+  const troll=!forceWolf&&(lair?rnd()<.8:den?false:rnd()<.2)&&canSpawnTroll(x,y);
+  // boars: chargers on open ground. They paw the earth, then rush through the marked spot and stand winded after (punish them)
+  if(!troll&&!forceWolf&&!lair&&!den&&S.nextId%3===0){S.monsters.push({id:S.nextId++,kind:'boar',wild:true,x,y,hx:x,hy:y,home,hp:60,max:60,atk:10,gold:14,xp:18,r:16,cd:0});return}
+  S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',wild:true,x,y,hx:x,hy:y,home,hp:troll?90:30,max:troll?90:30,atk:troll?13:6,gold:troll?22:8,xp:troll?30:12,r:troll?22:13,cd:0})}
 // crystals: half in the three fields on the flanks between towns, half spread over the three sectors. In strict turn: a field crystal, then a sector crystal, round the three fields and sectors. Every second crystal in a field is the
 // last one mirrored across the field's line from the giant, so each field leans to neither of its two towns; sector crystals come
 // in threes, one spot copied round to each town's sector
@@ -1046,7 +1049,8 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
     if(slot==='Y'){const j=reachT(h).j;if(j){h.kits.wedge--;if(h.you)h.wedged=(h.wedged||0)+1;S.firstWedge=S.firstWedge||{};if(!S.firstWedge[h.town]){S.firstWedge[h.town]=1;chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' drove '+(Object.keys(S.firstWedge).length===1?'the first':TOWNS[h.town].name+'\u2019s first')+' wedge into the '+(S.g.awake?'':'sleeping ')+'giant\u2019s '+JOINTS[j].name.toLowerCase()+'.')}S.joints[j].wedges.push({town:h.town,who:h.id});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       return drinkPotion(h)}
     return false}
-  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;onBlow(h,m,dm,0);if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(h.riding?' charge':''),t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1;h.critNext=0;
+    const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&h.hero&&poiAct(h))return usePoi(h,poiNear(h));if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1948,8 +1952,8 @@ function stepMonsters(dt){
 // one at a time, two for a pack of four or more) while the rest circle at a slot round them. Blows you land knock back by
 // their strength, harder from a held (charged) Attack; a beast knocked into stone or a footprint lake takes more.
 // All of it is sim state on the fixed tick and uses rnd() only; hit-stop, shake and rings are presentation.
-const CB={WIND:{wolf:.7,troll:.85},RING:{wolf:34,troll:46},RECOVER:{wolf:.45,troll:.6},CD:{wolf:.9,troll:1.2},HIT:1.4,
-  CIRCLE:{wolf:80,troll:92},DODGE_T:.3,DODGE_IFR:.22,DODGE_DIST:105,DODGE_CD:.5,CHARGE_MIN:.16,CHARGE_FULL:.6,TOK_GAP:.3};
+const CB={WIND:{wolf:.7,troll:.85,boar:.75},RING:{wolf:34,troll:46,boar:44},RECOVER:{wolf:.45,troll:.6,boar:1.1},CD:{wolf:.9,troll:1.2,boar:1.6},HIT:1.4,
+  CIRCLE:{wolf:80,troll:92,boar:150},DODGE_T:.3,DODGE_IFR:.22,DODGE_DIST:105,DODGE_CD:.5,CHARGE_MIN:.16,CHARGE_FULL:.6,TOK_GAP:.3};
 const untouchable=h=>!!(h&&h.dodge&&h.dodge.t<CB.DODGE_IFR);
 function cstat(k){const c=S.cstat||(S.cstat={winds:0,hits:0,dodged:0,missed:0,heavy:0,slams:0,lakes:0,dodges:0,two:0});c[k]++}
 function dodgedFx(h){if(S.headless||!(h.you||nearPlayer(h))||S.t-(h.dfxT||-9)<.5)return;h.dfxT=S.t;S.fx.push({k:'txt',x:h.x,y:h.y,z:95,text:'Dodged!',t:0,life:.9,col:'#9fe8ff'})}
@@ -1972,11 +1976,12 @@ function beastBusy(m,dt){if(m.kb)return true;
   if(m.wind){const W=m.wind;W.t+=dt;const tg=S.humans.find(h=>h.id===W.id);if(!tg||tg.dead||tg.mode!=='ground'){m.wind=null;m.cd=.4;return true}if(W.t>=W.dur)beastStrike(m,W,tg);return true}
   if(m.rec>0){m.rec-=dt;return true}return false}
 function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.CD[m.kind]||1;tg.nextTok=S.t+CB.TOK_GAP;
-  if(m.kind!=='troll'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy);if(d>m.r+6){m.x+=dx/d*(d-m.r-6);m.y+=dy/d*(d-m.r-6);solidPush(m,m.r)}}
+  if(m.kind==='boar'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy)||1;m.kb={x:dx/d,y:dy/d,left:d+70,by:null,dmg:0,k:0,charge:1};if(!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.3,col:'#ffb070'})}
+  else if(m.kind!=='troll'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy);if(d>m.r+6){m.x+=dx/d*(d-m.r-6);m.y+=dy/d*(d-m.r-6);solidPush(m,m.r)}}
   const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
   if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
   if(!hit.includes(tg)){cstat('missed');if(tg.you&&!S.headless)S.fx.push({k:'txt',x:tg.x,y:tg.y,z:95,text:'Missed',t:0,life:.8,col:'#d8f0ff'})}
-  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);h.dodgedN=(h.dodgedN||0)+1;continue}cstat('hits');h.lastBeast=m;hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
+  for(const h of hit){if(untouchable(h)){cstat('dodged');h.dodgedN=(h.dodgedN||0)+1;if(h.dodge.t<.14){m.rec=Math.max(m.rec,1.4);m.cd+=1;h.critNext=1;h.perfects=(h.perfects||0)+1;if(h.you&&!S.headless){S.fx.push({k:'txt',x:h.x,y:h.y,z:100,text:'Perfect! Next hit crits',t:0,life:1.1,col:'#9fe8ff',big:1});slowMo(450)}}else dodgedFx(h);continue}cstat('hits');h.lastBeast=m;hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
 // a dodge: a quick sidestep, untouchable for its first part, then a short cooldown; no stamina
 function threatOf(h){let b=null,bd=1e9;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-(m.wind&&m.wind.id===h.id?1e4:0);if(d<bd&&d<300){bd=d;b=m}}if(!b)b=rivalNear(h,200);return b}
 function humanDodge(h,dir){if(h.dead||h.mode!=='ground'||h.job)return false;if(h.dodge||(h.dodgeCd||0)>0)return false;
@@ -2433,7 +2438,7 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Every blow wears a chain, and worn through it breaks; once all four are broken, a wake horn, forged in town from twenty sky crystals and sounded at its head for ten seconds, wakes it, and the town that wakes it earns its favour; and only then can it move. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
 <p><b>Playing the giant.</b> You win by surviving until dusk with your Heart-stone whole and completing three of five tasks: be Freed (all four chains broken), be Braced (three braces), be Avenged (a town that angered you brought below half its walls), be Befriended (a town friendly to you), and be a Wanderer (six thousand paces walked). The HUD shows each. You cannot build: court the towns that brace you and leave the hunters to rue it. Awake, you always have the strength of one brace (a slow walk and Stomp); Smash needs two braces and Swipe three. If both knees are crippled you fall: press any action fast to Struggle up sooner. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
 <p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction, or tap or click your body panel, to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: until people start breaking your chains or someone forges a wake horn it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. Once a town has hurt you, Nightmare sends the beasts of the land against it; its people must go home to fight them. </p>
-<p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
+<p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, Y and G tilt it, + and - (or F) zoom, R rides, T picks a talent, 1 2 3 use skills, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
 // every barracks you built, wherever you are: pick one to train and give orders
 function openArmy(){const h=S.you;if(!h)return;const mine=S.builds.filter(b=>b.k==='barracks'&&b.town===h.town&&playerBuilt(b));if(!mine.length){toast('You have no barracks yet: Build one near your town.');return}
@@ -2679,8 +2684,8 @@ function g3Update(){const g=S.g,t=S.t;
     L(h.x+ca*22,h.y+sa*22,z+36,14,7,a,-2.4,0,hc);L(h.x-ca*25,h.y-sa*25,z+36,18,3,a,-2.5,Math.sin(t*6+h.id)*.4,'#2e2018')}
   for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,w=G3.walk.get(m);
     if(w&&Math.hypot(m.x-w.x,m.y-w.y)>.2)m.fa=Math.atan2(m.y-w.y,m.x-w.x);if(m.wind&&Math.hypot(m.wind.x-m.x,m.wind.y-m.y)>2)m.fa=Math.atan2(m.wind.y-m.y,m.wind.x-m.x);const cw=m.wind?Math.min(1,m.wind.t/m.wind.dur):0;const a=m.fa||0,ry=-a,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
-    if(m.kind==='wolf'&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.rec>.25?1:0,bx=m.x+ca*(lk*10-cw*7),by=m.y+sa*(lk*10-cw*7),bz=z+14-cw*7+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
-      const es=m.elite?1.45:1;put(G3.wolfB,wi,bx,by,bz*1+(es-1)*8,32*es,14*es,13*es,ry);put(G3.wolfH,wi,bx+ca*18*es,by+sa*18*es,bz+6-lk*6-cw*5+(es-1)*10,12*es,10*es,10*es,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':m.elite?'#4a4440':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
+    if((m.kind==='wolf'||m.kind==='boar')&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.rec>.25?1:0,bx=m.x+ca*(lk*10-cw*7),by=m.y+sa*(lk*10-cw*7),bz=z+14-cw*7+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
+      const es=m.elite?1.45:m.kind==='boar'?1.2:1;put(G3.wolfB,wi,bx,by,bz*1+(es-1)*8,32*es,14*es,13*es,ry);put(G3.wolfH,wi,bx+ca*18*es,by+sa*18*es,bz+6-lk*6-cw*5+(es-1)*10,12*es,10*es,10*es,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':m.elite?'#4a4440':m.kind==='boar'?'#6b4a32':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
       for(const[f,sd,ph]of[[11,1,1],[11,-1,-1],[-11,1,-1],[-11,-1,1]])L(bx+ca*f+px*sd*4,by+sa*f+py*sd*4,bz-4,11,3.5,a,sw*ph,0,lc);
       L(bx-ca*15,by-sa*15,bz+3,13,3,a,-2.3,Math.sin(t*7+m.id)*.5,lc)}
     else if(m.kind==='troll'&&ti<80){const W=stride(m,m.x,m.y,13),sw=Math.sin(W.ph)*.6*W.sp,club=m.wind?.4+2.7*cw:m.rec>0?1.25:.25+sw*.6,bz=z+Math.abs(Math.sin(W.ph))*2.5*W.sp,lc=fl?'#ffffff':'#6b4630';
@@ -2927,7 +2932,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(S.bodies)for(const bd of S.bodies){const a=1-(S.t-bd.t)/25;if(a<=0)continue;ringOnGround(bd.x,bd.y,bd.r,null,0,null,`rgba(40,22,18,${.55*a})`)}
   if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
   for(const e of S.fx){const p=e.t/e.life;ctx.globalAlpha=1-p;if(e.k==='ring'||e.k==='mark')ringOnGround(e.x,e.y,e.k==='mark'?e.r*(1-p*.5):e.r*(.5+p*.5),e.col,3);
-    if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`700 ${15*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
+    if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`800 ${(e.big?21:15)*UI*(p<.12?1.4-p*3.3:1)}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
   for(const q of S.pois||[]){const tx=poiLabel(q,S.you);if(!tx)continue;const p=p3(q.x,q.y,q.k==='herb'?30:110);if(p&&p.d<(q.k==='herb'?1600:4200))lbl(tx,p.x,p.y,11,q.k==='camp'&&campBeasts(q).length?'#ff9a8a':q.k==='shrine'?SHRINES[q.sub].col:q.k==='merchant'?'#d8b4ff':'#cfe8c8')}
@@ -3417,6 +3422,7 @@ const goalEl=document.getElementById('goal');
 // ================= loop =================
 let acc=0,last=performance.now();
 // the next frame is asked for first and the work is guarded, so one thrown error never freezes the game
+let SLOW=0;function slowMo(ms){SLOW=performance.now()+ms}
 function frame(now){requestAnimationFrame(frame);try{frameWork(now)}catch(e){console.error(e)}}
 // the opening flight: up into the tearing sky, a slow turn under it, round to the chained giant on its line, then home behind you
 function introCamera(){if(!S||!S.introCam||!S.you&&S.role!=='giant')return;const t=S.t,ease=u=>u<0?0:u>1?1:u*u*(3-2*u);if(S.introYaw==null){S.introYaw=cam.yaw;const f=S.you||S.g;S.giantYaw=Math.atan2(S.g.x-f.x,-(S.g.y-f.y))}
@@ -3429,8 +3435,8 @@ function frameWork(now){{const f=!!S&&S.t<OPENING.len;if(f!==FILM){FILM=f;docume
   paintFeed(dt);
   if(S&&S.tut&&S.tut.cardDue&&!menu&&!S.fly)openTutorialCard();
   const fl=S&&S.fly?stepFly(dt):null;
-  if(S&&!menu&&!S.over&&!S.fly){acc+=dt;while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
-  if(S){let z=0;if(keys.has('KeyR'))z+=1;if(keys.has('KeyF'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyT'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);
+  if(S&&!menu&&!S.over&&!S.fly){acc+=dt*(performance.now()<SLOW?.35:1);while(acc>=C.DT){step(C.DT);acc-=C.DT}}else acc=0;
+  if(S){let z=0;if(keys.has('Equal')||keys.has('NumpadAdd'))z+=1;if(keys.has('KeyF')||keys.has('Minus')||keys.has('NumpadSubtract'))z-=1;z-=padZoom;let yw=padCam.x,pt=padCam.y;if(keys.has('KeyQ'))yw-=1;if(keys.has('KeyE'))yw+=1;if(keys.has('KeyY'))pt-=1;if(keys.has('KeyG'))pt+=1;if((yw||pt)&&!(S.you&&S.you.mode==='climb'))camTurn(yw*CAM.YAW_RATE*dt,pt*CAM.PITCH_RATE*dt);
     // the walking giant's camera eases round behind its heading: a 12 degree dead zone, 0.8/s gain, at most 30 degrees a second
     // (well under the ~60 deg/s where views start to sicken people); any manual turn holds it off for 3 s
     else if(S.role==='giant'&&!S.introCam&&S.g.awake&&!(S.g.fallen>0)&&S.g.v>3&&S.t-(cam.manualT??-99)>3){const x=S.g.ang+Math.PI/2-cam.yaw,d=Math.atan2(Math.sin(x),Math.cos(x)),a=Math.abs(d);

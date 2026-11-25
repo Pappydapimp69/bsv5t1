@@ -62,6 +62,14 @@ const {chromium} = require('playwright');
       // nemesis: an alpha that kills you takes a name and grows
       const N = __col.newGame('human', 9), n = N.you; __col.step(2); const al = N.monsters.find(m => m.elite); const hp0 = al.max;
       n.lastBeast = al; killHuman(n, 'beast'); out.nemesis = /Hero-Slayer/.test(al.elite) && al.max > hp0;
+      // combat: the third strike in a row lands harder and knocks back; a perfect dodge sets up a crit; boars roam the open land
+      const K = __col.newGame('human', 10), k = K.you; K.monsters = []; k.atk = 10;
+      const dummy = {id: K.nextId++, kind: 'troll', x: k.x + 25, y: k.y, hx: k.x, hy: k.y, hp: 9999, max: 9999, atk: 1, gold: 0, xp: 0, r: 22, cd: 9}; K.monsters.push(dummy);
+      const blows = []; const rr0 = rnd; for (let i = 0; i < 3; i++) { k.cd = 0; const before = dummy.hp; rnd = () => .99; humanAct(k, 'A'); rnd = rr0; blows.push(before - dummy.hp); dummy.kb = null; dummy.x = k.x + 25; dummy.y = k.y; }
+      out.comboFinisher = blows[2] > blows[0] * 1.5;
+      k.dodge = {t: .05, x: 1, y: 0}; const W = {t: 0, dur: .7, x: k.x, y: k.y, R: 46, id: k.id}; beastStrike(dummy, W, k); out.perfectDodge = k.critNext === 1 && dummy.rec >= 1.4;
+      k.dodge = null; k.cd = 0; k.combo = 0; k.comboT = -9; const b0 = dummy.hp; humanAct(k, 'A'); out.critAfterPerfect = b0 - dummy.hp >= 17 && !k.critNext;
+      const Bo = __col.newGame('human', 11); out.boars = Bo.monsters.some(m => m.kind === 'boar');
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

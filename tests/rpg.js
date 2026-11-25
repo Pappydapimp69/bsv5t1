@@ -26,6 +26,18 @@ const {chromium} = require('playwright');
       h.riding = true; horseHurt(h, 20); out.hardHitThrows = !h.riding;
       h.riding = true; h.horse.hp = 1; horseHurt(h, 5); out.bolts = !h.riding && h.horse.away > S.t && rideWhy(h) !== null;
       h.horse.away = 0; h.mode = 'climb'; out.noRideOnGiant = rideWhy(h) !== null; h.mode = 'ground';
+      // talents: a level gives one pick of three; taking one applies at once
+      const T = __col.newGame('human', 4), y = T.you; T.monsters = [];
+      y.xp = 0; gainXp(y, 50); out.levelGivesPick = y.lvl === 2 && y.picks === 1 && talentChoices(y).length === 3;
+      const a0 = y.atk; takeTalent(y, TALENTS.find(t => t.id === 'brawler')); out.brawler = y.atk === a0 + 4 && y.picks === 0;
+      // skills: locked by level, cooldown after use, whirlwind hits every beast in reach
+      out.lockedMend = skillWhy(y, SKILLS[2]) !== null;
+      gainXp(y, 100); const w = [0, 1, 2].map(k => ({id: T.nextId++, kind: 'wolf', x: y.x + 30 + k * 10, y: y.y, hx: y.x, hy: y.y, hp: 300, max: 300, atk: 1, gold: 1, xp: 1, r: 13, cd: 9}));
+      T.monsters.push(...w); out.whirl = useSkill(y, 'whirl') && w.every(m => m.hp < 300) && skillWhy(y, SKILLS[1]) !== null;
+      out.cry = useSkill(y, 'cry') && y.cryT > T.t;
+      // bot heroes pick talents on their own
+      const B = __col.newGame('human', 6); B.autoplay = true; while (B.t < 480) __col.step(60);
+      out.botTalents = B.humans.filter(o => o.hero && o.lvl > 1).every(o => Object.keys(o.perks || {}).length === o.lvl - 1);
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

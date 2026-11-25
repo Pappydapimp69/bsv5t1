@@ -258,3 +258,6 @@ large; earlier 6-seed set at the same tuning had one giant death).
   Struggle on the first fall, and the awake kit on waking. Checked in the page: strain at 0:24, Nightmare at 0:32.
 - The giant's five tasks were computed every frame but never shown (only "Tasks 1/3"). The goal box now carries a compact
   line: "Freed 0/4 · Braced 0/3 · Avenged ✗ · Befriended ✗ · Wanderer 0k/6k" (✓ when done). Checked in the page.
+- The "Now" line's shopping advice follows your town's way (or your lead): tenders are pointed at brace kits ("earn 10
+  more gold for a brace kit… or pull rivals' wedges"), hunters at wedges. Found while watching a Brindle tender policy
+  that built its ladder, had 40 gold and no way to earn regard.

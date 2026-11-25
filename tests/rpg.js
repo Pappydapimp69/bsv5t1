@@ -133,6 +133,12 @@ const {chromium} = require('playwright');
       const Cr = __col.newGame('human', 24), cr = Cr.you, ct = Cr.towns[cr.town]; cr.pack.pelts = 4; cr.x = ct.x; cr.y = ct.y; unloadPack(cr, ct);
       out.hideStore = cr.hides === 4; const m0c = cr.max; openTown(ct, 'Forge'); const it = menu.items.find(i => /^Fur cloak/.test(i.label)); it.act(); closeMenu();
       out.crafted = cr.max === m0c + 25 && cr.hides === 0;
+      // treasure: a map rings an area; X at the spot digs it up
+      const Tr = __col.newGame('human', 25), tr = Tr.you; Tr.monsters = []; out.treasureMap = giveTreasure(tr) && !!tr.treasure;
+      tr.x = tr.treasure.x + 30; tr.y = tr.treasure.y; const tg0 = tr.gold; out.dig = /Dig/.test(humanCtx(tr).X.l) && humanAct(tr, 'X') && tr.gold >= tg0 + 150 && !tr.treasure;
+      // festival: a home settlement at 70+ prosperity holds one a day
+      const Fe = __col.newGame('human', 26), fe = Fe.you, ft = Fe.towns[fe.town]; ft.houses = 6; Fe.builds.push(...['farm','farm','farm','market','smithy','stable','well'].map((k, i) => ({k, x: ft.x + i, y: ft.y, town: fe.town, settlementId: ft.id, hp: 1})));
+      Fe.t = 10; const fg0 = fe.gold; stepFestival(); out.festival = prosperity(ft) >= 70 && fe.gold === fg0 + 30 && buffOf(fe, 'might');
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

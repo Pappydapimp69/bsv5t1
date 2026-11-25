@@ -1108,11 +1108,11 @@ function stepBuilds(dt){
 // sky crystals buy upgrades: a level is one more step of what the thing already does
 const lv=o=>o.lvl||1;
 function upCost(kind,o){const c=C.UP[kind];return lv(o)-1<c.length?c[lv(o)-1]:null}
-function canUpgrade(h,kind,o,crystals=h.crystals){if(isForager(h)&&(kind!=='house'||foragerHome(h)?.id!==o.settlementId||!heroBuilt(o)||o.hp===0))return'Foragers can only raise hero-built houses in their own settlement';
+function canUpgrade(h,kind,o,crystals=h.crystals+(h.you&&storeNear(h)?poolOf(storeNear(h)):0)){if(isForager(h)&&(kind!=='house'||foragerHome(h)?.id!==o.settlementId||!heroBuilt(o)||o.hp===0))return'Foragers can only raise hero-built houses in their own settlement';
   if(kind==='town'){if(o.i!==h.town)return'Not your settlement';if(!o.alive)return'In ruins'}else if(o.town!=null&&o.town!==h.town)return'Not yours';
   const c=upCost(kind,o);if(c==null)return'At its highest level';return crystals<c?'Need '+(c-crystals)+' more crystals':null}
-function upgrade(h,kind,o,bank=h){const why=canUpgrade(h,kind,o,bank.crystals);if(why){sayTo(h,why);return false}const promote=kind==='town'&&o.outpost;
-  bank.crystals-=upCost(kind,o);o.lvl=lv(o)+1;sfx('build',h.you);gainXp(h,10*o.lvl);
+function upgrade(h,kind,o,bank=h){const near=bank===h&&h.you?storeNear(h):null,have=bank.crystals+(near?poolOf(near):0);const why=canUpgrade(h,kind,o,have);if(why){sayTo(h,why);return false}const promote=kind==='town'&&o.outpost;
+  {const c=upCost(kind,o),own=Math.min(c,bank.crystals);bank.crystals-=own;if(c>own&&near)spendPool(near,c-own)}o.lvl=lv(o)+1;sfx('build',h.you);gainXp(h,10*o.lvl);
   if(kind==='ladder'){const st=S.sites.find(q=>q.build===o);if(st)ladderDown(st,30+25*(o.lvl-1))}
   if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20;if(promote)o.outpost=false;else startCaravan(o)}
   if(kind==='house'){const t=S.towns[o.settlementId];if(t?.alive){t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP}}
@@ -1174,12 +1174,14 @@ function barracksWork(h,b){
     const gear=nextGear(soldier,k);
     if(gear&&lv(home)>=gear.t&&h.gold>=gear.g)return{soldier,k};
   }
+  {const kit=townWay(h.town)==='hunt'?'wedge':'brace';const s0=soldiers.find(x=>!x.kits[kit]&&(kit!=='brace'||!siteCapReached(x,'brace')));if(s0&&h.gold>=C.COST[kit]+10)return{soldier:s0,kit}}
   return null;
 }
 function tendBarracks(h,b){
   const work=barracksWork(h,b);
   if(!work||!S.builds.includes(b)||dist(h,b)>90)return false;
   if(work.train){h.gold-=ARMY.SOLDIER;b.q++}
+  else if(work.kit){h.gold-=C.COST[work.kit];work.soldier.kits[work.kit]++}
   else buyGear(work.soldier,work.k,h);
   return true;
 }
@@ -1351,8 +1353,35 @@ function pickGoalFolk(h){
   }
   return beast?{k:'monster',id:beast.id}:crystal?{k:'crystal',x:crystal.x,y:crystal.y}:shop;
 }
+// ---- the foragers' economy: they bank crystals in the town store, raise the town with them, build houses with their
+// gold, and lay roads to their town's outposts; settlements joined by road share one crystal store
+C.ROAD_COST=40;C.FOLK_HOUSES=6;
+function linked(t){const out=[t],seen=new Set([t.id]);S.links=S.links||[];
+  for(let k=0;k<out.length;k++)for(const [a,b] of S.links){const o=a===out[k].id?b:b===out[k].id?a:null;if(o==null||seen.has(o))continue;const u=S.towns.find(x=>x.id===o);if(u&&u.alive&&u.i===t.i){seen.add(o);out.push(u)}}
+  return out}
+const poolOf=t=>linked(t).reduce((n,u)=>n+(u.crystals||0),0);
+function spendPool(t,c){for(const u of linked(t)){const d=Math.min(c,u.crystals||0);u.crystals-=d;c-=d;if(c<=0)break}}
+// the settlement whose store the player can draw on: one of their own whose build area they stand in
+function storeNear(h){if(!h||h.mode==='climb')return null;let best=null;for(const t of aliveTowns())if(t.i===h.town&&withinLimits(t,h.x,h.y)&&(!best||dist(t,h)<dist(best,h)))best=t;return best}
+function folkRaiseTown(h,t){const c=upCost('town',t);if(c==null||poolOf(t)<c)return false;spendPool(t,c);const promote=t.outpost;t.lvl=lv(t)+1;t.max+=600;t.hp+=600;t.r+=20;if(promote)t.outpost=false;else startCaravan(t);
+  if(S.you&&S.role==='human'&&S.you.town===t.i)toast(t.name+'\u2019s foragers raised it to level '+t.lvl+' with the town\u2019s crystals'+(promote?': it is now a town.':'.'));return true}
+function folkBuildHouse(h,t){if((t.houses||0)>=C.FOLK_HOUSES||h.gold<C.COST.house+15)return false;
+  for(let k=0;k<12;k++){const a=rr(0,6.28),d=t.r+rr(50,170),x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d;
+    if(!withinLimits(t,x,y)||inSolid(x,y,30)||S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<50)||S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))continue;
+    h.gold-=C.COST.house;const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,'house');h.x=hx;h.y=hy;
+    if(S.you&&S.role==='human'&&S.you.town===t.i&&nearPlayer(t))toast('A forager of '+t.name+' built a house.');return true}
+  return false}
+function folkLayRoad(h,t){if(h.gold<C.ROAD_COST)return false;S.links=S.links||[];
+  const mine=new Set(linked(t).map(u=>u.id)),to=aliveTowns().filter(u=>u.i===t.i&&!mine.has(u.id)).sort((a,b)=>dist(a,t)-dist(b,t))[0];if(!to)return false;
+  h.gold-=C.ROAD_COST;S.links.push([t.id,to.id]);
+  // a road on the land: walkable faster (like the old roads) and drawn on the ground
+  const line=[];const n=Math.ceil(dist(t,to)/150);for(let k=0;k<=n;k++){const x=t.x+(to.x-t.x)*k/n,y=t.y+(to.y-t.y)*k/n;line.push({x,y});if(S.land&&S.land.road)S.land.road[landCell(x,y)]=1}
+  line.w=.5;(S.roads=S.roads||[]).push(line);groundSeed=-1;chron('Foragers of '+t.name+' laid a road to '+to.name+'; the two now share one crystal store.');
+  if(S.you&&S.role==='human'&&S.you.town===t.i)toast('Foragers laid a road from '+t.name+' to '+to.name+': they now share one crystal store.');return true}
 function botFolkShop(h){const t=townAt(h);if(!t||wallsDown(t))return;
-  if(isForager(h)&&foragerHome(h)===t)unloadPack(h,t);
+  if(isForager(h)&&foragerHome(h)===t){unloadPack(h,t);
+    // what the folk do with the town's crystals and their own gold, one thing per visit
+    if(!folkRaiseTown(h,t)&&!(rnd()<.35&&folkLayRoad(h,t)))if(rnd()<.4)folkBuildHouse(h,t)}
   if(!h.potions&&h.gold>=C.COST.potion){h.gold-=C.COST.potion;h.potions++}}
 // the soldiers carry the town's way toward the giant: the old roles, minus gathering
 function readyToWake(h){return !!h.horn&&!S.g.awake&&!S.g.dead&&allWeak()&&!nightLock()}
@@ -3149,7 +3178,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     b=!g.awake?(S.waker?'<span class="k">A horn sounds</span> at your head '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':allWeak()?'<span class="k">Free</span> strain once more to rise':'<span class="k">Chained</span> twitch off hunters, strain at your chains · aiming: '+ZONES[aimZone()]):g.fallen>0?'<span class="k">Down</span> '+Math.ceil(g.fallen)+' s':'';b=(b?b+'<br>':'')+'<span style="font-weight:500;font-size:.78rem">'+S.taskLine+'</span>'}
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
-      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals)+(h.horn?chip('Horn','ready'):'');
+      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals+((n=>n?' +'+n+' town':'')(storeNear(h)?poolOf(storeNear(h)):0)))+(h.horn?chip('Horn','ready'):'');
     const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');

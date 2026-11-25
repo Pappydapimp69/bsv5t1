@@ -169,7 +169,8 @@ async function main() {
         const returnsWithPartialPack = pickGoalFolk(villager)?.k === 'shop';
         unloadPack(villager);
         botFolkShop(villager);
-        const waitsForHero = lv(town) === 1;
+        // owner's note: foragers raise their town with the town's crystals (it used to wait for the hero)
+        const foragersRaiseTown = lv(town) === 2;
         hero.x = town.x;
         hero.y = town.y;
         botHeroShop(hero, town);
@@ -183,7 +184,7 @@ async function main() {
           stepEvents(0);
         }
         const foundedVillage = state.towns.some(t => t.i === i && t.outpost);
-        return {name: town.name, savedCrystals, returnsWithPartialPack, waitsForHero, assignedEscort, raisedAndSentSettlers, foundedVillage};
+        return {name: town.name, savedCrystals, returnsWithPartialPack, foragersRaiseTown, assignedEscort, raisedAndSentSettlers, foundedVillage};
       });
       return {startingTown, rivals};
     });

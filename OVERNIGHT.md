@@ -256,3 +256,5 @@ large; earlier 6-seed set at the same tuning had one giant death).
 - Just-in-time lessons for a first-time giant (each once ever, saved; at most one per 6 s; key names follow the device):
   Strain at the start, aim + Twitch when a hunter first climbs, Nightmare when a town first hurts it, chains weakening,
   Struggle on the first fall, and the awake kit on waking. Checked in the page: strain at 0:24, Nightmare at 0:32.
+- The giant's five tasks were computed every frame but never shown (only "Tasks 1/3"). The goal box now carries a compact
+  line: "Freed 0/4 · Braced 0/3 · Avenged ✗ · Befriended ✗ · Wanderer 0k/6k" (✓ when done). Checked in the page.

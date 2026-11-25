@@ -414,6 +414,15 @@ Shipped (each published to play/ with its version number on the menu screen):
 | v1.127-128 | Hoofbeats, dust, skill sounds, chimney smoke, town banners; rival heroes use the places too |
 | v1.129 | World events (ambushed traveller, golden stag); ? and ! over towns; gear visible on the hero; How to play updated |
 | v1.130 | Renown across matches with five perks; skill-upgrade talents; horses level up |
+| v1.132 | Villagers walking about towns; lanterns at dusk |
+| v1.133 | Full map on M with labels and the goal ring |
+| v1.134 | Elite traits (swift, armoured, vampiric, frenzied); Spear skill (4); palisades at town level 2-3 |
+| v1.135 | Late-game gold: houses you did not build pay half; Giantbone/Skyforged gear; training buys talents; horse barding |
+| v1.136 | A hound companion |
+| v1.137 | Ground cover: bushes, boulders, wildflowers (3 draws) |
+| v1.138 | Shop order: basics first |
+| v1.139 | Today's goals: three per match, 5 renown each |
+| v1.140 | Level-up fanfare |
 
 Tests: new tests/rpg.js (55 checks) covers all of the above; the older suites pass unchanged except where the owner's
 rules changed behaviour (outposts now need settlers; raising a town sends a trade caravan).

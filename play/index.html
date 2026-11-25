@@ -751,7 +751,7 @@ function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below 60% of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
-C.OWN_BRACE=1;C.BOT_TEND_BELOW=0;C.TEND_HEAL=12;C.TEND_FAVOR=2;C.BOT_SHOVE=.3;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
+C.OWN_BRACE=1;C.FIG_MAX=200;C.LIMB_MAX=3200;C.GUARD_R=260;C.GUARD_PULL=14;C.BOT_TEND_BELOW=0;C.TEND_HEAL=12;C.TEND_FAVOR=2;C.BOT_SHOVE=.3;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
 C.TWITCH_CD=6;C.TWITCH_WIND=1.1;C.TWITCH_GRIP=36;C.TWITCH_BRACED=8;C.TWITCH_WEDGE=.5;C.TWITCH_ANCHOR=.4;
 C.DREAM_CD=90;C.DREAM_WIND=1.5;C.DREAM_MIN=50;
 // the sleeper's nightmare: it dreams of the town that has hurt it most, and the beasts of the land march on that town
@@ -872,7 +872,7 @@ function hurtTown(t,d,why){if(!t.alive)return;if(!S.headless&&S.t-(t.sndT||0)>.6
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
-function hurtHuman(h,d,why,by){if(h.dead)return;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
+function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
 function killHuman(h,why){leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=null;h.gold=Math.floor(h.gold*.75);
@@ -1235,14 +1235,24 @@ function soldierMove(h,dt){const b=h.sol.b,o=h.ord,mv={x:0,y:0};if(!S.builds.inc
   if(S.g.dead&&o.k==='giant'){tire(h);return mv}
   const P=orderPost(h);if(!P){tire(h);return mv}
   if(o.ph==='walk'){if(go(P.x,P.y,30)<=45){o.ph='hold';o.t=0;if(o.k==='giant'&&playerArmy(h)&&!S.judgeTaught){S.judgeTaught=1;S.gsPulse=S.t+7;announce('The giant marks who guards it. Your standing in its regard rises.')}}return mv}
-  o.t+=dt;if(o.t>=ARMY.HOLD){tire(h);return mv}
+  o.t+=dt;if(o.t>=ARMY.HOLD*(o.k==='giant'?3:1)){tire(h);return mv}
   if(o.k==='attack'){
     const at=attackTarget(h);if(at){humanAct(h,'A');return mv}
     if(P.ob){if(Math.hypot(P.ob.x-h.x,P.ob.y-h.y)<95)swing(h,()=>damageBuild(P.ob,h.atk,h));else go(P.x,P.y,30);return mv}
     const bl=S.builds.find(x=>x.town===o.ti&&x.hp!==0&&Math.hypot(x.x-h.x,x.y-h.y)<80);if(bl){swing(h,()=>damageBuild(bl,h.atk,h));return mv}
     const t=P.t;if(t&&t.alive&&Math.hypot(t.x-h.x,t.y-h.y)<t.r+80){swing(h,()=>hurtWalls(t,h,h.atk));return mv}
     go(P.x,P.y,30);return mv}
-  if(o.k==='giant'){const own=S.humans.find(x=>x.id===b.owner);if(own){regard(own,ARMY.GUARD_REGARD*dt);S.grudge[own.town]-=ARMY.GUARD_REGARD*dt}}
+  if(o.k==='giant'){const own=S.humans.find(x=>x.id===b.owner);if(own){regard(own,ARMY.GUARD_REGARD*dt);S.grudge[own.town]-=ARMY.GUARD_REGARD*dt}
+    // holding the post: a detection ring around the soldier. Rival soldiers inside it are attacked; rival climbers low on the
+    // giant inside it are pulled off; rivals walking to the foot inside it are attacked; beasts only once they have bitten
+    const R=C.GUARD_R;let tg=null,bd=R;
+    for(const x of S.humans){if(x.dead||x.town===h.town)continue;const d=dist(x,h);
+      if(x.mode==='climb'){const f=S.g.feet[x.leg||0];if(x.cl&&x.cl.y<C.GUARD_PULL&&Math.hypot(f.x-h.x,f.y-h.y)<R+C.FOOT_R&&S.t-(x.pulledT||-99)>4){x.pulledT=S.t;leaveClimb(x);x.x=f.x+rr(-60,60);x.y=f.y+rr(-60,60);
+          S.feud[x.town][h.town]+=20;sayTo(x,'A '+TOWNS[h.town].name+' soldier guarding the giant pulls you off its foot!');if(!S.headless&&nearPlayer(h))sfx('hit',true)}continue}
+      if(x.mode!=='ground'||townAt(x))continue;if(d<bd&&(x.sol||x.goal&&x.goal.k==='foot'||x.you&&nearFoot(x)>=0)){bd=d;tg=x}}
+    if(!tg&&S.t-(h.beastAt||-99)<6){const m=nearMonster(h,R);if(m)tg=m}
+    if(tg){const at=attackTarget(h);if(at&&(at===tg||at.town!=null&&at.town!==h.town||at.town==null&&S.t-(h.beastAt||-99)<6)){humanAct(h,'A');return mv}go(tg.x,tg.y,30);return mv}
+    go(P.x,P.y,22);return mv}
   if(!fight(P.x,P.y))go(P.x,P.y,22);return mv}
 // bot towns use their barracks too: they train from the folk's gold, answer an attack on their walls, and take revenge on a feud
 // the player's own town follows the player's lead: once the giant clearly likes or hates what you do, your town's
@@ -2074,6 +2084,7 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if(S.fly){if(!e.repeat)flyPress();e.preventDefault();return}
   if((e.code==='Escape'||e.code==='KeyP')&&!e.repeat){openPause();e.preventDefault();return}
   if(e.code==='KeyC'&&!e.repeat)camReset();
+  if(e.code==='KeyB'&&!e.repeat&&S.you){openArmy();e.preventDefault();return}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});
 addEventListener('keyup',e=>keys.delete(e.code));
@@ -2239,10 +2250,15 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction, or tap or click your body panel, to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: until the chains weaken (minute 15, or 10 under a restless omen) it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. Once a town has hurt you, Nightmare sends the beasts of the land against it; its people must go home to fight them. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
+// every barracks you built, wherever you are: pick one to train and give orders
+function openArmy(){const h=S.you;if(!h)return;const mine=S.builds.filter(b=>b.k==='barracks'&&b.town===h.town&&playerBuilt(b));if(!mine.length){toast('You have no barracks yet: Build one near your town.');return}
+  const ordName=b=>b.order?({town:'defend town',giant:'defend the giant',tend:'tend the giant',hunt:'hunt the giant',attack:'attack '+(b.order.ti!=null?TOWNS[b.order.ti].name:'')}[b.order.k]):'no standing order';
+  openMenu({title:'Your barracks',body:'<p class="dim">Choose one to give orders from here.</p>',items:[...mine.map((b,i)=>({label:'Barracks '+(i+1)+' by '+(S.towns.find(t=>t.id===b.settlementId)||{name:'?'}).name,sub:soldiersOf(b).length+'/'+ARMY.CAP+' soldiers · '+ordName(b),act:()=>openBarracks(b)})),{label:'Back',act:closeMenu}],back:closeMenu})}
 function openPause(){if(!S||S.over)return;const h=S.you;
   const kits=h&&Object.entries(h.kits).filter(([,count])=>count>0).map(([name,count])=>count+' '+name+(count===1?'':'s')).join(', ');
   const body=(h?`<p class="dim"><b>Equipment</b> · ${kits||'No kits'}${h.horn?' · Wake horn':''}</p>`:'')+`<p class="dim controls-hint">${hintText()}</p>`;
-  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
+  const mine=h?S.builds.filter(b=>b.k==='barracks'&&b.town===h.town&&playerBuilt(b)):[];
+  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(mine.length?[{label:'Barracks orders ('+mine.length+')',sub:'Give orders from anywhere (B)',act:openArmy}]:[]),...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
   {label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();openPause()}},{label:'Quit to title',act:openTitle}],back:closeMenu})}
 function chronicleHtml(){const L=[];
   // the four chain breaks read as one beat: when, and whose work it was
@@ -2384,11 +2400,11 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   G3.gShadow=new THREE.Mesh(G3.shadeGeo,shade);sc.add(G3.gShadow);G3.blobs=inst(G3.shadeGeo,shade,200);sc.add(G3.blobs);
   G3.chain=inst(new THREE.CylinderGeometry(1,1,1,6),new THREE.MeshLambertMaterial({color:0x26262a}),80);sc.add(G3.chain);
   // people and beasts: a few simple parts each, readable from a distance, coloured by town
-  G3.cloak=inst(new THREE.ConeGeometry(1,1,8),new THREE.MeshLambertMaterial({color:0xffffff}),30);G3.head=inst(new THREE.SphereGeometry(1,10,8),new THREE.MeshLambertMaterial({color:0xe7d3b8}),30);
-  G3.badge=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshBasicMaterial({color:0xffffff}),30);
+  G3.cloak=inst(new THREE.ConeGeometry(1,1,8),new THREE.MeshLambertMaterial({color:0xffffff}),C.FIG_MAX);G3.head=inst(new THREE.SphereGeometry(1,10,8),new THREE.MeshLambertMaterial({color:0xe7d3b8}),C.FIG_MAX);
+  G3.badge=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshBasicMaterial({color:0xffffff}),C.FIG_MAX);
   G3.wolfB=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),160);G3.wolfH=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),160);
   G3.trollB=inst(new THREE.CylinderGeometry(.8,1,1,7),new THREE.MeshLambertMaterial({color:0xffffff}),80);G3.trollH=inst(new THREE.SphereGeometry(1,8,6),new THREE.MeshLambertMaterial({color:0xffffff}),80);
-  const limbG=new THREE.BoxGeometry(1,1,1);limbG.translate(0,-.5,0);G3.limb=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),1300);G3.tool=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),120);
+  const limbG=new THREE.BoxGeometry(1,1,1);limbG.translate(0,-.5,0);G3.limb=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),C.LIMB_MAX);G3.tool=inst(limbG,new THREE.MeshLambertMaterial({color:0xffffff}),C.FIG_MAX);
   G3.walk=new WeakMap();G3.e2=new THREE.Euler(0,0,0,'YXZ');
   sc.add(G3.cloak,G3.head,G3.badge,G3.wolfB,G3.wolfH,G3.trollB,G3.trollH,G3.limb,G3.tool);
   G3.crystal=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xbff4ff,emissive:0x2aa8c8}),300);sc.add(G3.crystal);
@@ -2443,11 +2459,11 @@ function g3Update(){const g=S.g,t=S.t;
   // flailing in a fall); render only, the sim never reads a pose
   let hi=0,bi=0,li=0,oi=0;
   const limb=(mesh,i,x,y,z,len,w,face,a,roll,col)=>{_p.set(x,z,y);G3.e2.set(-a,Math.PI/2-face,roll||0);_q.setFromEuler(G3.e2);_s.set(w,len,w);_m.compose(_p,_q,_s);mesh.setMatrixAt(i,_m);mesh.setColorAt(i,_c.set(col))};
-  const L=(x,y,z,len,w,face,a,roll,col)=>{if(li<1300)limb(G3.limb,li++,x,y,z,len,w,face,a,roll,col)};
+  const L=(x,y,z,len,w,face,a,roll,col)=>{if(li<C.LIMB_MAX)limb(G3.limb,li++,x,y,z,len,w,face,a,roll,col)};
   // the tip of a limb hung from (x,y,z) and swung forward by a: where a hand holds its tool
   const tip=(x,y,z,len,face,a)=>({x:x+Math.cos(face)*Math.sin(a)*len,y:y+Math.sin(face)*Math.sin(a)*len,z:z-Math.cos(a)*len});
   const stride=(o,x,y,r)=>{let w=G3.walk.get(o);if(!w){w={x,y,ph:0,sp:0};G3.walk.set(o,w)}const d=Math.hypot(x-w.x,y-w.y);w.x=x;w.y=y;if(d<80)w.ph+=d/r;w.sp+=((d>.2&&d<80?1:0)-w.sp)*.25;return w};
-  const fig=(h,x,y,z,col,badge,you,face)=>{if(hi>=30)return;const s=you?1.25:1,w=stride(h,x,y,9*s),sw=Math.sin(w.ph)*.7*w.sp,cl=h.mode==='climb'&&h.cl,fall=cl&&cl.fall;
+  const fig=(h,x,y,z,col,badge,you,face)=>{if(hi>=C.FIG_MAX)return;const s=you?1.25:1,w=stride(h,x,y,9*s),sw=Math.sin(w.ph)*.7*w.sp,cl=h.mode==='climb'&&h.cl,fall=cl&&cl.fall;
     let legA=sw,legB=-sw,armL=-sw*.8,armR=sw*.8,bob=Math.abs(Math.sin(w.ph))*3*w.sp,tool=true;
     if(w.sp<.05){armL=.08+Math.sin(t*1.7+h.id)*.05;armR=.08+Math.sin(t*1.7+h.id+1)*.05;bob=Math.sin(t*1.7+h.id)*.6}
     if(fall){armL=2.6+Math.sin(t*21)*.5;armR=2.6-Math.sin(t*21)*.5;legA=Math.sin(t*17)*.7;legB=-legA;tool=false}
@@ -2459,8 +2475,10 @@ function g3Update(){const g=S.g,t=S.t;
     G3.cloak.setColorAt(hi,_c.set(col));G3.badge.setColorAt(hi,_c.set(badge));hi++;
     L(x+sx*4*s,y+sy*4*s,zb+17*s,17*s,4.5*s,face,legA,0,'#3b3329');L(x-sx*4*s,y-sy*4*s,zb+17*s,17*s,4.5*s,face,legB,0,'#3b3329');
     L(x+sx*9*s,y+sy*9*s,zb+42*s,17*s,4*s,face,armL,0,col);L(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,4*s,face,armR,0,col);
-    if(tool&&oi<120){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
-  for(const h of S.humans){if(h.dead)continue;const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
+    if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
+  // people nearest the camera first, so the figure pool never drops those you can see (it used to hold 30, in list order)
+  const folkView=S.humans.filter(h=>!h.dead&&(h.mode!=='ground'||Math.hypot(h.x-S.cam.x,h.y-S.cam.y)<9000)).sort((a,b)=>(b.you-a.you)||Math.hypot(a.x-S.cam.x,a.y-S.cam.y)-Math.hypot(b.x-S.cam.x,b.y-S.cam.y));
+  for(const h of folkView){const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=climberWorld(h);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,g.ang+(h.cl.face===1?Math.PI:0))}}
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
@@ -2707,6 +2725,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   const onBody=!!climbing3D();if(S.you&&!S.you.dead&&!onBody)unionOutline(territory(S.you.town),(x,y)=>p3(x,y,2),TOWNS[S.you.town].col,2,[10,8]);
   for(const ft of g.feet)if(ft.air>0){const p=1-ft.air/ft.dur;ringOnGround(ft.lx,ft.ly,C.FOOT_R*(1.5-p*.5),null,0,null,`rgba(0,0,0,${.15+p*.35})`);ringOnGround(ft.lx,ft.ly,C.FOOT_R,'rgba(255,90,70,.95)',2.5)}
   if(g.wind&&(g.wind.k==='stomp'||g.wind.k==='smash')){const p=1-g.wind.t/g.wind.dur,pts=g.wind.k==='stomp'?g.feet:[g.wind],R=g.wind.k==='stomp'?C.STOMP_R:C.SMASH_R;for(const q of pts){ringOnGround(q.x,q.y,R*p,null,0,null,`rgba(255,80,60,${.15+p*.25})`);ringOnGround(q.x,q.y,R,'rgba(255,90,70,.95)',2.5,[8,6])}}
+  if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
   for(const e of S.fx){const p=e.t/e.life;ctx.globalAlpha=1-p;if(e.k==='ring'||e.k==='mark')ringOnGround(e.x,e.y,e.k==='mark'?e.r*(1-p*.5):e.r*(.5+p*.5),e.col,3);
     if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`700 ${15*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}

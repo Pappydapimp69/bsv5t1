@@ -125,6 +125,10 @@ const {chromium} = require('playwright');
       const prey = {id: 998, kind: 'wolf', x: hd.x + 120, y: hd.y, hx: hd.x + 120, hy: hd.y, hp: 300, max: 300, atk: 1, gold: 0, xp: 0, r: 13, cd: 9}; Hd.monsters.push(prey);
       for (let i = 0; i < 120; i++) { prey.x = hd.x + 120; prey.y = hd.y; prey.cd = 9; stepHound(hd, C.DT); }
       out.hound = prey.hp < 300 && Math.hypot(hd.hound.x - prey.x, hd.hound.y - prey.y) < 60;
+      // today's goals: three per match, completed from play, worth renown
+      const Go = __col.newGame('human', 23), go = Go.you; const gs = matchGoals(); out.threeGoals = gs.length === 3 && new Set(gs.map(g => g.id)).size === 3;
+      go.lvl = 5; go.perfects = 3; go.stat = {camp: 1, bounty: 1, hunt: 3, pray: 2, lore: 2, escort: 1, civic: 2, charm: 1}; Go.t = 10; stepGoals();
+      out.goalsDone = gs.every(g => g.done); Go.over = {giantWon: true, text: 'x'}; out.goalRenown = renownEarned(go, Go.over).n >= 15;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

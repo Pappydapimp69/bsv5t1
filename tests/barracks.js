@@ -169,21 +169,18 @@ async function main() {
         const returnsWithPartialPack = pickGoalFolk(villager)?.k === 'shop';
         unloadPack(villager);
         botFolkShop(villager);
-        const waitsForHero = lv(town) === 1;
+        // owner's note: foragers raise their town with the town's crystals (it used to wait for the hero)
+        const foragersRaiseTown = lv(town) === 2;
         hero.x = town.x;
         hero.y = town.y;
         botHeroShop(hero, town);
-        const caravan = state.events.find(e => e.k === 'caravan' && e.i === i && e.site);
+        // owner's rule: raising a town sends a trade caravan; only heroes found outposts (by staking a site)
+        const caravan = state.events.find(e => e.k === 'caravan' && e.i === i);
         stepEvents(0);
         const assignedEscort = caravan?.escort === villager;
-        const raisedAndSentSettlers = lv(town) === 2 && Boolean(caravan);
-        if (caravan) {
-          caravan.x = caravan.site.x;
-          caravan.y = caravan.site.y;
-          stepEvents(0);
-        }
-        const foundedVillage = state.towns.some(t => t.i === i && t.outpost);
-        return {name: town.name, savedCrystals, returnsWithPartialPack, waitsForHero, assignedEscort, raisedAndSentSettlers, foundedVillage};
+        const raisedAndSentSettlers = lv(town) === 2 && Boolean(caravan) && !caravan.site;
+        const foundedVillage = !state.towns.some(t => t.i === i && t.outpost);
+        return {name: town.name, savedCrystals, returnsWithPartialPack, foragersRaiseTown, assignedEscort, raisedAndSentSettlers, foundedVillage};
       });
       return {startingTown, rivals};
     });
@@ -204,7 +201,12 @@ async function main() {
       player.y = capital.y;
       build(player, 'outpost');
       stepJob(player, 15);
+      // owner's rule: the hero stakes the site and settlers walk there from the first town
+      const settlers = state.events.find(e => e.k === 'caravan' && e.site);
+      const staked = !!settlers && settlers.from === capital.id && state.towns.length === 3;
+      settlers.x = settlers.site.x; settlers.y = settlers.site.y; state.monsters = []; stepEvents(C.DT);
       const outpost = state.towns.at(-1);
+      if (!staked) throw new Error('outpost did not send settlers from the first town');
       const oneNewForager = outpost.outpost && state.humans.filter(h => isForager(h) && h.homeId === outpost.id).length === 1;
       forager.x = outpost.x + 220;
       forager.y = outpost.y;
@@ -422,6 +424,7 @@ async function main() {
       const capacityIncreasesOnCompletion = foragersIn(town).length === 2 && foragerCapacity(town) === 2;
       upgrade(player, 'house', state.builds[0]);
       const upgradingKeepsSameForagerCount = foragersIn(town).length === 2;
+      town.lvl = 2; // owner's rule: three houses at level 1 and two more per level
       for (const offset of [310, 370, 430]) { startHouse(town, offset); stepJob(player, 6); }
       const cappedAtFour = town.houses === 4 && foragersIn(town).length === 4;
       startHouse(outpost, 250);
@@ -491,7 +494,12 @@ async function main() {
       state.t = RENT_INTERVAL * 2 + .01;
       stepBuilds(C.DT);
       const upgradedRentPaysMore = player.gold === goldBefore + 8;
-      return {buildMenuShowsRent, noEarlyRent, heroGetsRent, playerSeesPayout, requiresLocalHeroHouse, foragerUpgradesHouse, upgradedRentPaysMore};
+      // owner's rule: a house a forager built in the player's town pays the player, not the forager
+      const fHouse = {k: 'house', x: town.x - 300, y: town.y, town: town.i, owner: forager.id, cd: 0, hp: C.HOUSE_HP, max: C.HOUSE_HP};
+      state.builds.push(fHouse); const pg = player.gold, fg = forager.gold;
+      state.t = RENT_INTERVAL * 3 + .01; stepBuilds(C.DT);
+      const foragerHousePaysPlayer = player.gold === pg + 4 + Math.round(HOUSE_RENT * .5) && forager.gold === fg; // houses you did not build pay half
+      return {foragerHousePaysPlayer, buildMenuShowsRent, noEarlyRent, heroGetsRent, playerSeesPayout, requiresLocalHeroHouse, foragerUpgradesHouse, upgradedRentPaysMore};
     });
     for (const [check, passed] of Object.entries(rent)) assert.ok(passed, check);
 

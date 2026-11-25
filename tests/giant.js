@@ -89,7 +89,7 @@ async function main() {
       state.monsters = [];
       const right = state.chains.find(chain => chain.id === 'ankleR');
       const before = right.hp;
-      state.t = C.CHAIN_OPEN;
+      state.t = 900; state.chainsStarted = 1;
       botHuman(soldier, C.DT);
       const struckFromGround = soldier.mode === 'ground' && right.hp === before - soldier.atk && soldier.chainHits === 1;
       const rejectedHitsNotCounted = !strikeChain(soldier, right) && soldier.chainHits === 1;
@@ -110,7 +110,7 @@ async function main() {
       const keeper = state.humans.find(h => h.town === 1);
       keeper.role = 'keeper';
       keeper.horn = 1;
-      state.t = C.CHAIN_OPEN;
+      state.t = 900; state.chainsStarted = 1;
       for (const chain of state.chains) chain.hp = 0;
       mount(keeper, 0);
       const row = C.WAKE_ROW;
@@ -245,9 +245,7 @@ async function main() {
 
       const ambushX = town.x + 1050;
       state.monsters = [-10, 0, 10].map(dx => ({x: ambushX + dx, y: town.y, kind: 'troll', hp: 90}));
-      const originalVillageSite = villageSite;
-      villageSite = () => ({x: town.x + 3000, y: town.y});
-      try { startCaravan(town); } finally { villageSite = originalVillageSite; }
+      startCaravan(town, {x: town.x + 3000, y: town.y});
       const ambush = state.monsters.filter(m => m.ambush);
       const crowdedAmbushUsesWolves = ambush.length === 3 && ambush.every(m => m.kind === 'wolf');
       return {wildSpawnsRespectLimit, raidUsesTwoTrollsAndWolf, fullAreaBlocksMoreTrolls, distantAreaAllowsTrolls, crowdedAmbushUsesWolves};

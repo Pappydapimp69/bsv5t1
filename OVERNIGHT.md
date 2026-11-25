@@ -343,6 +343,10 @@ tests/sleeper.js 22 checks; all suites pass.
   query now passes acceptance (it failed both ways before).
 - Colossus: the forward-outpost hint shows first when gold covers both an outpost and a kit (≥170), so it is no longer
   starved by the brace/wedge advice (Brindle 130 g → brace; 200 g → outpost).
+- Colossus: tenders can earn money from the giant. The board's "tend" job now reads "Tend the giant's wounds (Tend a hurt
+  joint, or pull a wedge)" and counts Tend presses (1 each) and pulls (3 each) toward 6; giant jobs are posted from the
+  start for players on the giant's side (owner's rule kept: the giant is never a job you must take, never one to strike).
+  20 seeds at 1:00: Brindle boards 23 of 60 slots are giant jobs; Corvel 0.
 
 ## What I would build next
 

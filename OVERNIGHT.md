@@ -285,3 +285,6 @@ large; earlier 6-seed set at the same tuning had one giant death).
   from falls 1–3 to 0–1). Fixed: bots shove only by their own rule; for players Shove yields to joint/chain/build.
   After the fix, seeds 1–3: 0 vs 1–3 shoves per match, falls 0–3 either way, giant to dusk 3/3.
 - tests/sleeper.js: shove label/effect/feud and that a joint keeps priority (18 checks).
+- **Tend** (the anchor button at a hurt, unwedged joint): heals 12 per press (0.6 s apart) and earns +2 regard — the
+  mirror of Strike, so a tender has a free verb on the giant. Found by the Brindle tender policy: ladder built, 30–40
+  gold, no rival wedges to pull, regard 0 for 7 minutes. About 12 s of tending passes the ±40 lead threshold.

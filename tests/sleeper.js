@@ -72,6 +72,10 @@ const {chromium} = require('playwright');
       out.shove = /^Shove/.test(label) && did && rival.grip <= g0 - C.SHOVE_GRIP + 1e-6 && X.feud[rival.town][me.town] > f0;
       me.cd = 0; me.cl.y = 43.5; me.cl.x = 10.5; rival.cl.y = 44.5; rival.cl.x = 10.5;
       out.shoveYieldsToJoint = /^Strike/.test(humanCtx(me).A.l);
+      // tending: at a hurt joint with no wedge, the anchor button soothes it and earns regard
+      me.cd = 0; X.g.awake = true; X.joints.kneeL.hp = 900; const r0 = (X.reg && X.reg[me.id]) || 0;
+      out.tendLabel = /^Tend/.test(humanCtx(me).X.l); humanAct(me, 'X');
+      out.tend = X.joints.kneeL.hp === 900 + C.TEND_HEAL && X.reg[me.id] > r0;
       // the real entry point: starting from the menu closes it, sets up the opening camera, and applies an omen (none on the guided first day)
       save.firstDay = 1; start('giant', 2);
       out.startGiant = !menu && __col.S.introCam === true && __col.S.omen && __col.S.omen.id === drawOmen(2).id;

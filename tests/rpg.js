@@ -168,6 +168,9 @@ const {chromium} = require('playwright');
       // the Warlord's phases: its pack at half health, rage at a quarter
       const Wl = __col.newGame('human', 32), wh = Wl.you; Wl.monsters = []; spawnWarlord(wh); const wlb = Wl.monsters.find(m => m.warlord); const n0 = Wl.monsters.length;
       hitBeast(wh, wlb, 270); out.warlordPack = Wl.monsters.length === n0 + 4; const wa0 = wlb.atk; hitBeast(wh, wlb, 140); out.warlordRage = wlb.atk > wa0 && wlb.swift;
+      // the ultimate: Earthshaker at level 7 stuns and hurts everything near
+      const Qk = __col.newGame('human', 33), qh = Qk.you; Qk.monsters = []; const ws = [0, 1, 2].map(k => ({id: 900 + k, kind: 'wolf', x: qh.x + 60 + k * 30, y: qh.y, hx: 0, hy: 0, hp: 300, max: 300, atk: 1, gold: 0, xp: 0, r: 13, cd: 0})); Qk.monsters.push(...ws);
+      out.quakeLocked = !useSkill(qh, 'quake'); qh.lvl = 7; out.quake = useSkill(qh, 'quake') && ws.every(m => m.hp < 300 && m.rec >= 2);
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

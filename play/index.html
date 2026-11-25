@@ -122,7 +122,7 @@ body[data-dev=pad] .ab.off{opacity:.85}body[data-dev=pad] .ab.off .k{opacity:.45
 #skillbar{position:absolute;z-index:6;left:50%;bottom:var(--sb);transform:translateX(-50%);display:flex;flex-direction:column;align-items:stretch;gap:.25rem;pointer-events:none}
 .skrow{display:flex;gap:.35rem;justify-content:center}.xpb{position:relative;height:.5rem;border-radius:.25rem;background:rgba(14,16,20,.86);border:1px solid #56627a;overflow:hidden}.xpb i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#b98a2e,#ffd27a)}.xpt{font:700 .62rem system-ui;color:#ffd27a;text-align:center;text-shadow:0 1px 2px #000}
 body.titling #skillbar{display:none}
-.sk{position:relative;width:3.3rem;height:3.3rem;border-radius:.55rem;background:rgba(14,16,20,.86);border:1px solid #56627a;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:.15rem;box-sizing:border-box;overflow:hidden;font:600 .62rem/1.1 system-ui,sans-serif;text-align:center}
+.sk{pointer-events:auto;cursor:pointer;position:relative;width:3.3rem;height:3.3rem;border-radius:.55rem;background:rgba(14,16,20,.86);border:1px solid #56627a;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:.15rem;box-sizing:border-box;overflow:hidden;font:600 .62rem/1.1 system-ui,sans-serif;text-align:center}
 .sk .ic{font-size:1.25rem;line-height:1.3rem;margin-bottom:.1rem}.sk .ky{position:absolute;left:.25rem;top:.12rem;font-size:.62rem;color:var(--accent)}
 .sk .cdv{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.62)}.sk .cdn{position:absolute;inset:0;display:grid;place-items:center;font-size:1rem;font-weight:800;color:#fff}
 .sk.off{opacity:.38}.sk.ready{border-color:var(--accent);box-shadow:0 0 .5rem rgba(255,207,106,.45)}.sk.tal{border-color:#9be08a;box-shadow:0 0 .6rem rgba(155,224,138,.6);animation:pulse 1.2s infinite}
@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.151 · b5596bf · 2026-11-25 06:57 UTC</div>
+  <div id="ver">v1.152 · 142d207 · 2026-11-25 06:58 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -3635,11 +3635,12 @@ function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f|
   if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)>20){S.eyeSaid=S.t;S.eyeOn=me;toast(me?'The giant\u2019s eye settles on you: you stand first in its regard. Keep it there until dusk.':'The giant\u2019s eye turns from you to '+whoOf(f)+'.')}
   else if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)<=20){}else S.eyeOn=me}
 const skillEl=document.getElementById('skillbar');let skSig='';
+skillEl.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-sk]');if(!el||!S||!S.you||menu)return;e.preventDefault();e.stopPropagation();const k=el.dataset.sk;if(k==='talent')openTalents();else if(k==='ride')toggleRide(S.you);else useSkill(S.you,k)});
 function paintSkills(){const h=S&&S.you;if(!h||FILM||S.role!=='human'){if(skSig){skSig='';skillEl.innerHTML=''}return}
   const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
-    return `<div class="sk${lock?' off':c<=0&&h.mode==='ground'?' ready':''}" title="${k.text}"><span class="ky">${k.key}</span><span class="ic">${ic[k.id]}</span>${lock?'Lv '+k.lvl:k.name}${!lock&&c>0?`<div class="cdv" style="height:${Math.round(c/tot*100)}%"></div><div class="cdn">${Math.ceil(c)}</div>`:''}</div>`});
-  if(h.picks>0)parts.push(`<div class="sk tal"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
-  if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);
+    return `<div class="sk${lock?' off':c<=0&&h.mode==='ground'?' ready':''}" data-sk="${k.id}" title="${k.text}"><span class="ky">${k.key}</span><span class="ic">${ic[k.id]}</span>${lock?'Lv '+k.lvl:k.name}${!lock&&c>0?`<div class="cdv" style="height:${Math.round(c/tot*100)}%"></div><div class="cdn">${Math.ceil(c)}</div>`:''}</div>`});
+  if(h.picks>0)parts.push(`<div class="sk tal" data-sk="talent"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
+  if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}" data-sk="ride"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);
   const f=Math.round(h.xp/(h.lvl*50)*100),sig=`<div class="xpt">Level ${h.lvl} \u00b7 ${h.xp}/${h.lvl*50} XP${h.buff&&h.buff.until>S.t?' \u00b7 '+SHRINES[h.buff.k].n.replace('Shrine of ','Blessed: ')+' '+Math.ceil(h.buff.until-S.t)+'s':''}${h.combo&&S.t-h.comboT<.9?' \u00b7 combo '+h.combo+'/3':''}</div><div class="xpb"><i style="width:${f}%"></i></div><div class="skrow">${parts.join('')}</div>`;if(sig!==skSig){skSig=sig;skillEl.innerHTML=sig}}
 function paintHud(){paintSkills();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;

@@ -261,3 +261,15 @@ large; earlier 6-seed set at the same tuning had one giant death).
 - The "Now" line's shopping advice follows your town's way (or your lead): tenders are pointed at brace kits ("earn 10
   more gold for a brace kit… or pull rivals' wedges"), hunters at wedges. Found while watching a Brindle tender policy
   that built its ladder, had 40 gold and no way to earn regard.
+
+## What I would build next (draft, updated at the end)
+
+1. **Put a person in each role.** Every claim here rests on bots, key-press policies and my own hand play. The open GPTBS
+   questions (is twitch/strain play or busywork for a person; do players read the chronicle; does the Now line narrow
+   play) need first-time players, one match each role, with screen recording.
+2. **The walk.** Bots spend 86–90% of the early game walking; roads only shave ~25%. Try purpose on the way (caravans to
+   escort, beasts guarding crystal fields between town and giant) before touching map scale (GPTBS 0101#E97).
+3. **Climber-vs-climber on the body.** Rival hunters and keepers share the giant but cannot touch each other up there;
+   a shove (grip damage) would make the horn race and wedge-pulling contests real.
+4. **Online play.** The asymmetric premise wants one real giant and several real humans; everything is single-file and
+   deterministic per seed, which helps a lockstep or host-authoritative prototype.

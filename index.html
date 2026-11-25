@@ -748,7 +748,7 @@ function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below 60% of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
-C.OWN_BRACE=1;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
+C.OWN_BRACE=1;C.BOT_SHOVE=.3;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
 C.TWITCH_CD=6;C.TWITCH_WIND=1.1;C.TWITCH_GRIP=36;C.TWITCH_BRACED=8;C.TWITCH_WEDGE=.5;C.TWITCH_ANCHOR=.4;
 C.DREAM_CD=90;C.DREAM_WIND=1.5;C.DREAM_MIN=50;
 // the sleeper's nightmare: it dreams of the town that has hurt it most, and the beasts of the land march on that town
@@ -974,6 +974,8 @@ function humanCtx(h){
     if(chH)A={l:chainWeak(chH)?chH.name+': broken':'Strike '+chH.name,why:busy||(chainWeak(chH)?'Already broken':null)};
     if(j)A={l:'Strike '+JOINTS[j].name.toLowerCase(),why:busy||(!huntOpen()?'It sleeps as stone':null)};
     else if(s){if(s.build&&s.build.k==='cannon'&&s.build.town!==h.town)A={l:'Wreck cannon',why:busy};else if(s.build)A={l:'Upgrade '+s.build.k+(upCost(s.build.k,s.build)!=null?' ('+upCost(s.build.k,s.build)+' crystals)':''),why:busy||canUpgrade(h,s.build.k,s.build)};else{const kn=Object.keys(SITE_KITS).filter(k=>h.kits[k]).length;A={l:s.pending?'Being built':'Build at '+s.r*FT+' ft',why:busy||(s.pending?'Someone is building here':!kn?'No kits for the giant: buy them in town':null)}}}
+    // a rival within arm's reach can be shoved: it costs them grip, and their town will remember the blow
+    {const o=!j&&!s&&!chH?shoveTarget(h):null;if(o)A={l:'Shove '+(o.you?'the rival':TOWNS[o.town].name+'\u2019s '+(o.hero?'hero':'climber')),why:busy||(h.cd>0?'Steady yourself':h.grip<C.SHOVE_COST+5?'Grip too low':null)}}
     // at the head a carried wake horn takes the button over any joint or build spot there, or no one could sound it standing on the crown's ladder
     if(!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||!j&&!s))A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':S.waker&&S.waker!==h&&S.waker.waking?'Another horn is sounding':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: break all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
     const siteFree=s&&!s.build;
@@ -985,6 +987,12 @@ function humanCtx(h){
   const t=townAt(h),foot=nearFoot(h),at=attackTarget(h),m=at&&at.town==null?at:null,foe=at&&at.town!=null?at:null,up=upgradeTarget(h);
   return{A:(fc=>fc?{l:'Attack the '+fc.name,why:chainWeak(fc)?'Already broken':null}:{l:foe?'Attack '+TOWNS[foe.town].name:'Attack',why:m||foe?null:'Nothing in reach',sub:attackHint()})(m||foe?null:footChain(h)),B:foot>=0||!up?{l:'Climb',why:foot>=0?(nightLock()?'Night: the chained giant cannot be touched':null):S.g.dead?'The giant is dead':'Stand by a planted foot'}:{l:'Upgrade '+up.label,why:up.why},
     X:t?{l:t.outpost?'Outpost':'Town',why:null}:h.hero&&cacheNear(h)?{l:'Search ruins',why:null}:barracksNear(h)?{l:'Barracks',why:null}:{l:'Build',why:null},Y:{l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions+h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null}}}
+// climber against climber: rivals on the body within 1.8 cells; a shove costs you a little grip and them a lot
+C.SHOVE_R=1.8;C.SHOVE_GRIP=35;C.SHOVE_COST=6;C.SHOVE_CD=1.5;C.SHOVE_FEUD=40;
+function shoveTarget(h){if(h.mode!=='climb'||!h.cl||h.waking)return null;let b=null,bd=C.SHOVE_R;for(const o of climbers()){if(o===h||o.town===h.town||o.cl.fall)continue;const d=Math.hypot(o.cl.x-h.cl.x,o.cl.y-h.cl.y);if(d<bd){bd=d;b=o}}return b}
+function shove(h,o){if(h.cd>0||h.grip<C.SHOVE_COST+5)return false;h.cd=C.SHOVE_CD;h.swing=.2;h.grip-=C.SHOVE_COST;o.grip-=C.SHOVE_GRIP;if(o.waking)interruptWake(o);
+  S.feud[o.town][h.town]+=C.SHOVE_FEUD;S.shoves=(S.shoves||0)+1;sfx('hit',h.you||o.you);
+  sayTo(h,'You shove '+(o.hero?TOWNS[o.town].name+'\u2019s hero':'a '+TOWNS[o.town].name+' climber')+'.');sayTo(o,whoOf(h).replace(/^./,c=>c.toUpperCase())+' shoves you! Your grip slips.');return true}
 function drinkPotion(h){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.')}
   else{h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.')}return true}
 function humanAct(h,slot,dir){const r=humanAct0(h,slot,dir);if(r&&h.sol&&h.ord&&(h.mode==='climb'||slot==='A'&&footChain(h)))h.workedAt=S.t;return r}
@@ -992,6 +1000,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
     if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||(rt=>!rt.j&&!rt.s)(reachT(h)))){if(!h.horn||!allWeak()||S.waker&&S.waker!==h&&S.waker.waking)return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}
+    {const rt0=reachT(h),o=slot==='A'&&h.you&&!rt0.j&&!rt0.s&&!rt0.ch?shoveTarget(h):null;if(o)return shove(h,o)}
     {const ch=slot==='A'?reachT(h).ch:null;if(ch)return strikeChain(h,ch)}
     if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const rt=reachT(h),j=rt.j,s=rt.s;
       if(j){damageJoint(j,h.atk,h);gainXp(h,1);sfx('hit',h.you);questTick(h,'strike');return true}
@@ -1810,6 +1819,8 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   if(g.wind&&g.wind.k==='twitch'&&zoneAt(r,c)===g.wind.zone){if(h.bw!==g.wind){h.bw=g.wind;h.bOk=rnd()<.5}if(h.bOk){cl.path=null;return mv}}
   if(g.wind&&g.wind.k==='swipe'&&!restful(t)){const left=g.wind.side==='L';if(r>=30&&(left?c<COLS/2:c>=COLS/2)){if(!cl.path||!h.dodging){h.dodging=true;cl.path=bfs(r,c,(rr2,cc)=>restful(S.body.g[rr2*COLS+cc])||rr2<30||(left?cc>=COLS/2:cc<COLS/2),3000)}return mv}}
   h.dodging=false;
+  {const o=shoveTarget(h);if(o&&h.cd<=0&&h.grip>mg*.5&&rnd()<C.DT*C.BOT_SHOVE){const oj=jointAt(o.cl.x,o.cl.y),mine=hunter(h);
+    if(oj&&(mine?!hunter(o)&&S.joints[oj].wedges.length:hunter(o)))shove(h,o)}}
   const canRest=restful(t)||restRope(h,r,c);
   if(h.rest){if(h.grip>=mg*.92||g.fallen>0||!canRest){h.rest=false;h.seekRest=false}else return mv}
   if(h.grip<mg*.35&&g.fallen<=0){if(canRest){h.rest=true;cl.path=null;return mv}
@@ -2143,7 +2154,7 @@ function openTitle(){S=null;document.body.classList.add('titling');ov.classList.
   items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant. Hard: the giant turns on hunters, so lead your town or bring the giant down',act:()=>start('human',null,false,2)},
     {label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
     {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
-function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
+function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. A rival climber within arm's reach (away from a joint or build spot) can be shoved with Attack: it costs them a lot of grip, you a little, and starts a feud. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
 <p><b>Fighting.</b> Beasts warn before they strike: a wolf crouches and a troll raises its club over a red ring that shrinks to the spot it chose, and the blow lands only on whoever is still in the ring. Step out, or dodge (Shift on keys, a shoulder button on a pad, a quick flick across the screen on touch): the first part of a dodge cannot be hurt. Tap Attack for a quick strike; hold it to charge a heavy blow that knocks a beast back, hardest into stone or a footprint lake. Wolves take turns: one lunges while the pack circles.</p>
 <p><b>Rivals.</b> People of other towns can be attacked anywhere outside a settlement's walls (Attack when one is close); a kill takes what their pack holds and a quarter of their gold. Every blow starts a feud between the towns: their people answer it on sight, and towers shoot feuding rivals inside your build area.</p>
 <p><b>Building takes time.</b> A house takes 6 seconds, a tower 8, an outpost 15, anything on the giant 5 or 6; you are held at the work until it is done, and on the giant your grip still counts.</p>

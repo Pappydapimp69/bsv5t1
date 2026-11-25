@@ -273,3 +273,15 @@ large; earlier 6-seed set at the same tuning had one giant death).
    a shove (grip damage) would make the horn race and wedge-pulling contests real.
 4. **Online play.** The asymmetric premise wants one real giant and several real humans; everything is single-file and
    deterministic per seed, which helps a lockstep or host-authoritative prototype.
+
+### 16. Shoving rivals on the body (checkpoint 16)
+
+- Rivals shared the giant but could not touch each other there. Now Attack on a rival within 1.8 cells (when no joint,
+  chain or build spot is in reach) **shoves**: −35 grip to them, −6 to you, 1.5 s cooldown, feud +40, interrupts a horn.
+  Bots shove only deliberately (keepers shove hunters at joints; hunters shove keepers at wedged joints, 0.3/s).
+- Evidence: GPTBS dog#E20 (one context function per button with explicit priority — Colossus already has `humanCtx`).
+- **Two bugs caught by sweep, not suites:** the bot rule referenced an undefined `dt` (crash once two rivals met); and
+  giving Shove priority on A made bots *striking a joint* shove instead (54–103 accidental shoves a match, the giant went
+  from falls 1–3 to 0–1). Fixed: bots shove only by their own rule; for players Shove yields to joint/chain/build.
+  After the fix, seeds 1–3: 0 vs 1–3 shoves per match, falls 0–3 either way, giant to dusk 3/3.
+- tests/sleeper.js: shove label/effect/feud and that a joint keeps priority (18 checks).

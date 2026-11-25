@@ -64,6 +64,14 @@ const {chromium} = require('playwright');
       const ks = ['stomp', 'smash', 'shake', 'swipe', 'twitch', 'strain', 'dream'];
       while (Wg.t < 300) { __col.step(30); if (ks.some(k => canGiant(k) === null)) { gap = Math.max(gap, Wg.t - last); last = Wg.t } }
       out.neverIdle = Math.max(gap, Wg.t - last) <= 30;
+      // shove: a rival in arm's reach on the body, off any joint or build spot; it costs them grip and starts a feud
+      const X = __col.newGame('human', 5); X.t = 100; const me = X.you, rival = X.humans.find(o => o.town !== me.town);
+      mount(me, 0); mount(rival, 0); me.cl.y = 20.5; me.cl.x = 10.5; rival.cl.y = 21.5; rival.cl.x = 10.5; me.cl.grab = rival.cl.grab = null; me.grip = rival.grip = 80;
+      const label = humanCtx(me).A.l, g0 = rival.grip, f0 = X.feud[rival.town][me.town];
+      const did = humanAct(me, 'A');
+      out.shove = /^Shove/.test(label) && did && rival.grip <= g0 - C.SHOVE_GRIP + 1e-6 && X.feud[rival.town][me.town] > f0;
+      me.cd = 0; me.cl.y = 43.5; me.cl.x = 10.5; rival.cl.y = 44.5; rival.cl.x = 10.5;
+      out.shoveYieldsToJoint = /^Strike/.test(humanCtx(me).A.l);
       // the real entry point: starting from the menu closes it, sets up the opening camera, and applies an omen (none on the guided first day)
       save.firstDay = 1; start('giant', 2);
       out.startGiant = !menu && __col.S.introCam === true && __col.S.omen && __col.S.omen.id === drawOmen(2).id;

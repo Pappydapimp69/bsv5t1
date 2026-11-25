@@ -436,6 +436,14 @@ Shipped (each published to play/ with its version number on the menu screen):
 | v1.152 | Clickable skill bar |
 | v1.153 | Gamepad: D-pad skills, left stick rides |
 | v1.154 | Wave raiders hit walls a third as hard; warnings at 60% and 30% walls |
+| v1.155 | The Now line calls you home when beasts are at your walls |
+| v1.156 | Named rival heroes; a talent reroll; a charm chance in the first ruins |
+| v1.157 | Trample beasts on horseback; places appear on the map once discovered |
+| v1.158 | Villagers talk as you pass |
+| v1.159 | The Rim Warlord fights in phases |
+| v1.160 | Earthshaker, an ultimate skill at level 7 |
+| v1.161 | What's new and How to play updated |
+| v1.162 | The merchant and travellers talk; the merchant parks on dry ground |
 
 ## Independent review (v1.147)
 
@@ -470,3 +478,22 @@ All ten are fixed, with regression checks in tests/rpg.js (76 checks now).
 
 Tests: new tests/rpg.js (55 checks) covers all of the above; the older suites pass unchanged except where the owner's
 rules changed behaviour (outposts now need settlers; raising a town sends a trade caravan).
+
+## Final state of this run
+
+- Tests: tests/rpg.js 84 checks; giant 42, sleeper 26, heroes, barracks (soldier supply and tutorial checks), and land
+  fairness (40 seeds, 0 unfair) all pass.
+- Real-input playtest through key presses and clicks passed: buy a horse, ride, pray at a shrine, fight, level up, pick
+  a talent, open the hero sheet and the map. The 2D fallback renderer passed a key-mash run with no errors.
+- Whole matches: six human seeds and three giant seeds reach dusk with no errors.
+
+## What I would do next
+
+1. Watch the owner play one full human match. Every open GPTBS question in this run is about what a person does: do
+   they open T, swap charms, detour to places, take bounty jobs, notice the goals, avoid early town losses?
+2. Tune the numbers with a player rather than bots: XP pace (bots reach level 6-8 by minute 15), camp leaders'
+   strength at low level, wave pressure, gold sinks.
+3. Teach the new systems inside the first day. Today they are told by hints, the Now line and the What's new page,
+   and the first day itself is unchanged, as you asked.
+4. Clean up the code. These systems were added fast into one file. Before the next big push, split the human RPG
+   layer (talents, places, quests, charms, civic) into clearly marked sections.

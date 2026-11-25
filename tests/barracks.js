@@ -174,16 +174,12 @@ async function main() {
         hero.x = town.x;
         hero.y = town.y;
         botHeroShop(hero, town);
-        const caravan = state.events.find(e => e.k === 'caravan' && e.i === i && e.site);
+        // owner's rule: raising a town sends a trade caravan; only heroes found outposts (by staking a site)
+        const caravan = state.events.find(e => e.k === 'caravan' && e.i === i);
         stepEvents(0);
         const assignedEscort = caravan?.escort === villager;
-        const raisedAndSentSettlers = lv(town) === 2 && Boolean(caravan);
-        if (caravan) {
-          caravan.x = caravan.site.x;
-          caravan.y = caravan.site.y;
-          stepEvents(0);
-        }
-        const foundedVillage = state.towns.some(t => t.i === i && t.outpost);
+        const raisedAndSentSettlers = lv(town) === 2 && Boolean(caravan) && !caravan.site;
+        const foundedVillage = !state.towns.some(t => t.i === i && t.outpost);
         return {name: town.name, savedCrystals, returnsWithPartialPack, foragersRaiseTown, assignedEscort, raisedAndSentSettlers, foundedVillage};
       });
       return {startingTown, rivals};
@@ -205,7 +201,12 @@ async function main() {
       player.y = capital.y;
       build(player, 'outpost');
       stepJob(player, 15);
+      // owner's rule: the hero stakes the site and settlers walk there from the first town
+      const settlers = state.events.find(e => e.k === 'caravan' && e.site);
+      const staked = !!settlers && settlers.from === capital.id && state.towns.length === 3;
+      settlers.x = settlers.site.x; settlers.y = settlers.site.y; state.monsters = []; stepEvents(C.DT);
       const outpost = state.towns.at(-1);
+      if (!staked) throw new Error('outpost did not send settlers from the first town');
       const oneNewForager = outpost.outpost && state.humans.filter(h => isForager(h) && h.homeId === outpost.id).length === 1;
       forager.x = outpost.x + 220;
       forager.y = outpost.y;

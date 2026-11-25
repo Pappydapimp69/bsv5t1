@@ -748,7 +748,7 @@ function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below 60% of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
-C.OWN_BRACE=1;C.TEND_HEAL=12;C.TEND_FAVOR=2;C.BOT_SHOVE=.3;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
+C.OWN_BRACE=1;C.BOT_TEND_BELOW=0;C.TEND_HEAL=12;C.TEND_FAVOR=2;C.BOT_SHOVE=.3;C.STRUGGLE=.3;C.STRUGGLE_CD=.25;C.BOT_STRUGGLE=2;C.JOINT_HANDS=3;C.G_BURST=3;C.G_BURST_WIN=40;C.G_REST=25;C.SOL_JOINT=.7;C.FALLEN_HEART=1.5;C.BOT_READ_SHAKE=.65;C.HUNT_OPEN=45;C.SLEEP_HURT=.5;C.SLEEP_FLOOR=.6;
 C.TWITCH_CD=6;C.TWITCH_WIND=1.1;C.TWITCH_GRIP=36;C.TWITCH_BRACED=8;C.TWITCH_WEDGE=.5;C.TWITCH_ANCHOR=.4;
 C.DREAM_CD=90;C.DREAM_WIND=1.5;C.DREAM_MIN=50;
 // the sleeper's nightmare: it dreams of the town that has hurt it most, and the beasts of the land march on that town
@@ -1023,7 +1023,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
     if(slot==='X'&&reachT(h).j){const id=reachT(h).j,jj=S.joints[id];if(tends(h)&&!jj.wedges.length&&jj.hp<jj.max-1&&!jj.crip){if(h.cd>0)return false;h.cd=.6;h.swing=.2;
       const hs=jj.hands||(jj.hands=new Map());hs.set(h.id,S.t);let n=0;for(const[k,t]of hs){if(S.t-t>1.2)hs.delete(k);else n++}
       const heal=Math.min(jj.max-jj.hp,C.TEND_HEAL*(n>C.JOINT_HANDS?C.JOINT_HANDS/n:1)*(id==='heart'&&S.g.fallen>0?.25:1)),fav=heal/C.TEND_HEAL*C.TEND_FAVOR;
-      jj.hp+=heal;S.grudge[h.town]-=fav;regard(h,fav);gainXp(h,1);sfx('build',h.you);
+      jj.hp+=heal;S.tendHp=(S.tendHp||0)+heal;S.grudge[h.town]-=fav;regard(h,fav);gainXp(h,1);sfx('build',h.you);
       if(h.you&&S.t-(h.tendSaid||-99)>8){h.tendSaid=S.t;sayTo(h,'You tend the '+JOINTS[id].name.toLowerCase()+'. The giant feels it, and remembers '+TOWNS[h.town].name+' kindly.')}return true}}
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
     if(slot==='Y'){const j=reachT(h).j;if(j){h.kits.wedge--;if(h.you)h.wedged=(h.wedged||0)+1;S.firstWedge=S.firstWedge||{};if(!S.firstWedge[h.town]){S.firstWedge[h.town]=1;chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' drove '+(Object.keys(S.firstWedge).length===1?'the first':TOWNS[h.town].name+'\u2019s first')+' wedge into the '+(S.g.awake?'':'sleeping ')+'giant\u2019s '+JOINTS[j].name.toLowerCase()+'.')}S.joints[j].wedges.push({town:h.town,who:h.id});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
@@ -1812,6 +1812,8 @@ function botGoalCells(h){const g=S.g,J=S.joints;
   if(h.role==='keeper'){const w=wedgedJoints();if(w.length)return{kind:'pull',id:w[0]};
     for(const k of['brace','ladder','platform'])if(h.kits[k]>0&&!siteCapReached(h,k)){const free=S.sites.filter(s=>!s.build&&!s.pending);if(free.length)return{kind:'kit',kit:k,test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
     if(h.kits.cannon>0&&!siteCapReached(h,'cannon')){const free=S.sites.filter(s=>!s.build&&!s.pending);if(free.length)return{kind:'site',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
+    // with nothing to build or pull, a keeper could tend the worst-hurt joint; off (C.BOT_TEND_BELOW=0): in sweeps it erased the giant's falls
+    {const hurt=Object.keys(S.joints).filter(id=>id!=='heart'&&!S.joints[id].crip&&S.joints[id].hp<S.joints[id].max*C.BOT_TEND_BELOW).sort((a,b)=>S.joints[a].hp/S.joints[a].max-S.joints[b].hp/S.joints[b].max)[0];if(hurt&&tends(h))return{kind:'tend',id:hurt}}
     return{kind:'down',test:r=>r===0}}
   if(h.role==='raider'){if(h.kits.cannon>0&&!siteCapReached(h,'cannon')){const free=S.sites.filter(s=>!s.build&&!s.pending);if(free.length)return{kind:'site',test:(r,c)=>free.some(s=>s.r===r&&s.c===c)}}
     const enemy=S.sites.filter(s=>s.build&&s.build.k==='cannon'&&s.build.town!==h.town);if(enemy.length&&h.lvl>=2)return{kind:'wreck',test:(r,c)=>enemy.some(s=>s.r===r&&s.c===c)};
@@ -1847,6 +1849,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   const goal=botGoalCells(h);
   const j=jointAt(cl.x,cl.y);
   if(goal.kind==='pull'&&j===goal.id){cl.path=null;if(S.joints[j].wedges.length)humanAct(h,'X');return mv}
+  if(goal.kind==='tend'&&j===goal.id){cl.path=null;if(S.joints[j].hp<S.joints[j].max*.98)humanAct(h,'X');return mv}
   if(goal.kind==='joint'&&j===goal.id){cl.path=null;if(h.kits.wedge>0&&S.joints[j].wedges.length<C.WEDGE_MAX&&!S.joints[j].crip)humanAct(h,'Y');else humanAct(h,'A');return mv}
   const s=siteAt(cl.x,cl.y);
   if(s&&goal.kind==='site'&&!s.build){placeOnSite(h,s,'cannon');return mv}
@@ -1858,7 +1861,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   if(goal.kind==='down'&&r<=1){dismount(h,0);return mv}
   if(goal.kind==='down'&&!cl.path&&h.kits.anchor>0&&r>40&&!S.anchors.some(a=>a.town===h.town&&a.r===r)&&rnd()<.01)placeAnchor(h);
   if(!cl.path||h.botGoal!==goal.kind+(goal.id||'')){h.botGoal=goal.kind+(goal.id||'');
-    const test=goal.kind==='joint'||goal.kind==='pull'?(rr2,cc)=>{const J=JOINTS[goal.id];return rr2>=J.r0&&rr2<=J.r1&&cc>=J.c0&&cc<=J.c1}:goal.test;
+    const test=goal.kind==='joint'||goal.kind==='pull'||goal.kind==='tend'?(rr2,cc)=>{const J=JOINTS[goal.id];return rr2>=J.r0&&rr2<=J.r1&&cc>=J.c0&&cc<=J.c1}:goal.test;
     cl.path=bfs(r,c,test,8000);
     if(!cl.path&&h.hero&&h.grip>=C.LUNGE_GRIP)cl.path=bfs(r,c,test,8000,LUNGE_OFFS);
     if(!cl.path){h.botGoal=null;if(r<=1)dismount(h,0);else{const p=bfs(r,c,rr2=>rr2===0,8000);cl.path=p}}}

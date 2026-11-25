@@ -328,3 +328,6 @@ tests/sleeper.js 22 checks; all suites pass.
 - The dusk race made audible: a message when you take first place in the giant's regard ("The giant's eye settles on
   you…") or lose it ("…turns from you to Brindle's hero."), at most every 20 s. Ashville seed 21: two messages all match,
   at 18:19 (taken) and 24:41 (lost, 19 s before dusk).
+- Tried and reverted: **bot keepers tending** hurt joints (to show Tend in the world). Seeds 1–3 at <80%: 1.7–2.7k hp
+  healed per match, falls 3/0/0 vs 3/0/1; seeds 1–6 at <60%: one fall in six matches (bots tend exactly when a joint is
+  about to give). It flattened the awake phase, so the rule stays in code but off (`C.BOT_TEND_BELOW=0`).

@@ -331,3 +331,6 @@ tests/sleeper.js 22 checks; all suites pass.
 - Tried and reverted: **bot keepers tending** hurt joints (to show Tend in the world). Seeds 1–3 at <80%: 1.7–2.7k hp
   healed per match, falls 3/0/0 vs 3/0/1; seeds 1–6 at <60%: one fall in six matches (bots tend exactly when a joint is
   about to give). It flattened the awake phase, so the rule stays in code but off (`C.BOT_TEND_BELOW=0`).
+- The horn race is visible: once the chains are gone, the Now line names the leading rival horn carrier and their height
+  ("· Brindle's hero carries a horn (1025 ft)"), and without a horn suggests shoving them or conceding the thanks.
+  Ashville seed 21: the line tracked Brindle's hero climbing to 1104 ft and falling back.

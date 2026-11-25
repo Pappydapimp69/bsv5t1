@@ -3086,7 +3086,11 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
 function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k=>h.kits[k]>0,climb=h.mode==='climb';
   if(packCount(h)>=packCap(h))return'your pack is full: bank it at home';
   if(g.dead)return'the giant is dead: hold your town until dusk';
-  if(h.horn&&!g.awake&&allWeak())return'sound your wake horn at the giant\u2019s head (1860 ft): it will owe '+TOWNS[h.town].name;
+  // the horn race: whoever sounds a horn at the head first wakes the giant and earns its thanks for their town
+  if(!g.awake&&allWeak()){const rivals=S.humans.filter(o=>o!==h&&o.horn&&!o.dead&&o.town!==h.town).sort((a,b)=>(b.cl?b.cl.y:0)-(a.cl?a.cl.y:0)),lead=rivals[0],
+      lh=lead?(lead.mode==='climb'?Math.round(lead.cl.y*FT)+' ft':'on the ground'):null,race=lead?' \u00b7 '+whoOf(lead)+' carries a horn ('+lh+')':'';
+    if(h.horn)return'sound your wake horn at the giant\u2019s head (1860 ft): it will owe '+TOWNS[h.town].name+race;
+    if(lead&&lead.mode==='climb')return'horn race: '+whoOf(lead)+' is climbing to wake it ('+lh+'); shove them on the way, or let '+TOWNS[lead.town].name+' have the thanks'}
   if(!g.awake&&chainsOpen()&&!allWeak())return'the chains weaken: break them at the ankles and wrists';
   const w=wedgedJoints().filter(id=>J[id].wedges.some(x=>x.town!==h.town));
   if(S.grudge[h.town]>=C.ANGER*.6)return'the giant is angry with '+TOWNS[h.town].name+': pull wedges or brace it to calm it, or bring it down';

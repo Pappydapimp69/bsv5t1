@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.148 · 83078cf · 2026-11-25 06:45 UTC</div>
+  <div id="ver">v1.149 · 784665f · 2026-11-25 06:55 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1051,7 +1051,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
       return drinkPotion(h)}
     return false}
   if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(!at&&h.hero&&critterNear(h)){huntCritter(h,critterNear(h));return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1+.1*charm(h,'tooth');h.critNext=0;
-    const dm=Math.round((m.affix==='armoured'&&m.hp>m.max/2?.5:1)*h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+    const dm=Math.round((m.affix==='armoured'&&m.hp>m.max/2?.5:1)*h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(h.you)S.fx.push({k:'slash',x:h.x,y:h.y,a:Math.atan2(m.y-h.y,m.x-h.x),t:0,life:.16,big:fin||crit})}if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&digTreasure(h))return true;if(!t&&h.hero&&poiAct(h))return usePoi(h,poiNear(h));if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1524,7 +1524,9 @@ function pickGoalHero(h){
   const q=h.quest;
   // rivals use the land's places too: a ready shrine, an unsoaked spring, herbs, or a camp chest left unguarded, within reach
   {const P=(S.pois||[]).filter(p=>Math.hypot(p.x-h.x,p.y-h.y)<(h.riding?2600:1600)&&inForageRange(home,p)&&(p.k==='shrine'&&S.t>=p.ready&&!(h.buff&&h.buff.until>S.t)||p.k==='spring'&&!(p.used||{})[h.id]||p.k==='herb'&&S.t>=p.ready&&h.hp<h.max*.9||p.k==='camp'&&!campBeasts(p).length&&p.alive))
-    .sort((a,b)=>dist(h,a)-dist(h,b))[0];if(P)return{k:'poi',x:P.x,y:P.y,poi:P}}
+    .sort((a,b)=>dist(h,a)-dist(h,b))[0];if(P)return{k:'poi',x:P.x,y:P.y,poi:P}
+    // a seasoned rival goes after a guarded camp's leader (so rivals race you for the chests)
+    if(h.lvl>=4&&h.hp>h.max*.75){const cp=(S.pois||[]).filter(p=>p.k==='camp'&&inForageRange(home,p)&&Math.hypot(p.x-h.x,p.y-h.y)<2200&&campBeasts(p).length).sort((a,b)=>dist(h,a)-dist(h,b))[0];if(cp){const m=campBeasts(cp).sort((a,b)=>dist(h,a)-dist(h,b))[0];if(m)return{k:'monster',id:m.id}}}}
   if(q?.k==='search'||h.hp>=h.max*.8&&h.gold<60){
     const cache=S.caches.filter(c=>c.ready<=S.t).sort((a,b)=>dist(h,a)-dist(h,b))[0];
     if(cache)return{k:'cache',x:cache.x,y:cache.y,cache};
@@ -3131,6 +3133,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   for(const m of S.monsters)if(m.kind==='archer'&&m.wind){const a=p3(m.x,m.y,40),b=p3(m.wind.x,m.wind.y,20);if(a&&b){const k=m.wind.t/m.wind.dur;ctx.globalAlpha=.35+.5*k;ctx.strokeStyle='#ff5a4a';ctx.setLineDash([6,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}}
   for(const e of S.fx){if(e.k!=='arrow')continue;const a=p3(e.x,e.y,40),b=p3(e.x2,e.y2,20);if(a&&b){const k=e.t/e.life,mx=a.x+(b.x-a.x)*k,my=a.y+(b.y-a.y)*k;ctx.strokeStyle='#f2e6c8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-(b.x-a.x)*.12,my-(b.y-a.y)*.12);ctx.stroke()}}
   if(S.you&&S.you.treasure&&Math.hypot(S.you.treasure.x-S.you.x,S.you.treasure.y-S.you.y)<160){const q=p3(S.you.treasure.x,S.you.treasure.y,10);if(q){ctx.fillStyle='#fff6c0';ctx.globalAlpha=.6+.4*Math.sin(S.t*8);ctx.beginPath();for(let i=0;i<4;i++){const a=i*1.571+S.t;ctx.moveTo(q.x,q.y);ctx.lineTo(q.x+Math.cos(a)*14*UI,q.y+Math.sin(a)*14*UI)}ctx.strokeStyle='#fff6c0';ctx.lineWidth=2;ctx.stroke();ctx.globalAlpha=1;lbl('Dig here (X)',q.x,q.y-22,11,'#ffd24a')}}
+  for(const e of S.fx){if(e.k!=='slash')continue;const p=e.t/e.life,R=(e.big?62:48),pts=[];for(let i=0;i<=8;i++){const a=e.a-1+i*.25,q=p3(e.x+Math.cos(a)*R,e.y+Math.sin(a)*R,38+i*2);if(q)pts.push(q)}if(pts.length>2){ctx.globalAlpha=.85*(1-p);ctx.strokeStyle=e.big?'#fff05a':'#ffffff';ctx.lineWidth=(e.big?7:4)*UI*(1-p*.6);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(const q of pts)ctx.lineTo(q.x,q.y);ctx.stroke();ctx.lineCap='butt';ctx.globalAlpha=1}}
   for(const e of S.fx){if(e.k!=='dust')continue;const p=e.t/e.life,q=p3(e.x,e.y,8+p*20);if(!q)continue;ctx.globalAlpha=.35*(1-p);ctx.fillStyle='#cdbb94';ctx.beginPath();ctx.arc(q.x,q.y,(8+p*22)*UI,0,7);ctx.fill()}ctx.globalAlpha=1;
   for(const e of S.fx){if(e.k!=='spark'&&e.k!=='lvl')continue;const p=e.t/e.life,q=p3(e.x,e.y,e.z||40);if(!q)continue;ctx.globalAlpha=1-p;
     if(e.k==='spark'){ctx.strokeStyle=e.col||'#ffe6a0';ctx.lineWidth=2.5*UI;ctx.beginPath();for(let i=0;i<9;i++){const a=i*0.698+e.x,r0=(6+p*34)*UI,r1=r0+(10-p*8)*UI;ctx.moveTo(q.x+Math.cos(a)*r0,q.y+Math.sin(a)*r0*.7);ctx.lineTo(q.x+Math.cos(a)*r1,q.y+Math.sin(a)*r1*.7)}ctx.stroke()}

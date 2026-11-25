@@ -1,7 +1,7 @@
 # Colossus overnight expansion — working log
 
 - Start commit: `c4be89c` (origin/colossus, "Update Colossus heroes, settlements, and giant gameplay")
-- Window: 2026-11-24 20:30:41Z → original cutoff 23:30:41Z; extended by the owner at 21:53Z by 4 h → cutoff 2026-11-25 01:53:40Z (final 20 min from 01:33Z); the same message arrived again at 23:52Z after a container restart — treated as a further 4 h → cutoff 2026-11-25 03:52Z (final 20 min from 03:32Z). Assumption: it was a new extension, not a replay.
+- Window: 2026-11-24 20:30:41Z → original cutoff 23:30:41Z; extended by the owner at 21:53Z by 4 h → cutoff 2026-11-25 01:53:40Z (final 20 min from 01:33Z); the same message arrived again at 23:52Z after a container restart — treated as a further 4 h → cutoff 2026-11-25 03:52Z (final 20 min from 03:32Z). Assumption: it was a new extension, not a replay. **Corrected at 01:03Z:** the same message arrived a third time right after a second container restart, so these were replays; the cutoff is 01:53:40Z (final 20 min from 01:33Z).
 - Branch: `codex/colossus-overnight-expansion`
 - GPTBS: `Pappydapimp69/BS@GPTBS` 065c7e3 — `brief` ran fine (access OK). No Colossus entries existed.
 
@@ -236,6 +236,10 @@ large; earlier 6-seed set at the same tuning had one giant death).
   2500 of you; the giant player still hears all. Seeds 71–72: raids 21 → 12 announced, 25 → 7 announced.
 - When your lead turns your own town's soldiers (tend or hunt), you are told and the chronicle records it ("Following
   your lead, Corvel's soldiers turned to tending the giant." — Corvel player, regard injected at 5:00, line at 7:10).
+
+## GPTBS batches saved
+
+- Batch 2 (14 records) finished, verified, acceptance passed, committed as BS@0fa472a (01:05Z).
 
 ## GPTBS batch 1 saved (23:52Z)
 

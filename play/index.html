@@ -1647,8 +1647,10 @@ function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPE
     if(S.tut.i>=FIRST_DAY.length){S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}}}
 const TUT_HUNT=['strike','dodge','heavy','reward'];
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
-  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
-    ...(last||st.info?[]:[{label:'Got it',sub:'No camera flight; the goal line and map marker keep pointing the way',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0}}]),
+  openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[...(()=>{const show={label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
+      // once "Got it" is chosen it stays the default (remembered), so pressing on through the cards never flies the camera
+      got={label:'Got it',sub:'No camera flight; the goal line and map marker keep pointing the way',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(!save.noFly){save.noFly=1;persist()}}};
+      return last||st.info?[show]:save.noFly?[got,show]:[show,got]})(),
     ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}]),
     // once the giant has been climbed, the rest of the first day (jobs, building, soldiers) can be left for later
@@ -1661,6 +1663,8 @@ function stepFly(dt){const f=S.fly;if(!f)return null;f.t+=dt;const e=u=>u<0?0:u>
   const fr=S.you;return{x:fr.x+(f.to.x-fr.x)*k,y:fr.y+(f.to.y-fr.y)*k,k}}
 function cacheNear(h){let best=null,d=160;for(const c of S.caches){const next=dist(h,c);if(next<d){best=c;d=next}}return best}
 // ruins in the old giants hold old things: gold, crystals and sometimes a kit; they fill again after a while
+// what a ruin holds, said where you can see it: a ready chest is worth the detour, a searched one says when it refills
+function cacheLabel(c){if(S.t<c.ready){const s=Math.ceil(c.ready-S.t);return'Ruins: chest refills in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}return'Ruins: chest ready (gold, crystals, a kit)'}
 function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist(h,c)>=160)return false;
   if(S.t<c.ready){sayTo(h,'Someone has searched here lately. Come back in '+Math.ceil(c.ready-S.t)+' s.');return false}
   c.ready=S.t+C.CACHE_REFILL;if(rnd()<.5){const t=nearestOwn(h.town,c.x,c.y);if(t)startRaid(t,'Beasts stir in the robbed ruin and march on '+t.name+'!',c)}const gold=50+Math.floor(rnd()*70),cr=2+Math.floor(rnd()*4),kits=['anchor','wedge','brace','cannon'],k=kits[Math.floor(rnd()*4)];
@@ -2738,7 +2742,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
     if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`700 ${15*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
-  for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<2600)lbl('Ruins',p.x,p.y,11,'#ffcf6a')}
+  for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<4200)lbl(cacheLabel(c),p.x,p.y,11,S.t>=c.ready?'#ffcf6a':'#a9afbb')}
   mapLabels();
   upgradeReady();barracksFlags();
   for(const e of S.events){if(e.k==='star'){const p=p3(e.x,e.y,300);if(p&&p.d<20000)lbl('Fallen star: '+e.left+' crystals',p.x,p.y,12,'#9fe8ff')}if(e.k==='raid'&&S.t<e.go){const p=p3(e.x,e.y,150);if(p)lbl('Raiders gathering: '+Math.ceil(e.go-S.t)+' s',p.x,p.y,12,'#ff8f80')}
@@ -3018,7 +3022,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
       shapePath(ctx,p.x,q.y-24*k,Math.max(4,8*k),TOWNS[e.i].shape);ctx.fillStyle=TOWNS[e.i].col;ctx.fill();pbar(p.x,q.y-40*k,40,e.hp/e.max,'#9be08a')})}
     if(e.k==='raid'&&S.t<e.go){const p=proj(e.x,e.y,200);if(p)add(0,()=>lbl('Raiders gathering: '+Math.ceil(e.go-S.t)+' s',p.x,p.y,12,'#ff8f80'))}}
   for(const c of S.caches){const p=proj(c.x,c.y,0);if(!p||p.d>7000)continue;add(p.d,()=>{const k=p.s,ok=S.t>=c.ready;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle=ok?'#d9b45a':'#6b6250';ctx.fillRect(p.x-22*k,p.y-26*k,44*k,26*k);ctx.fillStyle='#3a2d1c';ctx.fillRect(p.x-22*k,p.y-30*k,44*k,8*k);ctx.globalAlpha=1;
-    if(ok&&p.d<2600)lbl('Ruins',p.x,p.y-44*k-10,11,'#ffcf6a')})}
+    if(ok&&p.d<2600)lbl(cacheLabel(c),p.x,p.y-44*k-10,11,S.t>=c.ready?'#ffcf6a':'#a9afbb')})}
 
   for(const cr of S.crystals){const p=proj(cr.x,cr.y,14+Math.sin(S.t*3+cr.id)*4);if(!p||p.d>7000)continue;add(p.d,()=>{const q=Math.max(5,12*p.s);ctx.fillStyle='#bff4ff';ctx.strokeStyle='#1a3a44';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(p.x,p.y-q);ctx.lineTo(p.x+q*.6,p.y);ctx.lineTo(p.x,p.y+q);ctx.lineTo(p.x-q*.6,p.y);ctx.closePath();ctx.fill();ctx.stroke()})}
   for(const m of S.monsters){const p=proj(m.x,m.y,0);if(!p||p.d>7000||p.x<-40||p.x>W+40)continue;add(p.d,()=>{const hp=Math.max(m.kind==='troll'?16:10,(m.kind==='troll'?42:20)*p.s);ctx.globalAlpha=1-fogOf(p.d);
@@ -3176,6 +3180,7 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
     if(!climb&&huntOpen()&&hunt&&h.gold>=C.COST.wedge)return'buy a wedge in town and drive it into a knee';
     if(!climb&&h.gold>=C.COST.wedge&&huntOpen()&&h.gold<C.COST.outpost)return'buy a wedge or a brace kit in town, then climb the giant'}
   {const o=outpostAim(h);if(o)return o}
+  if(!climb&&h.hero){const c=(S.caches||[]).filter(c=>S.t>=c.ready&&dist(c,h)<3500).sort((a,b)=>dist(a,h)-dist(b,h))[0];if(c)return'a chest is ready in the ruins nearby (marked on the land): gold, crystals and a kit; beasts may follow you home'}
   return!climb?'earn gold: take a job on the Board, hunt beasts or gather sky crystals':''}
 function outpostAim(h){const g=S.g,climb=h.mode==='climb';
   {const near=nearestOwn(h.town,g.x,g.y),site=()=>{for(let k=0;k<12;k++){const a=k/12*6.283,x=g.x+Math.cos(a)*1400,y=g.y+Math.sin(a)*1400;if(outpostSiteOpen(x,y)&&!inSolid(x,y,60)&&!S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))return true}return false};

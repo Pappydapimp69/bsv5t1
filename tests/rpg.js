@@ -103,7 +103,7 @@ const {chromium} = require('playwright');
       const E = __col.newGame('human', 17), eh = E.you; __col.step(2); E.wevT = 0; const rnd0 = Math.random; Math.random = () => .2; __col.step(1); Math.random = rnd0;
       const amb = E.pois.find(p => p.ambush); out.ambush = !!amb && E.monsters.filter(m => m.guard === amb.id).length === 3;
       eh.x = amb.x + 40; eh.y = amb.y; out.ambushBlocked = !!poiAct(eh).why; E.monsters = E.monsters.filter(m => m.guard !== amb.id); out.ambushHelp = humanAct(eh, 'X') && amb.follow === eh.id;
-      E.wevT = 0; Math.random = () => .7; __col.step(1); Math.random = rnd0; const stag = E.critters.find(c => c.golden); out.stag = !!stag;
+      E.wevT = 0; const sq = [.1, .7, .7, .5]; Math.random = () => sq.length ? sq.shift() : .5; __col.step(1); Math.random = rnd0; const stag = E.critters.find(c => c.golden); out.stag = !!stag;
       eh.x = stag.x + 30; eh.y = stag.y; eh.cd = 0; const sg = eh.gold; humanAct(eh, 'A'); out.stagPays = eh.gold >= sg + 60;
       // renown: the end of a human match pays renown; bought perks apply at the next start
       const sv = JSON.stringify(save); save.renown = 0; save.unlocks = {}; save.firstDay = 1;
@@ -139,6 +139,10 @@ const {chromium} = require('playwright');
       // festival: a home settlement at 70+ prosperity holds one a day
       const Fe = __col.newGame('human', 26), fe = Fe.you, ft = Fe.towns[fe.town]; ft.houses = 6; Fe.builds.push(...['farm','farm','farm','market','smithy','stable','well'].map((k, i) => ({k, x: ft.x + i, y: ft.y, town: fe.town, settlementId: ft.id, hp: 1})));
       Fe.t = 10; const fg0 = fe.gold; stepFestival(); out.festival = prosperity(ft) >= 70 && fe.gold === fg0 + 30 && buffOf(fe, 'might');
+      // a wandering champion: a duel event that pays and gives a title
+      const Du = __col.newGame('human', 27), du = Du.you; __col.step(2); Du.wevT = 0; const r0 = Math.random; Math.random = () => .8; __col.step(1); Math.random = r0;
+      const champ = Du.monsters.find(m => m.champion); out.champion = !!champ && champ.kind === 'knight';
+      champ.hp = 1; hitBeast(du, champ, 5); out.duelWon = du.title === 'Champion';
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

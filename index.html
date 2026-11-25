@@ -1994,6 +1994,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?climbInput(S.you,mv):null)}
   if(S.you&&S.you.mode==='climb'&&S.you.cl)S.you.best=Math.max(S.you.best||0,S.you.cl.y);
   if(S.role==='giant'&&!S.autoplay&&!S.headless)giantHints();
+  if(S.you&&!S.headless&&S.t-(S.eyeT||0)>2){S.eyeT=S.t;watchFavour()}
   stepCombat(dt);stepDays(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepArmy(dt);stepCrumble(dt);stepEvents(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
@@ -3106,6 +3107,11 @@ function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=sa
     if(chainsOpen())say('open','The chains weaken now: Strain can tear them loose, and once all four are gone you can rise.')}
   else if(g.fallen>0)say('struggle','You are down! Press any action fast to Struggle up sooner.');
   else say('awake','You are awake. Walk with the stick or WASD; Stomp ('+k.A+') crushes around your feet, Shake ('+k.X+') throws off climbers, Smash ('+k.B+') and Swipe ('+k.Y+') need towns to brace you.')}
+// the dusk honour goes to whoever stands first in the giant's regard: say so when that changes to or from you
+function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f||!(S.reg[f.id]>20))return;const me=f===S.you;
+  if(S.eyeOn===undefined){S.eyeOn=me;return}
+  if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)>20){S.eyeSaid=S.t;S.eyeOn=me;toast(me?'The giant\u2019s eye settles on you: you stand first in its regard. Keep it there until dusk.':'The giant\u2019s eye turns from you to '+whoOf(f)+'.')}
+  else if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)<=20){}else S.eyeOn=me}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
   paintPanel();

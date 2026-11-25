@@ -325,3 +325,6 @@ tests/sleeper.js 22 checks; all suites pass.
 - Hand play (Brindle): reached the knee at 1:21; parked on the joint instead of the ledge and fell (my error); on the
   re-climb hit a genuine dead end at 65 ft where the nearest hold was 3 cells right — the hint "No hold within reach that
   way: lunge (K)…" appeared every 4 s and right+lunge crossed it.
+- The dusk race made audible: a message when you take first place in the giant's regard ("The giant's eye settles on
+  you…") or lose it ("…turns from you to Brindle's hero."), at most every 20 s. Ashville seed 21: two messages all match,
+  at 18:19 (taken) and 24:41 (lost, 19 s before dusk).

@@ -1669,7 +1669,7 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
 function gainXp(h,x){h.xp+=x;while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;if(h.you){toast('Level '+h.lvl+'! Stronger arm, better grip.');sfx('coin')}}}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
-function killMonster(m,h){if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
+function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
   {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll')}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.
@@ -2485,7 +2485,7 @@ function g3Update(){const g=S.g,t=S.t;
     if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
   // people nearest the camera first, so the figure pool never drops those you can see (it used to hold 30, in list order)
   const folkView=S.humans.filter(h=>!h.dead&&(h.mode!=='ground'||Math.hypot(h.x-S.cam.x,h.y-S.cam.y)<9000)).sort((a,b)=>(b.you-a.you)||Math.hypot(a.x-S.cam.x,a.y-S.cam.y)-Math.hypot(b.x-S.cam.x,b.y-S.cam.y));
-  for(const h of folkView){const T=TOWNS[h.town];if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
+  for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=climberWorld(h);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,g.ang+(h.cl.face===1?Math.PI:0))}}
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
@@ -2732,6 +2732,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   const onBody=!!climbing3D();if(S.you&&!S.you.dead&&!onBody)unionOutline(territory(S.you.town),(x,y)=>p3(x,y,2),TOWNS[S.you.town].col,2,[10,8]);
   for(const ft of g.feet)if(ft.air>0){const p=1-ft.air/ft.dur;ringOnGround(ft.lx,ft.ly,C.FOOT_R*(1.5-p*.5),null,0,null,`rgba(0,0,0,${.15+p*.35})`);ringOnGround(ft.lx,ft.ly,C.FOOT_R,'rgba(255,90,70,.95)',2.5)}
   if(g.wind&&(g.wind.k==='stomp'||g.wind.k==='smash')){const p=1-g.wind.t/g.wind.dur,pts=g.wind.k==='stomp'?g.feet:[g.wind],R=g.wind.k==='stomp'?C.STOMP_R:C.SMASH_R;for(const q of pts){ringOnGround(q.x,q.y,R*p,null,0,null,`rgba(255,80,60,${.15+p*.25})`);ringOnGround(q.x,q.y,R,'rgba(255,90,70,.95)',2.5,[8,6])}}
+  if(S.bodies)for(const bd of S.bodies){const a=1-(S.t-bd.t)/25;if(a<=0)continue;ringOnGround(bd.x,bd.y,bd.r,null,0,null,`rgba(40,22,18,${.55*a})`)}
   if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
   for(const e of S.fx){const p=e.t/e.life;ctx.globalAlpha=1-p;if(e.k==='ring'||e.k==='mark')ringOnGround(e.x,e.y,e.k==='mark'?e.r*(1-p*.5):e.r*(.5+p*.5),e.col,3);
     if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`700 ${15*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}

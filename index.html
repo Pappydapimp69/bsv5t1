@@ -3068,7 +3068,7 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
   {const way=townWay(h.town),tend=way==='tend'||(S.reg&&S.reg[h.id]||0)>C.LEAD_REG,hunt=way==='hunt'&&!tend;
     if(!climb&&huntOpen()&&tend&&h.gold>=C.COST.brace)return'buy a brace kit in town and bolt it on: the giant remembers who braces it';
-    if(!climb&&huntOpen()&&tend)return'earn '+(C.COST.brace-h.gold)+' more gold for a brace kit (jobs, beasts), or pull rivals\u2019 wedges from its joints';
+    if(!climb&&huntOpen()&&tend)return(Object.values(S.joints).some(j=>j.hp<j.max-1&&!j.crip)?'climb and Tend a hurt joint (anchor button): the giant remembers kindness; or ':'')+'earn '+(C.COST.brace-h.gold)+' more gold for a brace kit';
     if(!climb&&huntOpen()&&hunt&&h.gold>=C.COST.wedge)return'buy a wedge in town and drive it into a knee';
     if(!climb&&h.gold>=C.COST.wedge&&huntOpen())return'buy a wedge or a brace kit in town, then climb the giant'}
   if(!climb)return'earn gold: take a job on the Board, hunt beasts or gather sky crystals';

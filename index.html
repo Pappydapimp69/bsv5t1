@@ -876,7 +876,7 @@ function hurtTown(t,d,why){if(!t.alive)return;if(!S.headless&&S.t-(t.sndT||0)>.6
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
-function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
+function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;if(why!=='fall')horseHurt(h,d);h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
 function killHuman(h,why){leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=null;h.gold=Math.floor(h.gold*.75);
@@ -1036,7 +1036,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
     if(slot==='Y'){const j=reachT(h).j;if(j){h.kits.wedge--;if(h.you)h.wedged=(h.wedged||0)+1;S.firstWedge=S.firstWedge||{};if(!S.firstWedge[h.town]){S.firstWedge[h.town]=1;chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' drove '+(Object.keys(S.firstWedge).length===1?'the first':TOWNS[h.town].name+'\u2019s first')+' wedge into the '+(S.g.awake?'':'sleeping ')+'giant\u2019s '+JOINTS[j].name.toLowerCase()+'.')}S.joints[j].wedges.push({town:h.town,who:h.id});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       return drinkPotion(h)}
     return false}
-  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){m.hp-=h.atk;m.hitT=S.t;onBlow(h,m,h.atk,0);if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+h.atk,t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(m){const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1));m.hp-=dm;m.hitT=S.t;onBlow(h,m,dm,0);if(h.you)S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(h.riding?' charge':''),t:0,life:.8,col:'#ffe6a0'});sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1054,6 +1054,18 @@ function canBuild(h,k,placement=k==='barracks'?barracksPlacement(h):null){if(!h.
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
 // owner's rule: a settlement holds three houses at level 1 and two more per level, and its foragers build only after a hero built the first
 const houseCap=t=>3+2*(lv(t)-1);
+// Mounts (owner's request: mounts to increase speed). A hero buys a horse in town and rides with R: much faster on open ground
+// (the walk took 90% of a match in the pacing review), a charging blow while riding, and a hard hit can throw you. The horse
+// is hurt by blows taken while riding; worn out it bolts home and comes back in a minute. No riding on the giant or while building.
+C.HORSE_COST=80;C.RIDE=1.9;C.RIDE_HIT=1.5;C.HORSE_HP=80;C.THROW=.3;C.HORSE_AWAY=60;
+const horseReady=h=>!!h.horse&&!(h.horse.away>S.t);
+function rideWhy(h){if(!h.horse)return'Buy a horse in town ('+C.HORSE_COST+' gold)';if(h.horse.away>S.t)return'Your horse bolted; it returns in '+Math.ceil(h.horse.away-S.t)+' s';if(h.mode!=='ground')return'Not on the giant';if(h.job)return'Not while building';return null}
+function setRide(h,on){if(on&&rideWhy(h))return false;if(!!h.riding===!!on)return true;h.riding=!!on;if(h.you){sfx(on?'coin':'thud');toast(on?'You mount your horse. R to get down.':'You get down from your horse.')}return true}
+function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if(w){if(h.you)toast(w);return false}return setRide(h,true)}
+function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
+  if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
+  if(d>=12||rnd()<C.THROW){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
+function stepHorse(h,dt){if(!h.horse)return;if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
 function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
@@ -1709,7 +1721,7 @@ function stepHuman(h,dt,mv){
   const folk=isForager(h),assigned=folk?foragerHome(h):null;
   if(h.dead){h.dead-=dt;if(h.dead<=0){h.dead=0;const home=homeOf(h)||(folk||h.hero?nearestOwn(h.town,h.x,h.y)||h:S.towns[0]);h.x=home.x+rr(-50,50);h.y=home.y+rr(-50,50);h.hp=h.max;h.mode='ground';h.cl=null}return}
   recoverNearHouse(h,dt);
-  h.cd=Math.max(0,h.cd-dt);h.swing=Math.max(0,h.swing-dt);
+  h.cd=Math.max(0,h.cd-dt);h.swing=Math.max(0,h.swing-dt);stepHorse(h,dt);
   if(h.job?.kind==='site'&&(!h.cl||h.cl.fall))dropJob(h);
   if(h.job){stepJob(h,dt);if(h.mode==='climb'){stepClimb(h,dt,{x:0,y:0});if(!h.cl||h.cl.fall)dropJob(h)}if(h.job||h.mode==='climb')return}
   if(h.mode==='climb'){stepClimb(h,dt,mv);return}
@@ -1717,7 +1729,7 @@ function stepHuman(h,dt,mv){
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
   ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
   const x=h.x,y=h.y;
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);h.x+=vx*C.H_SPEED*wade*dt;h.y+=vy*C.H_SPEED*wade*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=h.riding?C.RIDE:1;h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   if(assigned&&dist(h,assigned)>Math.max(C.FORAGE_RANGE,dist(assigned,{x,y}))){h.x=x;h.y=y;h.goal=null;h.returnHome=true}
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered>=(S.nextStar||C.STAR_EVERY)){S.nextStar=S.gathered+C.STAR_EVERY+4*S.evc.star;if(S.events.filter(e=>e.k==='star').length<2)startStar()};
@@ -1943,7 +1955,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   // drop an anchor every so often on the way up
   if(h.kits.anchor>0&&r>20&&r%35===0&&!S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<20))placeAnchor(h);
   return mv}
-function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.you&&h.role==='you')h.role='keeper'; // a played person tends the giant: the bot standing in for one wins its regard
+function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.horse&&h.mode==='ground'&&(!h.you||S.autoplay)){const foe=S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<320);if(foe&&h.riding)setRide(h,false);else if(!foe&&!h.riding&&horseReady(h))setRide(h,true)}if(h.you&&h.role==='you')h.role='keeper'; // a played person tends the giant: the bot standing in for one wins its regard
 h.think-=dt;
   if(h.mode==='climb')return botClimb(h);
   const folk=isForager(h),home=folk?foragerHome(h):null;
@@ -1994,6 +2006,7 @@ function botGroundStrike(h,target,dt){
 }
 function botHeroShop(h,t){
   if(t.i!==h.town)return;
+  if(!h.horse&&h.gold>=C.HORSE_COST+20&&!wallsDown(t)){h.gold-=C.HORSE_COST;h.horse={hp:C.HORSE_HP,max:C.HORSE_HP}}
   if(wallsDown(t)){const repair=repairWalls(h,t);if(!repair.why){h.gold-=repair.need;t.hp=t.max}}
   if(wallsDown(t))return;
   const g=S.g;
@@ -2108,6 +2121,7 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if((e.code==='Escape'||e.code==='KeyP')&&!e.repeat){openPause();e.preventDefault();return}
   if(e.code==='KeyC'&&!e.repeat)camReset();
   if(e.code==='KeyB'&&!e.repeat&&S.you){openArmy();e.preventDefault();return}
+  if(e.code==='KeyR'&&!e.repeat&&S.you&&!S.you.dead){toggleRide(S.you);e.preventDefault();return}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});
 addEventListener('keyup',e=>keys.delete(e.code));
@@ -2281,7 +2295,7 @@ function openPause(){if(!S||S.over)return;const h=S.you;
   const kits=h&&Object.entries(h.kits).filter(([,count])=>count>0).map(([name,count])=>count+' '+name+(count===1?'':'s')).join(', ');
   const body=(h?`<p class="dim"><b>Equipment</b> · ${kits||'No kits'}${h.horn?' · Wake horn':''}</p>`:'')+`<p class="dim controls-hint">${hintText()}</p>`;
   const mine=h?S.builds.filter(b=>b.k==='barracks'&&b.town===h.town&&playerBuilt(b)):[];
-  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(mine.length?[{label:'Barracks orders ('+mine.length+')',sub:'Give orders from anywhere (B)',act:openArmy}]:[]),...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
+  openMenu({title:'Paused',body,items:[{label:'Resume',act:closeMenu},...(h&&h.horse?[{label:h.riding?'Get down from your horse':'Ride your horse',sub:'R',why:h.riding?null:rideWhy(h),act:()=>{closeMenu();toggleRide(h)}}]:[]),...(mine.length?[{label:'Barracks orders ('+mine.length+')',sub:'Give orders from anywhere (B)',act:openArmy}]:[]),...(tutStep()?[{label:'Skip the first day',act:()=>{S.tut.done=true;save.firstDay=1;persist();closeMenu()}}]:[]),{label:'How to play',act:()=>openHelp(openPause)},
   {label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();openPause()}},{label:'Quit to title',act:openTitle}],back:closeMenu})}
 function chronicleHtml(){const L=[];
   // the four chain breaks read as one beat: when, and whose work it was
@@ -2324,7 +2338,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
       :(tutJob()&&t.i===h.town?[{k:'slay',need:3,n:0,gold:42,xp:40,text:'Slay 3 beasts outside Ashville',tut:1}]:board(t)).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{if(o.tut){h.quest=o;openTown(t);return}h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
   else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
     const gearItem=k=>{const it=nextGear(h,k);if(!it)return{label:GEAR[k][GEAR[k].length-1].n,why:'The best there is',act:()=>{}};return{label:it.n+' \u2013 '+it.g+' gold',sub:{blade:'Hits '+it.v+' harder',armour:'Takes '+it.v+' off every blow',pack:'Carry '+it.v+' more',gloves:'25 more grip'}[k],why:lv(t)<it.t?'Raise '+t.name+' to level '+it.t+' to sell this':h.gold<it.g?'Need '+(it.g-h.gold)+' more gold':null,act:()=>{buyGear(h,k);sfx('coin');openTown(t)}}};
-    items=[gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
+    items=[h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
       buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3,'Catches your people when they fall'),buy('Ladder kit',C.COST.ladder,()=>h.kits.ladder++,'Firm holds below a spot on the giant'),buy('Platform kit',C.COST.platform,()=>h.kits.platform++,'A resting place on the giant'),buy('Potion',C.COST.potion,()=>h.potions++,'Restores 60 health'),
       ...(huntOpen()?[buy('Wedge',C.COST.wedge,()=>h.kits.wedge++,S.g.awake?'Bleeds a joint':'Bruises the sleeper (half, never crippling)'),buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++,'Fires on rival towns'),buy('Brace kit',C.COST.brace,()=>h.kits.brace++,'Lets the giant walk')]:[{label:'Giant’s kits',why:'On sale in '+Math.max(1,Math.ceil(C.HUNT_OPEN-S.t))+' s',act:()=>{}}])]}
   else if(tb==='Forge'){body=`<p class="dim">${h.crystals} sky crystals in your store.</p>`;
@@ -2501,14 +2515,20 @@ function g3Update(){const g=S.g,t=S.t;
     if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);limb(G3.tool,oi++,hd.x,hd.y,hd.z,22*s,2.5*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':'#d6d9de')}};
   // people nearest the camera first, so the figure pool never drops those you can see (it used to hold 30, in list order)
   const folkView=S.humans.filter(h=>!h.dead&&(h.mode!=='ground'||Math.hypot(h.x-S.cam.x,h.y-S.cam.y)<9000)).sort((a,b)=>(b.you-a.you)||Math.hypot(a.x-S.cam.x,a.y-S.cam.y)-Math.hypot(b.x-S.cam.x,b.y-S.cam.y));
-  for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
+  for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y)+(h.riding?24:0);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=climberWorld(h);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,g.ang+(h.cl.face===1?Math.PI:0))}}
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   // beasts: wolves low and long, trolls tall; a struck beast flashes white
   // beasts keep the heading they last moved on (a resting wolf no longer snaps to face east); wolves trot on four legs and lunge as they bite,
   // trolls stride and swing a club, raising it as their next blow comes due; a struck beast flashes white
-  let wi=0,ti=0;for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,w=G3.walk.get(m);
+  let wi=0,ti=0;
+  // horses under their riders: a long brown body, raised head, four legs at a trot
+  for(const h of folkView){if(!h.riding||h.mode!=='ground'||wi>=150)continue;const z=groundH(h.x,h.y),a=h.face||0,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca,w=G3.walk.get(h)||{ph:0,sp:0},sw=Math.sin(w.ph*.8)*.8*w.sp,hc=h.horse&&h.horse.hp<h.horse.max*.4?'#5a3f2a':'#7a5434';
+    put(G3.wolfB,wi,h.x,h.y,z+30,50,20,17,-a);put(G3.wolfH,wi,h.x+ca*30,h.y+sa*30,z+46,18,13,10,-a);G3.wolfB.setColorAt(wi,_c.set(hc));G3.wolfH.setColorAt(wi,_c.set('#4a3322'));wi++;
+    for(const[f,sd,ph]of[[17,1,1],[17,-1,-1],[-17,1,-1],[-17,-1,1]])L(h.x+ca*f+px*sd*6,h.y+sa*f+py*sd*6,z+24,24,4.5,a,sw*ph,0,'#4a3322');
+    L(h.x+ca*22,h.y+sa*22,z+36,14,7,a,-2.4,0,hc);L(h.x-ca*25,h.y-sa*25,z+36,18,3,a,-2.5,Math.sin(t*6+h.id)*.4,'#2e2018')}
+  for(const m of S.monsters){if(Math.hypot(m.x-S.cam.x,m.y-S.cam.y)>7000)continue;const z=groundH(m.x,m.y),fl=m.hitT&&t-m.hitT<.15,w=G3.walk.get(m);
     if(w&&Math.hypot(m.x-w.x,m.y-w.y)>.2)m.fa=Math.atan2(m.y-w.y,m.x-w.x);if(m.wind&&Math.hypot(m.wind.x-m.x,m.wind.y-m.y)>2)m.fa=Math.atan2(m.wind.y-m.y,m.wind.x-m.x);const cw=m.wind?Math.min(1,m.wind.t/m.wind.dur):0;const a=m.fa||0,ry=-a,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca;
     if(m.kind==='wolf'&&wi<160){const W=stride(m,m.x,m.y,7),sw=Math.sin(W.ph)*.75*W.sp,lk=m.rec>.25?1:0,bx=m.x+ca*(lk*10-cw*7),by=m.y+sa*(lk*10-cw*7),bz=z+14-cw*7+Math.abs(Math.sin(W.ph))*2*W.sp,lc=fl?'#ffffff':'#6f6860';
       put(G3.wolfB,wi,bx,by,bz,32,14,13,ry);put(G3.wolfH,wi,bx+ca*18,by+sa*18,bz+6-lk*6-cw*5,12,10,10,ry);G3.wolfB.setColorAt(wi,_c.set(fl?'#ffffff':'#8c847a'));G3.wolfH.setColorAt(wi,_c.set(fl?'#ffffff':'#6f6860'));wi++;
@@ -3221,7 +3241,7 @@ function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Coloss
     {const ts=giantTasks(),n=ts.filter(x=>x.done).length;a+=chip('Tasks',n+'/'+C.GIANT_TASKS,n/C.GIANT_TASKS,' goal')+chip('Climbers',climbers().length);S.taskLine=ts.map(x=>x.name+(x.done?' \u2713':' '+({Freed:S.chains.filter(c=>c.hp<=0).length+'/4',Braced:braces()+'/3',Wanderer:Math.floor(S.walked/100)/10+'k/'+C.WANDER/1000+'k'}[x.name]||'\u2717'))).join(' \u00b7 ')}
     b=!g.awake?(S.waker?'<span class="k">A horn sounds</span> at your head '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':allWeak()?'<span class="k">Free</span> strain once more to rise':'<span class="k">Chained</span> twitch off hunters, strain at your chains · aiming: '+ZONES[aimZone()]):g.fallen>0?'<span class="k">Down</span> '+Math.ceil(g.fallen)+' s':'';b=(b?b+'<br>':'')+'<span style="font-weight:500;font-size:.78rem">'+S.taskLine+'</span>'}
   else{const h=S.you;
-    a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+
+    a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+(h.horse&&h.mode==='ground'?chip('Horse',h.riding?'riding':h.horse.away>S.t?'back in '+Math.ceil(h.horse.away-S.t)+' s':'R to ride',h.horse.hp/h.horse.max):'')+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals+((n=>n?' +'+n+' town':'')(storeNear(h)?poolOf(storeNear(h)):0)))+(h.horn?chip('Horn','ready'):'');
     const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)))}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}

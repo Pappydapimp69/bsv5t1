@@ -2425,7 +2425,7 @@ function pollPad(){const pads=navigator.getGamepads?navigator.getGamepads():[];l
   for(const i of now){if(padHeld.has(i)||padLatch.has(i))continue;unlockAudio();
     if(menu){const m={12:'ArrowUp',13:'ArrowDown',14:'ArrowLeft',15:'ArrowRight',0:'Enter',1:'Escape',9:'Escape'}[i];if(m)menuKey(m)}
     else if(S&&S.fly)flyPress();
-    else if(S&&!S.over){if(i===9||i===8)openPause();else if(i===11)camReset();else{const s={0:'A',1:'B',2:'X',3:'Y',4:'D',5:'D'}[i];if(s)presses.push(s)}}}
+    else if(S&&!S.over){if(i===9||i===8)openPause();else if(i===11)camReset();else if(S.you&&i===10)toggleRide(S.you);else if(S.you&&i>=12&&i<=15)useSkill(S.you,{12:'cry',15:'whirl',13:'mend',14:'spear'}[i]);else{const s={0:'A',1:'B',2:'X',3:'Y',4:'D',5:'D'}[i];if(s)presses.push(s)}}}
   for(const i of padLatch)if(!now.has(i))padLatch.delete(i);
   padHeld.clear();for(const i of now)padHeld.add(i)}
 function latchHeld(){for(const i of padHeld)padLatch.add(i);keys.clear();presses.length=0;chargeCancel()}
@@ -2475,7 +2475,7 @@ document.getElementById('stats-menu').addEventListener('click',()=>{if(!menu)ope
 function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
   const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
   if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
-  if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
+  if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges. D-pad: skills. Press the left stick to ride.';
   return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>4</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}

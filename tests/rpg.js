@@ -171,6 +171,11 @@ const {chromium} = require('playwright');
       // the ultimate: Earthshaker at level 7 stuns and hurts everything near
       const Qk = __col.newGame('human', 33), qh = Qk.you; Qk.monsters = []; const ws = [0, 1, 2].map(k => ({id: 900 + k, kind: 'wolf', x: qh.x + 60 + k * 30, y: qh.y, hx: 0, hy: 0, hp: 300, max: 300, atk: 1, gold: 0, xp: 0, r: 13, cd: 0})); Qk.monsters.push(...ws);
       out.quakeLocked = !useSkill(qh, 'quake'); qh.lvl = 7; out.quake = useSkill(qh, 'quake') && ws.every(m => m.hp < 300 && m.rec >= 2);
+      // caravan guard job: a quest tied to a live caravan, done when it arrives with you nearby
+      const Cv = __col.newGame('human', 34), cv = Cv.you, home2 = Cv.towns[cv.town]; Cv.monsters = []; startCaravan(home2); Cv.monsters = [];
+      const car = Cv.events.find(e => e.k === 'caravan' && e.i === cv.town); const cq = newQuest(cv, 'caravan'); cv.quest = cq;
+      out.caravanJob = cq.k === 'caravan' && questTarget(cv).x === car.x;
+      const dest = Cv.towns.find(t => t.id === car.to); car.x = dest.x; car.y = dest.y; cv.x = car.x + 100; cv.y = car.y; stepEvents(C.DT); out.caravanDone = cv.quest.done;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

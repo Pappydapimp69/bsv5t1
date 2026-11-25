@@ -82,6 +82,11 @@ const {chromium} = require('playwright');
       // bot heroes build civic buildings over a match
       const Bt = __col.newGame('human', 13); Bt.autoplay = true; while (Bt.t < 900) __col.step(60);
       out.botCivic = Bt.builds.some(b => CIVIC[b.k] && b.owner !== Bt.you.id);
+      // wildlife: deer graze, bolt from people, and can be hunted for a pelt and gold
+      const D = __col.newGame('human', 14), dh = D.you; D.monsters = []; __col.step(2);
+      out.deer = D.critters.length >= 24;
+      const deer = D.critters[0]; dh.x = deer.x + 200; dh.y = deer.y; const dx0 = deer.x; __col.step(30); out.deerFlee = Math.hypot(deer.x - dh.x, deer.y - dh.y) > 200;
+      dh.x = deer.x + 30; dh.y = deer.y; dh.cd = 0; const dg = dh.gold; out.hunt = humanAct(dh, 'A') && deer.dead && dh.gold === dg + 6;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

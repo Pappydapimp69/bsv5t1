@@ -105,6 +105,15 @@ const {chromium} = require('playwright');
       eh.x = amb.x + 40; eh.y = amb.y; out.ambushBlocked = !!poiAct(eh).why; E.monsters = E.monsters.filter(m => m.guard !== amb.id); out.ambushHelp = humanAct(eh, 'X') && amb.follow === eh.id;
       E.wevT = 0; Math.random = () => .7; __col.step(1); Math.random = rnd0; const stag = E.critters.find(c => c.golden); out.stag = !!stag;
       eh.x = stag.x + 30; eh.y = stag.y; eh.cd = 0; const sg = eh.gold; humanAct(eh, 'A'); out.stagPays = eh.gold >= sg + 60;
+      // renown: the end of a human match pays renown; bought perks apply at the next start
+      const sv = JSON.stringify(save); save.renown = 0; save.unlocks = {}; save.firstDay = 1;
+      start('human', 18); const Rn = __col.S; Rn.you.lvl = 4; Rn.you.campsBroken = 2; Rn.over = {giantWon: true, text: 'x'}; openEnd(); closeMenu();
+      out.renownEarned = save.renown === 8 + 6 + (Rn.you.charms || []).length;
+      save.renown = 100; save.unlocks = {mare: 1, purse: 1}; start('human', 19); out.renownPerks = !!__col.S.you.horse && __col.S.you.gold >= 100;
+      Object.assign(save, JSON.parse(sv)); delete save.unlocks; if (!JSON.parse(sv).renown) delete save.renown; closeMenu();
+      // skill talents need the skill unlocked; a horse levels with riding
+      const Sk = __col.newGame('human', 20), sk = Sk.you; out.skillTalentGated = !talentChoices(sk).some(t => t.lvl) || sk.lvl >= 2;
+      sk.horse = {hp: 80, max: 80}; horseGrow(sk, 6001); out.horseLevels = sk.horse.lv === 2 && sk.horse.max === 100;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

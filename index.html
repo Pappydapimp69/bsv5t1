@@ -2831,8 +2831,10 @@ function g3Update(){const g=S.g,t=S.t;
     L(x+sx*9*s,y+sy*9*s,zb+42*s,17*s,4*s,face,armL,0,col);L(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,4*s,face,armR,0,col);
     if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);const bl=h.gear?h.gear.blade:0;limb(G3.tool,oi++,hd.x,hd.y,hd.z,(22+5*bl)*s,(2.5+.5*bl)*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':['#d6d9de','#c9a46a','#e8ecf2','#9fe8ff','#f2ead8','#ffd24a'][bl]||'#d6d9de')}
     // armour shows as pauldrons, a worn crown as a gold band
-    if(h.gear&&h.gear.armour){const ac=['','#8a8f98','#b9bec6','#9fb8d8','#e8dcc4','#ffd24a'][h.gear.armour]||'#8a8f98';L(x+sx*9*s,y+sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac);L(x-sx*9*s,y-sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac)}
-    if(h.charms&&h.charms.includes('crown'))L(x,y,zb+60*s,4*s,9*s,face,0,0,'#ffd24a')};
+    if(h.gear&&h.gear.armour){const ac=['','#8a8f98','#b9bec6','#9fb8d8','#e8dcc4','#ffd24a'][h.gear.armour]||'#8a8f98';L(x+sx*9*s,y+sy*9*s,zb+45*s,4*s,6*s,face,0,0,ac);L(x-sx*9*s,y-sy*9*s,zb+45*s,4*s,6*s,face,0,0,ac)}
+    if(h.charms&&h.charms.includes('crown'))L(x,y,zb+60*s,4*s,9*s,face,0,0,'#ffd24a');
+    // heroes wear a hood in their town's colour (yours is red) with a short cape behind
+    else if(h.hero&&!cl)L(x,y,zb+60*s,4*s,8*s,face,0,0,you?'#8e2a1f':col)};
   // people nearest the camera first, so the figure pool never drops those you can see (it used to hold 30, in list order)
   const folkView=S.humans.filter(h=>!h.dead&&(h.mode!=='ground'||Math.hypot(h.x-S.cam.x,h.y-S.cam.y)<9000)).sort((a,b)=>(b.you-a.you)||Math.hypot(a.x-S.cam.x,a.y-S.cam.y)-Math.hypot(b.x-S.cam.x,b.y-S.cam.y));
   for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y)+(h.riding?24:0);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);

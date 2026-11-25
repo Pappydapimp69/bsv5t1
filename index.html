@@ -3100,14 +3100,17 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(w.length&&!climb)return'rivals\u2019 wedges bleed the giant\u2019s '+JOINTS[w[0]].name.toLowerCase()+': pull them out and it will remember you';
   if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
   // a forward base: an outpost near the giant shortens every walk (you shop and come back to life at your nearest settlement)
+  if(!climb&&h.gold>=C.COST.outpost+C.COST.brace){const o=outpostAim(h);if(o)return o}
   {const way=townWay(h.town),tend=way==='tend'||(S.reg&&S.reg[h.id]||0)>C.LEAD_REG,hunt=way==='hunt'&&!tend;
     if(!climb&&huntOpen()&&tend&&h.gold>=C.COST.brace)return'buy a brace kit in town and bolt it on: the giant remembers who braces it';
     if(!climb&&huntOpen()&&tend)return(Object.values(S.joints).some(j=>j.hp<j.max-1&&!j.crip)?'climb and Tend a hurt joint (anchor button): the giant remembers kindness; or ':'')+'earn '+(C.COST.brace-h.gold)+' more gold for a brace kit';
     if(!climb&&huntOpen()&&hunt&&h.gold>=C.COST.wedge)return'buy a wedge in town and drive it into a knee';
     if(!climb&&h.gold>=C.COST.wedge&&huntOpen()&&h.gold<C.COST.outpost)return'buy a wedge or a brace kit in town, then climb the giant'}
+  {const o=outpostAim(h);if(o)return o}
+  return!climb?'earn gold: take a job on the Board, hunt beasts or gather sky crystals':''}
+function outpostAim(h){const g=S.g,climb=h.mode==='climb';
   {const near=nearestOwn(h.town,g.x,g.y),site=()=>{for(let k=0;k<12;k++){const a=k/12*6.283,x=g.x+Math.cos(a)*1400,y=g.y+Math.sin(a)*1400;if(outpostSiteOpen(x,y)&&!inSolid(x,y,60)&&!S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))return true}return false};
     if(!climb&&!g.awake&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000)&&site())return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}
-  if(!climb)return'earn gold: take a job on the Board, hunt beasts or gather sky crystals';
   return''}
 // the giant's first lessons, each told once (ever) at the moment it applies, in the flow of play rather than on cards
 function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=save.ghint||{},k=device==='pad'?{A:'A',B:'B',X:'X',Y:'Y'}:device==='touch'?{A:'the big button',B:'the left button',X:'the top-left button',Y:'the top button'}:{A:'J',B:'K',X:'L',Y:'H'};

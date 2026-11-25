@@ -332,6 +332,18 @@ tests/sleeper.js 22 checks; all suites pass.
   forward outpost near the giant when you can afford one (120 gold) and your nearest settlement is >3000 away.
   Headless check: outpost founded 1273 from the giant; after a death the hero reappeared 64 from it (~8 s walk vs ~45 s).
 
+## Continued after the handoff (owner: "Keep improving GPTBS along the way", 01:12Z)
+
+- Working window set to the earlier 4-hour assumption: cutoff 03:52Z, wrap-up from 03:32Z. Alternating Colossus work
+  with fixes to the GPTBS tool itself.
+- GPTBS (BS@cc72f1a): `queue` lists a session's staged records; `finish --check` validates without saving;
+  `--source-ref` is checked when queued (native UUIDs refused with a hint); `acceptance.py` copies archives into its temp
+  library, compares native rows where imported rows may fill in, checks the snapshot stress query against the first
+  imported row, and runs the archive checks in an empty library. A probe record with `source_refs` that matched the stress
+  query now passes acceptance (it failed both ways before).
+- Colossus: the forward-outpost hint shows first when gold covers both an outpost and a kit (≥170), so it is no longer
+  starved by the brace/wedge advice (Brindle 130 g → brace; 200 g → outpost).
+
 ## What I would build next
 
 1. **Put a person in each role.** Every claim here rests on bots, key-press policies and my own hand play. The open GPTBS

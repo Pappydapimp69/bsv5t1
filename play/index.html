@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.153 · d16c637 · 2026-11-25 06:59 UTC</div>
+  <div id="ver">v1.154 · ce854fb · 2026-11-25 07:23 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -884,7 +884,7 @@ function hurtArea(x,y,r,dmg,tdmg,why){
   for(const h of S.humans)if(h.mode==='ground'&&!h.dead&&Math.hypot(h.x-x,h.y-y)<r+10)hurtHuman(h,dmg,why);
   for(const m of S.monsters)if(Math.hypot(m.x-x,m.y-y)<r+m.r)m.hp-=dmg;
   for(const t of S.towns)if(t.alive&&Math.hypot(t.x-x,t.y-y)<r+t.r)hurtTown(t,tdmg,why)}
-function hurtTown(t,d,why){if(!t.alive)return;if(!S.headless&&S.t-(t.sndT||0)>.6&&nearPlayer(t)){t.sndT=S.t;sfx('thud',true)}t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;t.fellBy=why||null;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
+function hurtTown(t,d,why){if(!t.alive)return;if(S.you&&t.i===S.you.town&&!S.headless){const f0=t.hp/t.max,f1=(t.hp-d)/t.max;for(const q of[.6,.3])if(f0>q&&f1<=q){announce(t.name+'\u2019s walls are at '+Math.round(q*100)+'%! Go home and fight, or order your barracks to defend it (B).');sfx('warn')}}if(!S.headless&&S.t-(t.sndT||0)>.6&&nearPlayer(t)){t.sndT=S.t;sfx('thud',true)}t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;t.fellBy=why||null;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
@@ -2048,7 +2048,7 @@ function stepMonsters(dt){
   for(const m of S.monsters){m.cd=Math.max(0,m.cd-dt);if(beastBusy(m,dt))continue;
     if(m.raid){const town=S.towns[m.raid.town];if(town?.alive&&S.t>=m.raid.go){let foe=null,fd=200**2;for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town===m.raid.i){const d2=distSq(h,m);if(d2<fd){fd=d2;foe=h}}
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;
-      if(foe){beastFight(m,foe,dt);continue}if(d>town.r){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;hurtTown(town,m.atk*1.5)}continue}}
+      if(foe){beastFight(m,foe,dt);continue}if(d>town.r){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;hurtTown(town,m.atk*(m.raid.wave?.5:1.5))}continue}}
     let tgt=null,bd=(m.kind==='archer'?440:260)**2;
     for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h!==protectedPlayer){const d2=distSq(h,m);
       if(d2<bd&&!townAt(h)){bd=d2;tgt=h}}

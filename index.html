@@ -1582,7 +1582,7 @@ function stepWaves(){S.waves=S.waves||[0,1,2].map(i=>({n:0,next:C.WAVE_FIRST+i*1
     if(W.ev){if(S.events.includes(W.ev))continue;W.ev=null;W.next=S.t+rr(C.WAVE_REST[0],C.WAVE_REST[1])*(S.g.awake?1.5:1);continue}
     if(S.t<W.next||nightLock())continue;W.n++;const size=Math.min(9,2+W.n),trolls=W.n>=3?Math.min(3,Math.floor((W.n-1)/2)):0;
     startRaid(t,'Wave '+W.n+': beasts gather beyond '+t.name+' and march in 20 s!',null,size,trolls);W.ev=S.events[S.events.length-1];W.ev.wave=W.n}}
-function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();stepFestival();
+function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();stepFestival();humanHints();
   for(let i=0;i<3;i++){const n=S.raided[i];if(n<C.RAID_AT.length&&wealth(i)>=C.RAID_AT[n]&&factionAlive(i)){S.raided[i]++;const t=nearestOwn(i,C.MAP/2,C.MAP/2);if(t)startRaid(t,'Beasts are gathering beyond '+t.name+', drawn by its wealth. They march in 20 s!')}}
   for(let k=S.events.length-1;k>=0;k--){const e=S.events[k];
     if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length){if(e.say)eventSay('The raid on '+town.name+' is beaten off.');
@@ -2602,6 +2602,17 @@ const GOALS=[{id:'camp',t:'Break a camp',n:1,k:'camp'},{id:'alpha',t:'Slay a nam
 function matchGoals(){if(!S.goals){const R=mulberry32((S.seed^0x60A1)>>>0),pool=GOALS.slice(),g=[];while(g.length<3)g.push(pool.splice(Math.floor(R()*pool.length),1)[0]);S.goals=g.map(x=>({...x,done:false}))}return S.goals}
 const goalProg=(h,g)=>Math.min(g.n,g.f?g.f(h):(h.stat&&h.stat[g.k])||0);
 function stepGoals(){const h=S.you;if(!h||S.role!=='human'||S.t%1>C.DT*1.5)return;for(const g of matchGoals())if(!g.done&&goalProg(h,g)>=g.n){g.done=true;if(!S.headless){announce('Goal done: '+g.t+' (+5 renown).');sfx('coin')}}}
+// first-time hints for the human side, each told once ever, when the thing is right there (like the giant's lessons)
+function humanHints(){const h=S.you;if(!h||S.headless||S.role!=='human'||S.tut||h.dead||S.t%1>C.DT*1.5||S.t<OPENING.len+8)return;const seen=save.hhint=save.hhint||{},X=device==='pad'?'X':device==='touch'?'the top-left button':'L';
+  const say=(id,text)=>{if(seen[id]||S.hintAt>S.t-8)return;seen[id]=1;S.hintAt=S.t;persist();toast(text)};const near=(k,r)=>(S.pois||[]).some(p=>p.k===k&&Math.hypot(p.x-h.x,p.y-h.y)<r);
+  say('map','Press M for the full map with every town, shrine, camp and spring.');
+  if(near('shrine',350))say('shrine','A shrine: press '+X+' beside it to pray for a two-minute blessing.');
+  if(near('camp',700))say('camp','A camp: its named leader and pack guard a chest. Beat them, then press '+X+' at the chest. Charms drop from leaders.');
+  if(near('spring',350))say('spring','A hot spring: soak ('+X+') for 10 more most health, once per spring.');
+  if(near('stones',350))say('stones','Standing stones: read them ('+X+') for lore; read all four for a free talent.');
+  if((S.critters||[]).some(c=>!c.dead&&Math.hypot(c.x-h.x,c.y-h.y)<450))say('deer','Deer: get close and attack for a pelt. Pelts become hides at home for crafting at the Forge.');
+  if(h.picks>0)say('talent','You can choose a talent: press T.');if(h.lvl>=2)say('skills','Skills on 1-4 unlock as you level: watch the bar at the bottom.');
+  if(h.gold>=C.HORSE_COST&&!h.horse)say('horse','You can afford a horse in town ('+C.HORSE_COST+' gold): R to ride.');if(h.horse)say('ride','R mounts and dismounts. Riding blows hit harder; hard hits throw you.')}
 // renown: what a human match earns toward lasting starting perks, bought on the title screen (a light roguelite layer)
 const RENOWN=[{id:'purse',n:'A full purse',t:'Start with 60 more gold',c:15},{id:'seasoned',n:'Seasoned',t:'Start at level 2 with a talent to choose',c:20},
   {id:'mare',n:'An old mare',t:'Start with a horse',c:25},{id:'heirloom',n:'An heirloom',t:'Start wearing a random charm',c:30},{id:'pockets',n:'Wide pockets',t:'One more charm slot',c:40}];

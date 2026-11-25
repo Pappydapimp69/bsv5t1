@@ -384,3 +384,36 @@ Final giant hand-check: clicked the panel to aim (head → chest and head, shin 
 - All suites pass: sleeper 22, giant 42, heroes, barracks (incl. 8 tutorial checks), land fairness 40 seeds 0 unfair.
 - Final hand checks: giant (panel aiming, strain, hunter hint at 1:35) and Corvel human (menu start, Now line, end
   screen chronicle + Next time).
+
+---
+
+# Human-side RPG run (owner asleep; 2026-11-25 from 04:52Z)
+
+Owner's brief: make Colossus a real game on the human side: engagement, quests, skills and RPG elements, better graphics
+and UI, city-builder elements, better combat, more to do in the world, mounts; use GPTBS and ZaneGPT; pull ideas
+from outside sources; don't loop. ZaneGPT check before starting: the last run's work was mostly invisible to a player
+(hints, tests, review fixes), so every block in this run had to ship something you can see in the first five minutes,
+publish a new version number, and move on, with no review rounds. A research agent gathered sourced mechanics for
+mounts, places to visit, skill picks, quests, melee feel, city layers and HUD (BotW CEDEC talk, Ghost of Tsushima, Hades,
+Vampire Survivors, Diablo 4, Skyrim radiant, Shadow of Mordor nemesis, SFV/Sakurai hitstop, Kingdom Two Crowns,
+Fallout 4, Far Cry 5); each feature's GPTBS lesson cites the sources it drew on (session colossus-rpg-run).
+
+Shipped (each published to play/ with its version number on the menu screen):
+
+| Version | What |
+|---|---|
+| v1.117 | Only heroes found outposts; staking a site sends a settler caravan from the first town |
+| v1.118 | Horses: buy in town, R to ride (1.9x), charging blows, thrown by hard hits, a worn-out horse bolts for a minute |
+| v1.119 | Talents (pick 1 of 3 each level, T) and skills on 1-3 (War cry, Whirlwind, Mend), skill bar with cooldowns |
+| v1.120 | Places: 6 shrines, 3 hot springs, 4 standing stones, 16 herb patches, 4 camps with a named alpha, lost travellers, a wandering merchant |
+| v1.121 | Quests: camp, bounty, escort and prayer jobs with map targets; the elders' tale ending at the Rim Warlord; Hero-Slayer alphas |
+| v1.122 | Combat: 3-hit combos, crits, perfect dodge with slow-mo, popping damage numbers, charging boars; zoom moved to +/-, tilt to Y/G |
+| v1.123 | City: farm, market, smithy, stable, well; prosperity score per settlement; hero bots grow their towns |
+| v1.124-125 | Hero sheet (I), XP bar, sparks, LEVEL UP column, +gold popups, deer herds; Now line points at nearby places |
+| v1.126 | Charms (10, 2-4 slots) and bandit camps with archers that draw an aim line |
+| v1.127-128 | Hoofbeats, dust, skill sounds, chimney smoke, town banners; rival heroes use the places too |
+| v1.129 | World events (ambushed traveller, golden stag); ? and ! over towns; gear visible on the hero; How to play updated |
+| v1.130 | Renown across matches with five perks; skill-upgrade talents; horses level up |
+
+Tests: new tests/rpg.js (55 checks) covers all of the above; the older suites pass unchanged except where the owner's
+rules changed behaviour (outposts now need settlers; raising a town sends a trade caravan).

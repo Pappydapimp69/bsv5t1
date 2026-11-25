@@ -498,7 +498,7 @@ async function main() {
       const fHouse = {k: 'house', x: town.x - 300, y: town.y, town: town.i, owner: forager.id, cd: 0, hp: C.HOUSE_HP, max: C.HOUSE_HP};
       state.builds.push(fHouse); const pg = player.gold, fg = forager.gold;
       state.t = RENT_INTERVAL * 3 + .01; stepBuilds(C.DT);
-      const foragerHousePaysPlayer = player.gold === pg + 4 + HOUSE_RENT && forager.gold === fg;
+      const foragerHousePaysPlayer = player.gold === pg + 4 + Math.round(HOUSE_RENT * .5) && forager.gold === fg; // houses you did not build pay half
       return {foragerHousePaysPlayer, buildMenuShowsRent, noEarlyRent, heroGetsRent, playerSeesPayout, requiresLocalHeroHouse, foragerUpgradesHouse, upgradedRentPaysMore};
     });
     for (const [check, passed] of Object.entries(rent)) assert.ok(passed, check);

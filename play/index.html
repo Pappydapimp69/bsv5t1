@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.159 · eafeffb · 2026-11-25 07:37 UTC</div>
+  <div id="ver">v1.160 · 0ebddcc · 2026-11-25 07:39 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1913,7 +1913,8 @@ const SKILLS=[
   {id:'cry',key:'1',name:'War cry',lvl:2,cd:20,text:'Staggers and hurts beasts around you; you and nearby friends hit 30% harder for 8 s'},
   {id:'whirl',key:'2',name:'Whirlwind',lvl:3,cd:9,text:'A spinning blow at every beast in reach'},
   {id:'mend',key:'3',name:'Mend',lvl:5,cd:45,text:'Heal 40% of your health'},
-  {id:'spear',key:'4',name:'Spear',lvl:4,cd:6,text:'Throw a spear at the nearest beast within 450: double damage, staggers it'}];
+  {id:'spear',key:'4',name:'Spear',lvl:4,cd:6,text:'Throw a spear at the nearest beast within 450: double damage, staggers it'},
+  {id:'quake',key:'5',name:'Earthshaker',lvl:7,cd:60,text:'Slam the ground: 2.5x damage to every beast within 240 and stuns them for 2 s'}];
 function skillWhy(h,k){if(h.lvl<k.lvl)return'Unlocks at level '+k.lvl;if(h.dead)return'Dead';if(h.mode!=='ground')return'Not on the giant';const c=(h.skCd&&h.skCd[k.id]||0)-S.t;return c>0?'Ready in '+Math.ceil(c)+' s':null}
 function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){if(h.you)toast(k.name+': '+w);return false}
   (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'))*(1-.15*charm(h,'moon'));h.swing=.2;
@@ -1923,6 +1924,7 @@ function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){
   if(id==='whirl'){const wr=perk(h,'storm')?133:95;for(const m of near(wr))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:wr,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('whoosh',h.you||nearPlayer(h))}
   if(id==='spear'){const tg=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<450).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];if(!tg){h.skCd.spear=S.t+.5;if(h.you)toast('Spear: no beast within 450');return false}
     if(!S.headless)S.fx.push({k:'arrow',x:h.x,y:h.y,x2:tg.x,y2:tg.y,t:0,life:.2});h.face=Math.atan2(tg.y-h.y,tg.x-h.x);tg.wind=null;tg.rec=Math.max(tg.rec||0,.9);hitBeast(h,tg,Math.round(h.atk*2));if(!S.headless)sfx('whoosh',h.you)}
+  if(id==='quake'){for(const m of near(240)){m.wind=null;m.rec=Math.max(m.rec||0,2);m.cd=Math.max(m.cd||0,2);hitBeast(h,m,Math.round(h.atk*2.5))}if(!S.headless){for(let r=0;r<3;r++)S.fx.push({k:'ring',x:h.x,y:h.y,r:120+r*60,t:-r*.08,life:.7,col:'#e8c070'});for(let k=0;k<8;k++)S.fx.push({k:'dust',x:h.x+Math.cos(k*.785)*80,y:h.y+Math.sin(k*.785)*80,t:0,life:1.1});shake(16);sfx('stomp',h.you||nearPlayer(h))}}
   if(id==='mend'){const a=Math.round(h.max*(perk(h,'deep')?.7:.4));h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
@@ -2227,7 +2229,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   // drop an anchor every so often on the way up
   if(h.kits.anchor>0&&r>20&&r%35===0&&!S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<20))placeAnchor(h);
   return mv}
-function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.hero&&h.mode==='ground'&&(!h.you||S.autoplay)&&S.t%1<dt){const n=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<120).length;if(h.hp<h.max*.4&&!skillWhy(h,SKILLS[2]))useSkill(h,'mend');else if(n>=3&&!skillWhy(h,SKILLS[0]))useSkill(h,'cry');else if(n>=2&&!skillWhy(h,SKILLS[1]))useSkill(h,'whirl');else if(!n&&!skillWhy(h,SKILLS[3])&&S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<400&&m.eng===h.id))useSkill(h,'spear')}
+function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.hero&&h.mode==='ground'&&(!h.you||S.autoplay)&&S.t%1<dt){const n=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<120).length;if(h.hp<h.max*.4&&!skillWhy(h,SKILLS[2]))useSkill(h,'mend');else if(n>=3&&!skillWhy(h,SKILLS[4]))useSkill(h,'quake');else if(n>=3&&!skillWhy(h,SKILLS[0]))useSkill(h,'cry');else if(n>=2&&!skillWhy(h,SKILLS[1]))useSkill(h,'whirl');else if(!n&&!skillWhy(h,SKILLS[3])&&S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<400&&m.eng===h.id))useSkill(h,'spear')}
   if(h.horse&&h.mode==='ground'&&(!h.you||S.autoplay)){const foe=S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<320);if(foe&&h.riding)setRide(h,false);else if(!foe&&!h.riding&&horseReady(h))setRide(h,true)}if(h.you&&h.role==='you')h.role='keeper'; // a played person tends the giant: the bot standing in for one wins its regard
 h.think-=dt;
   if(h.mode==='climb')return botClimb(h);
@@ -2482,7 +2484,7 @@ function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
   const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
   if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
   if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges. D-pad: skills. Press the left stick to ride.';
-  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>4</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
+  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>5</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
@@ -3651,7 +3653,7 @@ function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f|
 const skillEl=document.getElementById('skillbar');let skSig='';
 skillEl.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-sk]');if(!el||!S||!S.you||menu)return;e.preventDefault();e.stopPropagation();const k=el.dataset.sk;if(k==='talent')openTalents();else if(k==='ride')toggleRide(S.you);else useSkill(S.you,k)});
 function paintSkills(){const h=S&&S.you;if(!h||FILM||S.role!=='human'){if(skSig){skSig='';skillEl.innerHTML=''}return}
-  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
+  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}',quake:'\u{1F4A5}'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
     return `<div class="sk${lock?' off':c<=0&&h.mode==='ground'?' ready':''}" data-sk="${k.id}" title="${k.text}"><span class="ky">${k.key}</span><span class="ic">${ic[k.id]}</span>${lock?'Lv '+k.lvl:k.name}${!lock&&c>0?`<div class="cdv" style="height:${Math.round(c/tot*100)}%"></div><div class="cdn">${Math.ceil(c)}</div>`:''}</div>`});
   if(h.picks>0)parts.push(`<div class="sk tal" data-sk="talent"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
   if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}" data-sk="ride"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);

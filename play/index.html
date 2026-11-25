@@ -513,6 +513,9 @@ function newGame(role,seed,town=0){resetOmen();
   for(let ti=0;ti<3;ti++){if(role==='human'&&ti===town)S.humans.push(mkHuman(ti,true,'you'));S.humans.push(mkHuman(ti,false,'folk'))}
   S.you=role==='human'?S.humans.find(h=>h.you):null;
   populateLand();
+  for(const t of towns)for(let k=0;k<2;k++){const a=Math.atan2(cy-t.y,cx-t.x)+rr(-.9,.9),d=rr(900,2200)*WS*.5+600,x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d;
+    // move three wandering wolves here (the land keeps its beast count; they just start where people walk)
+    for(let j=0;j<3;j++){const px=x+rr(-90,90),py=y+rr(-90,90),w=S.monsters.find(m=>m.wild&&m.kind==='wolf'&&!m.moved&&!m.home);if(!w||inSolid(px,py,30))continue;w.moved=1;w.x=w.hx=px;w.y=w.hy=py;w.home={x,y,r:420}}}
   for(const t of towns)if(!S.you||t.i!==S.you.town)S.humans.push(mkHuman(t.i,false,t.i===2?'warden':'keeper',t,true));
   if(S.you){S.cam.x=S.you.x;S.cam.y=S.you.y}
   return S}
@@ -1437,8 +1440,8 @@ function wealth(i){let w=0;for(const t of aliveTowns())if(t.i===i)w+=3*(lv(t)-1)
 function nearestOwn(i,x,y){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===i){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t}}return b}
 function eventSay(s){if(!S.headless)announce(s)}
 // a raid: beasts gather out of sight, then march on a settlement; set off by a town growing rich, or a ruin being robbed
-function startRaid(town,why,from){const a=rnd()*6.28,x=from?from.x:town.x+Math.cos(a)*1900,y=from?from.y:town.y+Math.sin(a)*1900,ev={k:'raid',town:town.id,i:town.i,x,y,t:S.t,go:S.t+20};
-  const n=from?3:5+Math.floor(rnd()*3);for(let k=0;k<n;k++){const px=x+rr(-80,80),py=y+rr(-80,80),troll=(from||k===0)&&canSpawnTroll(px,py);
+function startRaid(town,why,from,size,trolls){const a=rnd()*6.28,x=from?from.x:town.x+Math.cos(a)*1900,y=from?from.y:town.y+Math.sin(a)*1900,ev={k:'raid',town:town.id,i:town.i,x,y,t:S.t,go:S.t+20};
+  const n=size||(from?3:5+Math.floor(rnd()*3));for(let k=0;k<n;k++){const px=x+rr(-80,80),py=y+rr(-80,80),troll=(trolls!=null?k<trolls:(from||k===0))&&canSpawnTroll(px,py);
     S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x:px,y:py,hx:x,hy:y,hp:troll?110:36,max:troll?110:36,atk:troll?14:7,gold:troll?26:10,xp:troll?34:14,r:troll?22:13,cd:0,raid:ev})}
   S.events.push(ev);S.evc.raid++;ev.say=raidConcerns(town);if(ev.say)eventSay(why)}
 // a raid is news to you when it falls on your own people or near you; the giant hears of every raid it set off itself
@@ -1462,10 +1465,20 @@ function canEscort(h,e){if(h.dead||h.job||h.mode!=='ground')return false;
   return !!h.sol&&!playerArmy(h)&&!h.ord&&!readyToWake(h)&&S.builds.includes(h.sol.b)&&barracksTown(h.sol.b)?.id===e.from}
 function caravanEscort(e){let soldier=null;for(const h of S.humans){if(!canEscort(h,e)||escortCaravan(h))continue;
   if(isForager(h))return h;if(!soldier||dist(h,e)<dist(soldier,e))soldier=h}return soldier}
-function stepEvents(dt){
+// beast waves: from the first minute each town is attacked in waves that grow, with a rest of 30-60 s after each is beaten
+// (build-up, fight, relax: the Left 4 Dead director's rhythm). Beating one pays those who fought it.
+C.WAVE_FIRST=55;C.WAVE_REST=[30,60];C.WAVE_BOUNTY=15;
+function stepWaves(){S.waves=S.waves||[0,1,2].map(i=>({n:0,next:C.WAVE_FIRST+i*12,ev:null}));
+  for(let i=0;i<3;i++){const W=S.waves[i],t=S.towns.find(x=>x.i===i&&x.alive&&!x.outpost);if(!t)continue;
+    if(W.ev){if(S.events.includes(W.ev))continue;W.ev=null;W.next=S.t+rr(C.WAVE_REST[0],C.WAVE_REST[1])*(S.g.awake?1.5:1);continue}
+    if(S.t<W.next||nightLock())continue;W.n++;const size=Math.min(9,2+W.n),trolls=W.n>=3?Math.min(3,Math.floor((W.n-1)/2)):0;
+    startRaid(t,'Wave '+W.n+': beasts gather beyond '+t.name+' and march in 20 s!',null,size,trolls);W.ev=S.events[S.events.length-1];W.ev.wave=W.n}}
+function stepEvents(dt){stepWaves();
   for(let i=0;i<3;i++){const n=S.raided[i];if(n<C.RAID_AT.length&&wealth(i)>=C.RAID_AT[n]&&factionAlive(i)){S.raided[i]++;const t=nearestOwn(i,C.MAP/2,C.MAP/2);if(t)startRaid(t,'Beasts are gathering beyond '+t.name+', drawn by its wealth. They march in 20 s!')}}
   for(let k=S.events.length-1;k>=0;k--){const e=S.events[k];
-    if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length&&e.say)eventSay('The raid on '+town.name+' is beaten off.');continue}
+    if(e.k==='raid'){const left=S.monsters.filter(m=>m.raid===e);const town=S.towns.find(t=>t.id===e.town);if(!left.length||!town||!town.alive){S.events.splice(k,1);if(town&&town.alive&&!left.length){if(e.say)eventSay('The raid on '+town.name+' is beaten off.');
+        // the bounty: everyone who killed a beast of this raid is paid, and the town banks a crystal
+        if(e.wave){town.crystals=(town.crystals||0)+1;for(const h of S.humans)if(e.killers&&e.killers[h.id]){h.gold+=C.WAVE_BOUNTY;if(h.you)toast('Wave '+e.wave+' beaten: '+TOWNS[town.i].name+' pays you '+C.WAVE_BOUNTY+' gold.')}}}continue}
       e.x=left[0].x;e.y=left[0].y}
     if(e.k==='star'){e.left=S.crystals.filter(c=>c.star===e).length;if(!e.left){S.events.splice(k,1);continue}}
     if(e.k==='caravan'){const to=e.site?{x:e.site.x,y:e.site.y,r:60}:S.towns.find(t=>t.id===e.to);if(!to||e.site==null&&!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);
@@ -1610,7 +1623,7 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
 function gainXp(h,x){h.xp+=x;while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;if(h.you){toast('Level '+h.lvl+'! Stronger arm, better grip.');sfx('coin')}}}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
-function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
+function killMonster(m,h){if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
   {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll')}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.

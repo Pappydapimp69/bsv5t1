@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.158 · bf62f4f · 2026-11-25 07:35 UTC</div>
+  <div id="ver">v1.159 · eafeffb · 2026-11-25 07:37 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1054,7 +1054,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
       return drinkPotion(h)}
     return false}
   if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(!at&&h.hero&&critterNear(h)){huntCritter(h,critterNear(h));return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1+.1*charm(h,'tooth');h.critNext=0;
-    const dm=Math.round((m.affix==='armoured'&&m.hp>m.max/2?.5:1)*h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(h.you)S.fx.push({k:'slash',x:h.x,y:h.y,a:Math.atan2(m.y-h.y,m.x-h.x),t:0,life:.16,big:fin||crit})}if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+    const dm=Math.round((m.affix==='armoured'&&m.hp>m.max/2?.5:1)*h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(m.hp>0)warlordPhase(m);if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(h.you)S.fx.push({k:'slash',x:h.x,y:h.y,a:Math.atan2(m.y-h.y,m.x-h.x),t:0,life:.16,big:fin||crit})}if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&digTreasure(h))return true;if(!t&&h.hero&&poiAct(h))return usePoi(h,poiNear(h));if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1926,7 +1926,10 @@ function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){
   if(id==='mend'){const a=Math.round(h.max*(perk(h,'deep')?.7:.4));h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
-function hitBeast(h,m,d){if(m.affix==='armoured'&&m.hp>m.max/2)d=Math.ceil(d/2);if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
+// the Rim Warlord fights in phases: at half health it howls for its pack, at a quarter it rages (faster, harder)
+function warlordPhase(m){if(!m.warlord)return;const f=m.hp/m.max;if(!m.ph1&&f<=.5){m.ph1=1;for(let k=0;k<4;k++){const a=k*1.57;S.monsters.push({id:S.nextId++,kind:'wolf',x:m.x+Math.cos(a)*120,y:m.y+Math.sin(a)*120,hx:m.x,hy:m.y,hp:45,max:45,atk:8,gold:10,xp:14,r:13,cd:.5})}if(!S.headless){announce('The Rim Warlord howls: its pack answers!');shake(10)}}
+  if(!m.ph2&&f<=.25){m.ph2=1;m.atk=Math.round(m.atk*1.4);m.swift=1;if(!S.headless){announce('The Rim Warlord rages!');shake(12)}}}
+function hitBeast(h,m,d){if(m.affix==='armoured'&&m.hp>m.max/2)d=Math.ceil(d/2);if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(m.hp>0)warlordPhase(m);if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
 function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;{const gg=Math.round(m.gold*.5*(1+.5*perk(h,'plunder'))*(1+.25*charm(h,'coin')));h.gold+=gg;if(h.you&&!S.headless)S.fx.push({k:'txt',x:m.x+20,y:m.y,z:70,text:'+'+gg+' gold',t:0,life:1.2,col:'#ffd27a'})}if(perk(h,'blood'))h.hp=Math.min(h.max,h.hp+8*perk(h,'blood'));
@@ -2120,7 +2123,7 @@ const chargeK=t=>clamp((t-CB.CHARGE_MIN)/(CB.CHARGE_FULL-CB.CHARGE_MIN),0,1);
 function chargeCancel(){if(S&&S.you)S.you.charge=null}
 function heavyStrike(h,k){if(h.cd>0)return false;const at=attackTarget(h);h.swing=.2;if(!at){sayTo(h,'Nothing in reach');return false}h.cd=.5;cstat('heavy');
   const d=Math.round(h.atk*2.5);if(at.town!=null){strikeHuman(h,at,d,k);return true}
-  const m=at;m.hp-=d;m.hitT=S.t;if(k>=1&&m.wind){m.wind=null;m.rec=.6;m.cd=Math.max(m.cd,.6)}onBlow(h,m,d,k);
+  const m=at;m.hp-=d;m.hitT=S.t;if(m.hp>0)warlordPhase(m);if(k>=1&&m.wind){m.wind=null;m.rec=.6;m.cd=Math.max(m.cd,.6)}onBlow(h,m,d,k);
   if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?95:55,text:'-'+d+(k>=1?'!':''),t:0,life:1,col:k>=1?'#ffb347':'#ffd890'});if(k>=1)S.fx.push({k:'ring',x:m.x,y:m.y,r:m.r+26,t:0,life:.35,col:'#ffcf6a'})}
   sfx(k>=1?'heavy':'hit',h.you||nearPlayer(m));if(m.hp<=0){if(k>=1)h.heavyKills=(h.heavyKills||0)+1;killMonster(m,h)}return true}
 // a blow that lands: knockback by its strength (a troll is heavier), a short hit-stop and a small shake for the player

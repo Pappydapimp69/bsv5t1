@@ -120,6 +120,11 @@ const {chromium} = require('playwright');
       const arm = {id: 999, kind: 'wolf', x: af.x + 300, y: af.y, hx: 0, hy: 0, hp: 200, max: 200, atk: 1, gold: 0, xp: 0, r: 13, cd: 9, affix: 'armoured'}; Af.monsters = [arm];
       hitBeast(af, arm, 20); out.armoured = arm.hp === 190;
       af.lvl = 4; out.spear = useSkill(af, 'spear') && arm.hp < 190 && arm.rec >= .9;
+      // a hound follows and bites what you fight
+      const Hd = __col.newGame('human', 22), hd = Hd.you; Hd.monsters = []; hd.hound = {};
+      const prey = {id: 998, kind: 'wolf', x: hd.x + 120, y: hd.y, hx: hd.x + 120, hy: hd.y, hp: 300, max: 300, atk: 1, gold: 0, xp: 0, r: 13, cd: 9}; Hd.monsters.push(prey);
+      for (let i = 0; i < 120; i++) { prey.x = hd.x + 120; prey.y = hd.y; prey.cd = 9; stepHound(hd, C.DT); }
+      out.hound = prey.hp < 300 && Math.hypot(hd.hound.x - prey.x, hd.hound.y - prey.y) < 60;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

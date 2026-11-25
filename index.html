@@ -1097,7 +1097,7 @@ function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
   if(!perk(h,'rider')&&!charm(h,'bell')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
 function horseGrow(h,d){const H=h.horse;if(!H||(H.lv||1)>=3)return;H.ride=(H.ride||0)+d;if(H.ride>=6000*(H.lv||1)){H.ride=0;H.lv=(H.lv||1)+1;H.max+=20;H.hp=H.max;if(h.you){toast('Your horse grows stronger: level '+H.lv+' (faster, tougher).');sfx('coin')}}}
-function stepHorse(h,dt){if(!h.horse)return;if(h.riding&&!S.headless&&(h.you||nearPlayer(h))){const w=Math.hypot(h.x-(h.px??h.x),h.y-(h.py??h.y));h.px=h.x;h.py=h.y;if(w>.5){h.hoofT=(h.hoofT||0)+dt;if(h.hoofT>.22){h.hoofT=0;if(h.you)sfx('hoof',true);S.fx.push({k:'dust',x:h.x-Math.cos(h.face||0)*26,y:h.y-Math.sin(h.face||0)*26,t:0,life:.9})}}}if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
+function stepHorse(h,dt){if(h.hound)stepHound(h,dt);if(!h.horse)return;if(h.riding&&!S.headless&&(h.you||nearPlayer(h))){const w=Math.hypot(h.x-(h.px??h.x),h.y-(h.py??h.y));h.px=h.x;h.py=h.y;if(w>.5){h.hoofT=(h.hoofT||0)+dt;if(h.hoofT>.22){h.hoofT=0;if(h.you)sfx('hoof',true);S.fx.push({k:'dust',x:h.x-Math.cos(h.face||0)*26,y:h.y-Math.sin(h.face||0)*26,t:0,life:.9})}}}if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
 function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
@@ -1784,7 +1784,7 @@ function openMerchant(h,p){const it=(label,cost,sub,fn,why)=>({label:label+' \u2
     it('Tome of insight',150,'One more talent pick',()=>{h.picks=(h.picks||0)+1;toast('A talent to choose (T).')}),
     it('Elixir of strength',120,'+3 damage for good',()=>{h.atk+=3}),
     it('Swift mare',55,'A horse at a discount',()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. R to ride.')},h.horse?'You have a horse':null),
-    it('Greater potion',30,'Restores 140 health',()=>{h.bigPotions++}),it('A charm, sight unseen',100,'One of the charms you do not have',()=>{giveCharm(h)}),{label:'Leave',act:closeMenu}],back:closeMenu})}
+    it('Greater potion',30,'Restores 140 health',()=>{h.bigPotions++}),it('A hunting hound',160,'Follows you and fights beside you',()=>{h.hound={};toast('A hound is yours.')},h.hound?'You have a hound':null),it('A charm, sight unseen',100,'One of the charms you do not have',()=>{giveCharm(h)}),{label:'Leave',act:closeMenu}],back:closeMenu})}
 function stepPois(dt){layPois();
   for(const p of S.pois){if(p.k==='camp'&&!p.alive&&S.t>=p.ready&&!campBeasts(p).length&&Math.hypot((S.you||S.g).x-p.x,(S.you||S.g).y-p.y)>1500)spawnCamp(p)}
   // travellers: one or two lost at a time; a helped one follows its hero and is paid for at any town of theirs
@@ -1810,6 +1810,17 @@ function stepCritters(dt){if(!S.critters){const R=mulberry32((S.seed^0xDEE7)>>>0
     if(near){const d=nd||1,sp=(near.riding?250:200)*(c.golden?1.25:1)*WS*dt;fx=(c.x-near.x)/d*sp;fy=(c.y-near.y)/d*sp;c.scared=1}
     else{c.scared=0;const dx=c.hx-c.x,dy=c.hy-c.y,d=Math.hypot(dx,dy);if(d>160){fx=dx/d*30*dt;fy=dy/d*30*dt}else if(Math.sin(S.t*.3+c.x)>.6){fx=Math.cos(c.fa)*18*dt;fy=Math.sin(c.fa)*18*dt}else if(rnd()<.004)c.fa=rnd()*6.28}
     if(fx||fy){const nx=clamp(c.x+fx,200,C.MAP-200),ny=clamp(c.y+fy,200,C.MAP-200);if(!inSolid(nx,ny,20)){c.x=nx;c.y=ny;c.fa=Math.atan2(fy,fx)}else c.fa+=1.5}}}
+// a hound: a companion bought at a stable or from the merchant. It trots at your heel, runs down the beast you fight
+// (or the nearest one that comes at you), bites for 6 + 1 per level of yours, and lies down to lick its wounds if hurt
+// badly (it cannot die). Rival heroes don't keep hounds.
+function stepHound(h,dt){const d=h.hound;if(!d)return;if(d.x==null){d.x=h.x+30;d.y=h.y;d.cd=0;d.hp=d.max=80}if(h.dead||h.mode!=='ground'){d.tgt=null;return}
+  if(d.rest>0){d.rest-=dt;d.hp=Math.min(d.max,d.hp+12*dt);return}
+  let tg=d.tgt&&S.monsters.includes(d.tgt)&&Math.hypot(d.tgt.x-h.x,d.tgt.y-h.y)<420?d.tgt:null;
+  if(!tg)tg=S.monsters.filter(m=>(m.eng===h.id&&S.t-(m.engT||-9)<1)||Math.hypot(m.x-h.x,m.y-h.y)<180).sort((a,b)=>Math.hypot(a.x-d.x,a.y-d.y)-Math.hypot(b.x-d.x,b.y-d.y))[0]||null;d.tgt=tg;
+  const gx=tg?tg.x:h.x-Math.cos(h.face||0)*50,gy=tg?tg.y:h.y-Math.sin(h.face||0)*50,dd=Math.hypot(gx-d.x,gy-d.y),sp=(h.riding?C.H_SPEED*C.RIDE:C.H_SPEED)*1.25;
+  if(dd>(tg?tg.r+16:30)){const st=steerSolid(d,gx,gy,12);d.x+=st.x*Math.min(sp*dt,dd);d.y+=st.y*Math.min(sp*dt,dd);d.fa=Math.atan2(st.y,st.x)}
+  else if(tg){d.cd-=dt;if(d.cd<=0){d.cd=.8;hitBeast(h,tg,6+h.lvl);if(tg.cd!=null&&!tg.wind&&rnd()<.25){d.hp-=tg.atk;if(d.hp<=20){d.rest=12;d.tgt=null;if(h.you)toast('Your hound is hurt and lies down to rest.')}}}}
+  if(dd>1500){d.x=h.x+30;d.y=h.y}}
 function buffOf(h,k){return h.buff&&h.buff.k===k&&h.buff.until>S.t}
 function cacheNear(h){let best=null,d=160;for(const c of S.caches){const next=dist(h,c);if(next<d){best=c;d=next}}return best}
 // ruins in the old giants hold old things: gold, crystals and sometimes a kit; they fill again after a while
@@ -1864,7 +1875,7 @@ function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).
   const bf=h.buff&&h.buff.until>S.t?SHRINES[h.buff.k].n.replace('Shrine of ','Blessing of ')+' ('+Math.ceil(h.buff.until-S.t)+' s)':'none';
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i];
   openMenu({title:'Your hero \u00b7 level '+h.lvl,body:`<p><b>Health</b> ${Math.ceil(h.hp)}/${h.max} \u00b7 <b>Damage</b> ${h.atk} \u00b7 <b>Armour</b> ${h.def||0} \u00b7 <b>XP</b> ${h.xp}/${h.lvl*50}</p>
-    <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?'level '+(h.horse.lv||1)+', '+Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}.</p>
+    <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?'level '+(h.horse.lv||1)+', '+Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}. <b>Hound</b> ${h.hound?(h.hound.rest>0?'resting':'at your heel'):'none (a stable or the merchant)'}.</p>
     <p class="dim"><b>Charms</b> (${(h.charms||[]).length}/${charmSlots(h)} worn)<br>${(h.charms||[]).map(k=>'<b>'+CHARMS[k].n+'</b> '+CHARMS[k].t.toLowerCase()).join('<br>')||'None: alphas, camp chests and the merchant have them'}</p>
     <p class="dim"><b>Talents</b><br>${tal}</p><p class="dim"><b>Skills</b><br>${sk}</p>
     <p class="dim"><b>Job</b> ${h.quest?h.quest.text+' '+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need:'none (the board in town)'}. <b>Tale</b> ${h.saga?h.saga.done?'told':g.text.replace(/^The elders\u2019 tale: /,''):'offered after two jobs'}. <b>Stones read</b> ${Object.keys(h.lore||{}).length}/${LORE.length}.</p>`,
@@ -2598,6 +2609,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
     const gearItem=k=>{const it=nextGear(h,k);if(!it)return{label:GEAR[k][GEAR[k].length-1].n,why:'The best there is',act:()=>{}};return{label:it.n+' \u2013 '+it.g+' gold',sub:{blade:'Hits '+it.v+' harder',armour:'Takes '+it.v+' off every blow',pack:'Carry '+it.v+' more',gloves:'25 more grip'}[k],why:lv(t)<it.t?'Raise '+t.name+' to level '+it.t+' to sell this':h.gold<it.g?'Need '+(it.g-h.gold)+' more gold':null,act:()=>{buyGear(h,k);sfx('coin');openTown(t)}}};
     const tr=h.trained||0,trc=200*(tr+1);
     items=[{label:'Train with the master-at-arms \u2013 '+trc+' gold',sub:'A talent to choose (price doubles each time)',why:h.gold<trc?'Need '+(trc-h.gold)+' more gold':lv(t)<2?'Raise '+t.name+' to level 2':null,act:()=>{h.gold-=trc;h.trained=tr+1;h.picks=(h.picks||0)+1;sfx('coin');toast('Trained: a talent to choose (T).');openTown(t)}},
+      ...(!h.hound&&civicIn(t,'stable')&&t.i===h.town?[{label:'A hound \u2013 120 gold',sub:'Follows you and fights beside you',why:h.gold<120?'Need '+(120-h.gold)+' more gold':null,act:()=>{h.gold-=120;h.hound={};sfx('coin');toast('A hound is yours. It follows you and bites what you fight.');openTown(t)}}]:[]),
       ...(h.horse&&!h.horse.barded?[{label:'Horse barding \u2013 150 gold',sub:'+60 horse health; it never bolts',why:h.gold<150?'Need '+(150-h.gold)+' more gold':null,act:()=>{h.gold-=150;h.horse.barded=1;h.horse.max+=60;h.horse.hp=h.horse.max;sfx('coin');openTown(t)}}]:[]),
       h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',civicIn(t,'stable')&&t.i===h.town?45:C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
       buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3,'Catches your people when they fall'),buy('Ladder kit',C.COST.ladder,()=>h.kits.ladder++,'Firm holds below a spot on the giant'),buy('Platform kit',C.COST.platform,()=>h.kits.platform++,'A resting place on the giant'),buy('Potion',C.COST.potion,()=>h.potions++,'Restores 60 health'),
@@ -2798,6 +2810,9 @@ function g3Update(){const g=S.g,t=S.t;
     put(G3.wolfB,wi,h.x,h.y,z+30,50,20,17,-a);put(G3.wolfH,wi,h.x+ca*30,h.y+sa*30,z+46,18,13,10,-a);G3.wolfB.setColorAt(wi,_c.set(hc));G3.wolfH.setColorAt(wi,_c.set('#4a3322'));wi++;
     for(const[f,sd,ph]of[[17,1,1],[17,-1,-1],[-17,1,-1],[-17,-1,1]])L(h.x+ca*f+px*sd*6,h.y+sa*f+py*sd*6,z+24,24,4.5,a,sw*ph,0,'#4a3322');
     L(h.x+ca*22,h.y+sa*22,z+36,14,7,a,-2.4,0,hc);L(h.x-ca*25,h.y-sa*25,z+36,18,3,a,-2.5,Math.sin(t*6+h.id)*.4,'#2e2018')}
+  for(const o of S.humans){const d=o.hound;if(!d||d.x==null||wi>=158||o.dead||o.mode!=='ground')continue;const z=groundH(d.x,d.y),a=d.fa||0,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca,w=stride(d,d.x,d.y,7),sw=Math.sin(w.ph)*.75*w.sp,bz=z+12+(d.rest>0?-6:0);
+    put(G3.wolfB,wi,d.x,d.y,bz,28,12,11,-a);put(G3.wolfH,wi,d.x+ca*16,d.y+sa*16,bz+6,11,9,9,-a);G3.wolfB.setColorAt(wi,_c.set('#a0703c'));G3.wolfH.setColorAt(wi,_c.set('#8a5a2c'));wi++;
+    for(const[f,sd,ph]of[[9,1,1],[9,-1,-1],[-9,1,-1],[-9,-1,1]])L(d.x+ca*f+px*sd*4,d.y+sa*f+py*sd*4,bz-4,10,3,a,d.rest>0?1.4:sw*ph,0,'#7a4e28');L(d.x+ca*12,d.y+sa*12,bz+4,3,7,a,0,0,TOWNS[o.town].col)}
   for(const c of S.critters||[]){if(c.dead||wi>=158||Math.hypot(c.x-S.cam.x,c.y-S.cam.y)>6000)continue;const z=groundH(c.x,c.y),a=c.fa||0,ca=Math.cos(a),sa=Math.sin(a),px=-sa,py=ca,w=stride(c,c.x,c.y,8),sw=Math.sin(w.ph)*.8*w.sp;
     put(G3.wolfB,wi,c.x,c.y,z+26,30,13,11,-a);put(G3.wolfH,wi,c.x+ca*19,c.y+sa*19,z+36,10,10,8,-a);G3.wolfB.setColorAt(wi,_c.set(c.golden?'#ffd24a':'#b0804e'));G3.wolfH.setColorAt(wi,_c.set(c.golden?'#f0b830':'#9a6c40'));wi++;
     for(const[f,sd,ph]of[[10,1,1],[10,-1,-1],[-10,1,-1],[-10,-1,1]])L(c.x+ca*f+px*sd*4,c.y+sa*f+py*sd*4,z+22,22,2.5,a,sw*ph,0,'#7a5634');

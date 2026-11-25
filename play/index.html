@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.164 · fd047ec · 2026-11-25 07:49 UTC</div>
+  <div id="ver">v1.165 · 0416e24 · 2026-11-25 07:51 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1602,9 +1602,9 @@ function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();st
       if(e.site&&d<to.r){S.events.splice(k,1);if(S.outposts[e.i]>=3||!factionAlive(e.i)||!outpostSiteOpen(to.x,to.y)){eventSay('The settlers from '+TOWNS[e.i].name+' find no room and turn home.');continue}
         const v=foundVillage(e.i,e.site.x,e.site.y),by=S.humans.find(o=>o.id===e.by);if(by){gainXp(by,30);if(by.you)sfx('coin')}
         (by&&by.you?announce:eventSay)('Settlers from '+TOWNS[e.i].name+' found '+v.name+'. A new villager lives there.');continue}
-      if(d<to.r){S.events.splice(k,1);for(const h of S.humans)if(h.town===e.i)h.gold+=40;eventSay('The caravan from '+TOWNS[e.i].name+' reaches '+to.name+'. Every one of its people earns 40 gold.');continue}
+      if(d<to.r){S.events.splice(k,1);for(const h of S.humans)if(h.town===e.i)h.gold+=40;for(const h of S.humans)if(h.quest&&h.quest.k==='caravan'&&h.quest.car===e.t&&!h.dead&&Math.hypot(h.x-e.x,h.y-e.y)<700)questTick(h,'caravan');eventSay('The caravan from '+TOWNS[e.i].name+' reaches '+to.name+'. Every one of its people earns 40 gold.');continue}
       const near=S.monsters.find(m=>Math.hypot(m.x-e.x,m.y-e.y)<m.r+40);if(near){if(near.cd<=0){near.cd=1;e.hp-=near.atk}}else{const st=steerSolid(e,to.x,to.y,30);e.x+=st.x*55*WS*dt;e.y+=st.y*55*WS*dt;solidPush(e,30)}
-      if(e.hp<=0){S.events.splice(k,1);eventSay('The caravan from '+TOWNS[e.i].name+' is lost on the road.')}}}}
+      if(e.hp<=0){S.events.splice(k,1);eventSay('The caravan from '+TOWNS[e.i].name+' is lost on the road.');for(const h of S.humans)if(h.quest&&h.quest.k==='caravan'&&h.quest.car===e.t){h.quest=null;if(h.you)toast('Your caravan job is lost with the caravan.')}}}}}
 // a human's pack: six things at most; one crystal from the ground per trip, everything else from beasts they defeat;
 // it empties into the town's store (crystals) and market (pelts) whenever they come home
 function packCount(h){return h.pack.crystals+h.pack.pelts}
@@ -1940,7 +1940,7 @@ function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S
   {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll');if(m.elite&&!h.you&&h.hero&&S.you&&!S.headless)eventSay(whoOf(h).replace(/^./,c=>c.toUpperCase())+' slew '+m.elite+'.');if(m.champion){(h.stat=h.stat||{}).duel=(h.stat.duel||0)+1;h.title='Champion';if(h.you)announce('You beat '+m.elite+' in a duel! Folk now call you Champion.')}if(m.warlord){questTick(h,'warlord');giveCharm(h,'crown')}else if(m.elite)giveCharm(h);else if(m.kind==='troll'&&rnd()<.08)giveCharm(h);if(m.elite){questTick(h,'bounty',m.baseName||m.elite);if(h.you){announce('You slew '+m.elite+'!');shake(10)}}}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.
-const QUEST_KINDS=['slay','gather','deliver','build','search','troll','camp','bounty','escort','pray'];
+const QUEST_KINDS=['slay','gather','deliver','build','search','troll','camp','bounty','escort','pray','caravan'];
 // quests that send you out to the places in the world: clear a camp, hunt a named alpha (bounty), walk a lost traveller home,
 // pray at two shrines; each carries a map target so the goal beacon and the map ring point the way
 function liveAlphas(){return S.monsters.filter(m=>m.elite&&!m.champion&&!m.warlord)}
@@ -1955,7 +1955,8 @@ function newQuest(h,kind){const lv=h.lvl,side=S&&S.you===h&&huntOpen()&&tends(h)
   if(k==='bounty'&&liveAlphas().length){const a=liveAlphas()[Math.floor(rnd()*liveAlphas().length)];return{k,elite:a.elite,need:1,n:0,gold:90+lv*20,xp:70+lv*12,text:'Bounty: slay '+a.elite+', the alpha'}}
   if(k==='escort')return{k,need:1,n:0,gold:35+lv*10,xp:30+lv*8,text:'Walk a lost traveller to one of your towns'};
   if(k==='pray'&&(S.pois||[]).some(p=>p.k==='shrine'))return{k,need:2,n:0,gold:30+lv*10,xp:30+lv*8,text:'Pray at two shrines'};
-  if(['camp','bounty','escort','pray'].includes(k))return newQuest(h,'slay');
+  if(k==='caravan'){const car=S.events.find(e=>e.k==='caravan'&&e.i===h.town&&!e.site);if(car)return{k,car:car.t,need:1,n:0,gold:60+lv*12,xp:45+lv*10,text:'Guard '+TOWNS[h.town].name+'\u2019s caravan to the end of its road'}}
+  if(['camp','bounty','escort','pray','caravan'].includes(k))return newQuest(h,'slay');
   if(k==='troll')return{k,need:1,n:0,gold:45+lv*14,xp:45+lv*12,text:'Kill a troll at the old giants'};
   if(k==='tend')return{k,need:6,n:0,gold:50+lv*12,xp:40+lv*10,text:'Tend the giant\u2019s wounds (Tend a hurt joint, or pull a wedge)'};
   const ft=Math.min(1500,300+lv*200);return{k:'climb',need:ft/FT,n:0,gold:35+lv*14,xp:35+lv*12,text:'Climb the giant to '+ft+' ft'}}
@@ -1978,6 +1979,7 @@ function questTarget(h){if(!h)return null;const near=xs=>xs.sort((a,b)=>Math.hyp
   if(!k){const p=h.aimPoi;return p&&(S.pois.includes(p)||p.golden&&!p.dead)&&Math.hypot(p.x-h.x,p.y-h.y)>140?{x:p.x,y:p.y}:null}
   if(k==='warlord'){const w=S.monsters.find(m=>m.warlord);return w?{x:w.x,y:w.y}:null}
   if(k==='bounty'){const a=S.monsters.find(m=>m.elite&&!m.champion&&(!q||q.k!=='bounty'||(m.baseName||m.elite)===q.elite));return a?{x:a.x,y:a.y}:null}
+  if(k==='caravan'){const car=S.events.find(e=>e.k==='caravan'&&e.t===q.car);return car?{x:car.x,y:car.y}:null}
   if(k==='camp')return near((S.pois||[]).filter(p=>p.k==='camp'&&campBeasts(p).length));
   if(k==='pray')return near((S.pois||[]).filter(p=>p.k==='shrine'&&S.t>=p.ready));
   if(k==='lore')return near((S.pois||[]).filter(p=>p.k==='stones'&&!(h.lore||{})[p.lore]));

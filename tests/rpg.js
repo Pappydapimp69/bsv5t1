@@ -37,7 +37,7 @@ const {chromium} = require('playwright');
       out.cry = useSkill(y, 'cry') && y.cryT > T.t;
       // bot heroes pick talents on their own
       const B = __col.newGame('human', 6); B.autoplay = true; while (B.t < 480) __col.step(60);
-      out.botTalents = B.humans.filter(o => o.hero && o.lvl > 1).every(o => Object.keys(o.perks || {}).length === o.lvl - 1);
+      out.botTalents = B.humans.filter(o => o.hero && o.lvl > 1).every(o => Object.values(o.perks || {}).reduce((a, b) => a + b, 0) === o.lvl - 1);
       // places: laid out at the first step, each usable from its X button with its own reward
       const P = __col.newGame('human', 8), me = P.you; __col.step(2);
       const kinds = k => P.pois.filter(p => p.k === k);
@@ -70,6 +70,18 @@ const {chromium} = require('playwright');
       k.dodge = {t: .05, x: 1, y: 0}; const W = {t: 0, dur: .7, x: k.x, y: k.y, R: 46, id: k.id}; beastStrike(dummy, W, k); out.perfectDodge = k.critNext === 1 && dummy.rec >= 1.4;
       k.dodge = null; k.cd = 0; k.combo = 0; k.comboT = -9; const b0 = dummy.hp; humanAct(k, 'A'); out.critAfterPerfect = b0 - dummy.hp >= 17 && !k.critNext;
       const Bo = __col.newGame('human', 11); out.boars = Bo.monsters.some(m => m.kind === 'boar');
+      // city: civic buildings go up inside a settlement, raise prosperity, and pay off (farm harvest, market rent, smithy prices)
+      const Ci = __col.newGame('human', 12), c = Ci.you, home = Ci.towns[c.town]; Ci.monsters = []; c.gold = 2000; home.lvl = 2;
+      const p0 = prosperity(home); const spot = (dx, dy) => { c.x = home.x + dx; c.y = home.y + dy; c.job = null; };
+      spot(120, 40); build(c, 'farm'); stepJob(c, 10); spot(-120, 40); build(c, 'market'); stepJob(c, 12); spot(40, -130); build(c, 'smithy'); stepJob(c, 12);
+      out.civicBuilt = civicIn(home, 'farm') === 1 && civicIn(home, 'market') === 1 && civicIn(home, 'smithy') === 1;
+      out.prosperityUp = prosperity(home) > p0 + 25;
+      spot(-40, 140); out.oneMarket = build(c, 'market') === false;
+      c.x = home.x; c.y = home.y; out.smithyDiscount = nextGear(c, 'blade').g === Math.round(GEAR.blade[0].g * .8);
+      const cg0 = c.gold; Ci.t = RENT_INTERVAL - .01; stepBuilds(C.DT); Ci.t = RENT_INTERVAL + .01; stepBuilds(C.DT); out.farmPays = c.gold >= cg0 + 3;
+      // bot heroes build civic buildings over a match
+      const Bt = __col.newGame('human', 13); Bt.autoplay = true; while (Bt.t < 900) __col.step(60);
+      out.botCivic = Bt.builds.some(b => CIVIC[b.k] && b.owner !== Bt.you.id);
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

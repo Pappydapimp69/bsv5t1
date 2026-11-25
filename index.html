@@ -175,7 +175,7 @@ const C={
   WEDGE_DPS:4,WEDGE_MAX:3,CANNON_CD:3.5,CANNON_RANGE:1000,CANNON_TOWN:32,CANNON_HUM:20,CANNON_HP:60,
   PICKUP_R:84,UP:{town:[8,16,28],house:[3,6],tower:[5,10],cannon:[5,10],brace:[5,10],ladder:[4,8],platform:[]},RAID_AT:[4,9,15,22],STAR_EVERY:16,CARAVAN_HP:300,PACK:6,PELT_GOLD:6,GIANT_TASKS:3,WANDER:6000,ANGER:600,DUSK:1500,NIGHT:60,HORN_CRYSTALS:20,CACHE_REFILL:240,WAKE_ROW:186,WAKE_FAVOR:100,WAKE_TIME:10,CHAIN_HP:900,CHAIN_WEAK:0,G_DORMANT:4,G_PER_BRACE:12,BRACE_FAVOR:60,EXIT_R:350,HOUSE_HP:200,HOME_REACH:320,HOUSE_REACH:300,HOUSE_GROW:12,LAKE_GOLD:4,TOWER_R:380,OUTPOST_GAP:800,
   GRUDGE_FADE:240,PULL_FAVOR:40,CANNON_FAVOR:60,
-  COST:{ladder:25,platform:30,brace:50,house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
+  COST:{farm:35,market:90,smithy:80,stable:60,well:30,ladder:25,platform:30,brace:50,house:40,tower:60,outpost:120,anchor:20,wedge:30,cannon:70,potion:15,blade:60,gloves:50},
 };
 // the world's scale against the first 9000-unit map: distances between places scale by it, body-sized things do not
 const WS=C.MAP/9000;
@@ -542,7 +542,7 @@ const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2
   pack:[{n:'Larger pack',v:2,g:60,t:2},{n:'Great pack',v:2,g:120,t:3}],
   gloves:[{n:'Climbing gloves',v:1,g:50,t:1},{n:'Clawed gloves',v:1,g:110,t:2}]};
 const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0);
-function nextGear(h,k){const i=h.gear[k];return GEAR[k][i]||null}
+function nextGear(h,k){const i=h.gear[k],it=GEAR[k][i]||null;if(!it||!S.builds)return it;const t=townAt(h);return t&&t.i===h.town&&civicIn(t,'smithy')?{...it,g:Math.round(it.g*.8)}:it}
 function buyGear(h,k,payer=h){const it=nextGear(h,k);payer.gold-=it.g;h.gear[k]++;if(k==='blade')h.atk+=it.v;if(k==='armour')h.def=(h.def||0)+it.v;if(k==='gloves')h.gloves++}
 // beasts live somewhere: trolls by the ruins, wolves at their dens (both wander back there), the rest roam the open land
 const WOLF_REFILL_LIMIT=Math.ceil(C.MONSTERS*1.15);
@@ -1064,10 +1064,25 @@ function canBuild(h,k,placement=k==='barracks'?barracksPlacement(h):null){if(!h.
   if(S.builds.some(b=>Math.hypot(b.x-h.x,b.y-h.y)<45)||S.humans.some(o=>o.job&&o.job.kind==='ground'&&Math.hypot(o.job.x-h.x,o.job.y-h.y)<45))return'Too close to another building';
   if(k==='outpost')return !outpostSiteOpen(h.x,h.y)?'Too near a settlement':S.outposts[h.town]+pendingSettlers(h.town)>=3?'Your people have already founded three outposts':S.events.some(e=>e.k==='caravan'&&e.site&&Math.hypot(e.site.x-h.x,e.site.y-h.y)<C.OUTPOST_GAP)?'Settlers are already on their way near here':!firstTown(h.town)?'No town to send settlers from':null;
   if(k==='barracks')return null;
+  if(CIVIC[k])return civicWhy(h,k);
   if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t&&(t.houses||0)>=houseCap(t))return t.name+' (level '+lv(t)+') has room for '+houseCap(t)+' houses: raise it for more'}
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
 // owner's rule: a settlement holds three houses at level 1 and two more per level, and its foragers build only after a hero built the first
 const houseCap=t=>3+2*(lv(t)-1);
+// ================= the town as a place to grow (owner: more city-builder elements) =================
+// Production buildings beside houses and towers, and a prosperity score per settlement in the Fallout 4 needs-checklist
+// style (food for the houses, walls standing, a market, crafts) with Kingdom Two Crowns' plain coin payoff: prosperity
+// scales the rent you are paid, a market adds a quarter, a smithy cuts gear prices, a stable sells and heals horses,
+// a well heals people at home, farms feed two houses each and pay a little themselves.
+const CIVIC={farm:{n:'Farm',sub:'Feeds two houses; pays 3 gold every 15 s',one:false,col:'#c9b458'},market:{n:'Market',sub:'Rent here +25%; needs a level 2 settlement',one:true,lvl:2,col:'#d07a4a'},
+  smithy:{n:'Smithy',sub:'Gear 20% cheaper in this town',one:true,col:'#6b6f78'},stable:{n:'Stable',sub:'Horses for 45 gold here; heals your horse',one:true,col:'#8a6a44'},well:{n:'Well',sub:'Heals your people near it',one:false,max:2,col:'#7fb8c9'}};
+const civicIn=(t,k)=>t?S.builds.filter(b=>b.k===k&&b.hp!==0&&b.settlementId===t.id).length:0;
+function prosperity(t){if(!t)return 0;const houses=t.houses||0,farms=civicIn(t,'farm'),hungry=Math.max(0,houses-2*farms-1);
+  const parts=[['Base',20],['Houses',6*houses],['Farms',8*farms],['Market',15*civicIn(t,'market')],['Smithy',10*civicIn(t,'smithy')],['Stable',8*civicIn(t,'stable')],['Wells',5*civicIn(t,'well')],['Hungry houses',-10*hungry],['Walls down',t.hp<t.max*.5?-20:0],['Recent raid',S.t-(t.raidT??-999)<120?-10:0]];
+  const v=clamp(parts.reduce((a,p)=>a+p[1],0),0,100);t.prosp=v;t.prospParts=parts.filter(p=>p[1]);return v}
+const prospK=t=>1+Math.max(0,prosperity(t)-40)/100; // above 40, each point of prosperity adds 1% to rent
+function civicWhy(h,k){const D=CIVIC[k];if(!D)return null;const t=nearestOwn(h.town,h.x,h.y);if(!t||!inTerritory(h.town,h.x,h.y))return'Build it inside a settlement\u2019s area';
+  if(D.lvl&&lv(t)<D.lvl)return t.name+' must be level '+D.lvl;if(D.one&&civicIn(t,k))return t.name+' already has a '+D.n.toLowerCase();if(D.max&&civicIn(t,k)>=D.max)return t.name+' has '+D.max+' already';return null}
 // Mounts (owner's request: mounts to increase speed). A hero buys a horse in town and rides with R: much faster on open ground
 // (the walk took 90% of a match in the pacing review), a charging blow while riding, and a hard hit can throw you. The horse
 // is hurt by blows taken while riding; worn out it bolts home and comes back in a minute. No riding on the giant or while building.
@@ -1079,7 +1094,7 @@ function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
   if(!perk(h,'rider')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
-function stepHorse(h,dt){if(!h.horse)return;if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
+function stepHorse(h,dt){if(!h.horse)return;if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
 function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
@@ -1087,11 +1102,11 @@ function withinLimits(t,x,y){return Math.hypot(t.x-x,t.y-y)<=ringR(t)}
 const HOUSE_RECOVERY=2,HOUSE_RENT=2,RENT_INTERVAL=15;
 function houseRange(b){return C.HOUSE_REACH+120*(lv(b)-1)}
 function recoverNearHouse(h,dt){if(h.mode!=='ground'||h.hp>=h.max||S.t-(h.hurtAt??-Infinity)<5||!(isForager(h)||h.sol))return;
-  if(S.builds.some(b=>b.k==='house'&&b.town===h.town&&b.hp!==0&&distSq(h,b)<=houseRange(b)**2))h.hp=Math.min(h.max,h.hp+HOUSE_RECOVERY*dt)}
+  if(S.builds.some(b=>b.k==='house'&&b.town===h.town&&b.hp!==0&&distSq(h,b)<=houseRange(b)**2))h.hp=Math.min(h.max,h.hp+HOUSE_RECOVERY*dt);if(S.builds.some(b=>b.k==='well'&&b.town===h.town&&b.hp!==0&&Math.hypot(b.x-h.x,b.y-h.y)<260))h.hp=Math.min(h.max,h.hp+4*dt)}
 function territory(i){const out=[];for(const t of aliveTowns())if(t.i===i)out.push({x:t.x,y:t.y,r:ringR(t)});for(const b of S.builds)if(b.town===i&&b.k==='house')out.push({x:b.x,y:b.y,r:houseRange(b)});return out}
 function inTerritory(i,x,y){return territory(i).some(c=>Math.hypot(c.x-x,c.y-y)<=c.r)}
 function lakesNear(x,y,r){return S.prints.filter(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<r).length}
-const BUILD_TIME={house:6,tower:8,outpost:15,cannon:6,brace:6,ladder:5,platform:6};
+const BUILD_TIME={farm:6,market:10,smithy:9,stable:8,well:4,house:6,tower:8,outpost:15,cannon:6,brace:6,ladder:5,platform:6};
 function startJob(h,job){h.job={...job,t:0,dur:BUILD_TIME[job.k]};h.tx=h.ty=null;if(h.cl)h.cl.path=null;sfx('build',h.you);sayTo(h,'Building a '+job.k+'... ('+h.job.dur+' s)')}
 function stepJob(h,dt){const j=h.job;j.t+=dt;if(j.t<j.dur)return;h.job=null;if(j.kind==='site')finishSite(h,j.s,j.k);else finishBuild(h,j)}
 function dropJob(h){const j=h.job;if(!j)return;h.job=null;if(j.kind==='site'&&j.s.pending===h.id)j.s.pending=null}
@@ -1116,6 +1131,7 @@ function finishBuild0(h,k){
     const from=firstTown(h.town);if(!from){h.gold+=C.COST.outpost;return false}startCaravan(from,{x:h.x,y:h.y},h);gainXp(h,10);return true}
   const b={k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0};S.builds.push(b);
   questTick(h,'build');
+  if(CIVIC[k]){const t=nearestOwn(h.town,h.x,h.y);if(t)b.settlementId=t.id;gainXp(h,12);if(h.you)toast(CIVIC[k].n+' built in '+(t?t.name:'your town')+'. Prosperity '+prosperity(t)+'.');return true}
   let housed=false;
   if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){if(h.hero)t.heroHouse=true;b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t);
     if(housed&&!h.you&&S.you?.town===t.i)toast(t.name+' gained a forager from a new house.')}}
@@ -1132,8 +1148,9 @@ function stepBuilds(dt){
     let collected=0;
     // every house of the player's town pays the player, whoever built it (the owner's rule); other towns' houses pay their builders
     for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;
-      const gold=HOUSE_RENT*lv(b);owner.gold+=gold;if(owner===S.you)collected+=gold}
-    if(collected)toast('House rent: +'+collected+' gold.');
+      const st=S.towns[b.settlementId],gold=Math.round(HOUSE_RENT*lv(b)*prospK(st)*(1+.25*civicIn(st,'market')));owner.gold+=gold;if(owner===S.you)collected+=gold}
+    for(const b of S.builds){if(b.k!=='farm'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;owner.gold+=3;if(owner===S.you)collected+=3}
+    if(collected)toast((S.builds.some(b=>b.k==='farm'&&b.town===S.you?.town)?'Rent and harvest':'House rent')+': +'+collected+' gold.');
   }
   // the giant's lakes feed whoever settles beside them
   if(Math.floor(S.t/10)!==Math.floor((S.t-dt)/10)){const towns=aliveTowns();for(const i of [0,1,2]){const own=towns.filter(t=>t.i===i);
@@ -1175,7 +1192,7 @@ function upgradeReady(){const h=S&&S.you;if(!h||h.dead||S.over||S.role!=='human'
   for(const o of out){const q=o.q;if(!q)continue;const y=q.y-14-4*pulse;ctx.save();ctx.globalAlpha=.75+.25*pulse;ctx.fillStyle='#ffd27a';ctx.strokeStyle='rgba(20,14,4,.85)';ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(q.x,y-16);ctx.lineTo(q.x+13,y);ctx.lineTo(q.x+5,y);ctx.lineTo(q.x+5,y+10);ctx.lineTo(q.x-5,y+10);ctx.lineTo(q.x-5,y);ctx.lineTo(q.x-13,y);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore();
     lbl('Ready to raise',q.x,y+24,12,'#ffd27a')}}
-function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town||q.k==='barracks')continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
+function buildNear(h){let b=null,bd=90;for(const q of S.builds){if(q.town!==h.town||(q.k!=='house'&&q.k!=='tower'))continue;const d=Math.hypot(q.x-h.x,q.y-h.y);if(d<bd){bd=d;b=q}}return b}
 // ---- barracks and soldiers: each barracks trains up to three soldiers who garrison at it, and a town
 // has as many barracks as its level. Soldiers are people like any other (they climb, carry kits and fight) but wear their town's
 // way toward the giant; the player's own soldiers instead take orders beside the barracks: defend the town, defend the giant,
@@ -1377,6 +1394,9 @@ function pickGoalFolk(h){
     const x=home.x+Math.cos(a)*d,y=home.y+Math.sin(a)*d;
     if(withinLimits(home,x,y)&&!inSolid(x,y,30))return{k:'build',what:'house',x,y};
   }
+  // a hero bot grows its town too: farms when houses go hungry, then a well, market, smithy and stable as gold allows
+  if(h.hero&&home&&!home.outpost){const hungry=(home.houses||0)>2*civicIn(home,'farm')+1,want=hungry?'farm':['well','market','smithy','stable'].find(k=>!civicIn(home,k)&&(!CIVIC[k].lvl||lv(home)>=CIVIC[k].lvl));
+    if(want&&h.gold>=C.COST[want]+30){const a=rr(0,6.28),d=home.r*.6+rr(40,160),x=home.x+Math.cos(a)*d,y=home.y+Math.sin(a)*d;if(withinLimits(home,x,y)&&!inSolid(x,y,30)&&!S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<60))return{k:'build',what:want,x,y}}}
   if(q?.k==='troll'){
     const troll=S.monsters.find(m=>m.kind==='troll'&&local(m));if(troll)return{k:'monster',id:troll.id};
   }
@@ -1517,7 +1537,7 @@ function wealth(i){let w=0;for(const t of aliveTowns())if(t.i===i)w+=3*(lv(t)-1)
 function nearestOwn(i,x,y){let b=null,bd=1e9;for(const t of aliveTowns())if(t.i===i){const d=Math.hypot(t.x-x,t.y-y);if(d<bd){bd=d;b=t}}return b}
 function eventSay(s){if(!S.headless)announce(s)}
 // a raid: beasts gather out of sight, then march on a settlement; set off by a town growing rich, or a ruin being robbed
-function startRaid(town,why,from,size,trolls){const a=rnd()*6.28,x=from?from.x:town.x+Math.cos(a)*1900,y=from?from.y:town.y+Math.sin(a)*1900,ev={k:'raid',town:town.id,i:town.i,x,y,t:S.t,go:S.t+20};
+function startRaid(town,why,from,size,trolls){town.raidT=S.t;const a=rnd()*6.28,x=from?from.x:town.x+Math.cos(a)*1900,y=from?from.y:town.y+Math.sin(a)*1900,ev={k:'raid',town:town.id,i:town.i,x,y,t:S.t,go:S.t+20};
   const n=size||(from?3:5+Math.floor(rnd()*3));for(let k=0;k<n;k++){const px=x+rr(-80,80),py=y+rr(-80,80),troll=(trolls!=null?k<trolls:(from||k===0))&&canSpawnTroll(px,py);
     S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x:px,y:py,hx:x,hy:y,hp:troll?110:36,max:troll?110:36,atk:troll?14:7,gold:troll?26:10,xp:troll?34:14,r:troll?22:13,cd:0,raid:ev})}
   S.events.push(ev);S.evc.raid++;ev.say=raidConcerns(town);if(ev.say)eventSay(why)}
@@ -2158,6 +2178,10 @@ function botGroundStrike(h,target,dt){
 function botHeroShop(h,t){
   if(t.i!==h.town)return;
   if(!h.horse&&h.gold>=C.HORSE_COST+20&&!wallsDown(t)){h.gold-=C.HORSE_COST;h.horse={hp:C.HORSE_HP,max:C.HORSE_HP}}
+  // grow the town: farms when houses go hungry, then a well, market, smithy and stable, built on a free spot near the hall
+  if(S.t>=120&&!t.outpost&&!h.job&&!h.horn&&h.crystals<C.HORN_CRYSTALS&&!wallsDown(t)){const want=(t.houses||0)>2*civicIn(t,'farm')+1?'farm':['well','market','smithy','stable','farm'].find(k=>!civicIn(t,k)&&(!CIVIC[k].lvl||lv(t)>=CIVIC[k].lvl));
+    if(want&&h.gold>=C.COST[want]+40)for(let k=0;k<12;k++){const a=rnd()*6.28,d=t.r*.5+rnd()*120,x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d,hx=h.x,hy=h.y;h.x=x;h.y=y;const why=canBuild(h,want);h.x=hx;h.y=hy;
+      if(!why&&!inSolid(x,y,30)){h.gold-=C.COST[want];startJob(h,{kind:'ground',k:want,x,y});break}}}
   if(wallsDown(t)){const repair=repairWalls(h,t);if(!repair.why){h.gold-=repair.need;t.hp=t.max}}
   if(wallsDown(t))return;
   const g=S.g;
@@ -2175,7 +2199,9 @@ function botHeroShop(h,t){
   if(!h.kits.anchor&&h.gold>=C.COST.anchor+25){h.gold-=C.COST.anchor;h.kits.anchor+=3}
   if(!h.potions&&h.gold>=C.COST.potion){h.gold-=C.COST.potion;h.potions++}
 }
-function botShop0(){}
+function botShop0(){
+
+}
 function botShop(h){const town=townAt(h);if(h.hero){if(town)botHeroShop(h,town);return}
   if(town&&wallsDown(town))return;
   if(!h.sol){botFolkShop(h);return}if(h.role==='keeper'&&braces()>=BRACES_MAX&&h.kits.brace>0){h.kits.brace=0;h.gold+=C.COST.brace}
@@ -2479,7 +2505,7 @@ function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub,placement)
   const lk=lakesNear(h.x,h.y,500),near=buildNear(h),placement=barracksPlacement(h);
   const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?' · '+HOUSE_RENT*lv(near)+' gold every '+RENT_INTERVAL+' s':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
   openMenu({title:'Build here',body:`<p class="dim">${h.gold} gold, ${h.crystals} sky crystals. ${lk?lk+' footprint lake'+(lk>1?'s':'')+' nearby: a settlement here earns gold from them.':'Settlements beside the giant\u2019s footprint lakes earn gold from them.'} The giant\u2019s feet and fists flatten whatever stands in their way.</p>`,
-    items:[...upItem,it('house','House',HOUSE_RENT+' gold every '+RENT_INTERVAL+' s. Expands territory and houses a forager.'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('barracks','Barracks',placement.town?placement.town.name+' has '+barracksOf(h.town,placement.town).length+'/'+lv(placement.town)+' barracks':'One barracks per settlement level',placement),it('outpost','Found an outpost','Build away from other settlements, then raise it into a town'),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
+    items:[...upItem,it('house','House',HOUSE_RENT+' gold every '+RENT_INTERVAL+' s. Expands territory and houses a forager.'),it('tower','Watchtower','Shoots beasts; anywhere inside your build area'),it('barracks','Barracks',placement.town?placement.town.name+' has '+barracksOf(h.town,placement.town).length+'/'+lv(placement.town)+' barracks':'One barracks per settlement level',placement),it('outpost','Found an outpost','Stake a site away from other settlements; settlers walk there from your first town'),...Object.entries(CIVIC).map(([k,D])=>it(k,D.n,D.sub)),{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}
 let townTab='Board';
 function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const fi=focusI;const tb=townTab;
   const buy=(k,cost,fn,sub)=>({label:k+' – '+cost+' gold',sub,why:h.gold<cost?'Need '+(cost-h.gold)+' more gold':null,act:()=>{h.gold-=cost;fn();sfx('coin');openTown(t);setFocus(Math.min(fi,menu.items.length-1))}});
@@ -2491,13 +2517,13 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
       :(tutJob()&&t.i===h.town?[{k:'slay',need:3,n:0,gold:42,xp:40,text:'Slay 3 beasts outside Ashville',tut:1}]:board(t)).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{if(o.tut){h.quest=o;openTown(t);return}h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
   else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
     const gearItem=k=>{const it=nextGear(h,k);if(!it)return{label:GEAR[k][GEAR[k].length-1].n,why:'The best there is',act:()=>{}};return{label:it.n+' \u2013 '+it.g+' gold',sub:{blade:'Hits '+it.v+' harder',armour:'Takes '+it.v+' off every blow',pack:'Carry '+it.v+' more',gloves:'25 more grip'}[k],why:lv(t)<it.t?'Raise '+t.name+' to level '+it.t+' to sell this':h.gold<it.g?'Need '+(it.g-h.gold)+' more gold':null,act:()=>{buyGear(h,k);sfx('coin');openTown(t)}}};
-    items=[h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
+    items=[h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',civicIn(t,'stable')&&t.i===h.town?45:C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
       buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3,'Catches your people when they fall'),buy('Ladder kit',C.COST.ladder,()=>h.kits.ladder++,'Firm holds below a spot on the giant'),buy('Platform kit',C.COST.platform,()=>h.kits.platform++,'A resting place on the giant'),buy('Potion',C.COST.potion,()=>h.potions++,'Restores 60 health'),
       ...(huntOpen()?[buy('Wedge',C.COST.wedge,()=>h.kits.wedge++,S.g.awake?'Bleeds a joint':'Bruises the sleeper (half, never crippling)'),buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++,'Fires on rival towns'),buy('Brace kit',C.COST.brace,()=>h.kits.brace++,'Lets the giant walk')]:[{label:'Giant’s kits',why:'On sale in '+Math.max(1,Math.ceil(C.HUNT_OPEN-S.t))+' s',act:()=>{}}])]}
   else if(tb==='Forge'){body=`<p class="dim">${h.crystals} sky crystals in your store.</p>`;
     items=[{label:h.horn?'You carry a wake horn':'Forge a wake horn – '+C.HORN_CRYSTALS+' crystals',sub:h.horn?'Sound it at the giant’s head':'The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant’s head.');openTown(t)}},
       {label:'Sell sky crystals – 4 gold each',sub:'You have '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}}]}
-  else{body=`<p class="dim">${t.name} ${t.outpost?'outpost':'town'}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses. ${foragersIn(t).length}/${foragerCapacity(t)} foragers housed. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p>`;
+  else{body=`<p class="dim">${t.name} ${t.outpost?'outpost':'town'}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses. ${foragersIn(t).length}/${foragerCapacity(t)} foragers housed. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p><p><b>Prosperity ${prosperity(t)}</b>${prosperity(t)>40?' \u00b7 rent +'+(prosperity(t)-40)+'%':' \u00b7 above 40 it raises rent'}${civicIn(t,'market')?' \u00b7 market +25%':''}</p><p class="dim">${(t.prospParts||[]).map(p=>p[0]+' '+(p[1]>0?'+':'')+p[1]).join(' \u00b7 ')}${Math.max(0,(t.houses||0)-2*civicIn(t,'farm')-1)?' \u2014 build farms: each feeds two houses':''}</p>`;
     items=[{label:(t.outpost?'Raise outpost to town':'Raise '+t.name)+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:t.outpost?'Becomes a level 2 town with stronger walls and a wider build area':'+600 walls and a wider build area',why:canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
       ...(t.i===h.town?[{label:'Withdraw crystals',sub:t.crystals+' in '+t.name+'’s stockpile',why:t.crystals?null:'Stockpile is empty',act:()=>{if(t.alive&&townAt(h)===t){h.crystals+=t.crystals;t.crystals=0;sfx('coin')}openTown(t)}},{label:'Build here',act:openBuild}]:[]),...repairItems(h,t)]}
   openMenu({title:t.name,body,items:[...tabs,...items,{label:t.outpost?'Leave outpost':'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
@@ -2709,6 +2735,11 @@ function g3Update(){const g=S.g,t=S.t;
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,f=j.t/j.dur;if(j.kind==='ground'){const z=groundH(j.x,j.y),hh=(j.k==='tower'?95:j.k==='outpost'?60:34)*Math.max(.08,f);B(j.x+30,j.y,z+hh/2,j.k==='outpost'?90:40,hh,j.k==='outpost'?90:32,'#9a7a4e');B(j.x+30,j.y,z+hh+4,j.k==='outpost'?100:48,4,j.k==='outpost'?100:40,'#6b5236')}else{const a=bodyWorld(j.s.c+.5,j.s.r+.5,climbing3D()?.face??o.cl?.face),z=groundH(a.x,a.y)+a.z;B(a.x,a.y,z,50*f+8,10,30,'#9a7a4e',g.ang)}}
   for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
     else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
+    else if(b.k==='farm'){for(let r=0;r<4;r++)B(b.x-36+r*24,b.y,z+5,16,10,90,r%2?'#c9b458':'#a8963e');B(b.x+60,b.y-30,z+14,26,28,22,'#9a7a4e');RF(b.x+60,b.y-30,z+34,20,16,'#7a4e38')}
+    else if(b.k==='market'){for(const[dx,c]of[[-40,'#d07a4a'],[0,'#4a8ad0'],[40,'#d0c04a']]){B(b.x+dx,b.y,z+14,28,28,24,'#9a8a72');B(b.x+dx,b.y,z+32,34,6,30,c)}B(b.x,b.y+30,z+30,6,60,6,'#6b5a44');B(b.x+10,b.y+30,z+56,22,14,3,col)}
+    else if(b.k==='smithy'){B(b.x,b.y,z+20,56,40,44,'#6b6f78');RF(b.x,b.y,z+50,40,22,'#3e3a36');B(b.x+20,b.y-10,z+62,10,30,10,'#4a4440');B(b.x-34,b.y+20,z+10,18,14,12,'#2e2a28');B(b.x-34,b.y+20,z+18,10,4,6,'#ff8a3a')}
+    else if(b.k==='stable'){B(b.x,b.y,z+18,70,36,40,'#8a6a44');RF(b.x,b.y,z+46,44,22,'#5a3f2a');for(let k=0;k<4;k++)B(b.x-45+k*30,b.y+36,z+10,4,20,4,'#6b5a44');B(b.x,b.y+36,z+16,96,4,4,'#6b5a44')}
+    else if(b.k==='well'){B(b.x,b.y,z+10,34,20,34,'#8d8f94');B(b.x,b.y,z+21,24,2,24,'#4f86a8');B(b.x-15,b.y,z+34,4,30,4,'#6b5a44');B(b.x+15,b.y,z+34,4,30,4,'#6b5a44');RF(b.x,b.y,z+54,26,14,'#7a4e38')}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
   for(const p of S.pois||[]){if(Math.hypot(p.x-S.cam.x,p.y-S.cam.y)>9000)continue;const z=groundH(p.x,p.y),rd=S.t>=p.ready;
     if(p.k==='shrine'){const c=SHRINES[p.sub].col;B(p.x,p.y,z+6,70,12,70,'#8f8a80');B(p.x-24,p.y,z+40,12,70,12,'#a39d92');B(p.x+24,p.y,z+40,12,70,12,'#a39d92');B(p.x,p.y,z+80,70,10,16,'#6b665e');B(p.x,p.y,z+48+(rd?Math.sin(t*2)*6:0),16,16,16,rd?c:'#555',t*1.5)}
@@ -2933,7 +2964,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
   for(const e of S.fx){const p=e.t/e.life;ctx.globalAlpha=1-p;if(e.k==='ring'||e.k==='mark')ringOnGround(e.x,e.y,e.k==='mark'?e.r*(1-p*.5):e.r*(.5+p*.5),e.col,3);
     if(e.k==='txt'){const q=p3(e.x,e.y,(e.z||40)+p*40);if(q){ctx.font=`800 ${(e.big?21:15)*UI*(p<.12?1.4-p*3.3:1)}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.8)';ctx.strokeText(e.text,q.x,q.y);ctx.fillStyle=e.col||'#fff';ctx.fillText(e.text,q.x,q.y)}}ctx.globalAlpha=1}
-  if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
+  if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?' \u00b7 Lv '+lv(t)+(p.d<6000?' \u00b7 prosperity '+(t.prosp??prosperity(t)):''):' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
   for(const q of S.pois||[]){const tx=poiLabel(q,S.you);if(!tx)continue;const p=p3(q.x,q.y,q.k==='herb'?30:110);if(p&&p.d<(q.k==='herb'?1600:4200))lbl(tx,p.x,p.y,11,q.k==='camp'&&campBeasts(q).length?'#ff9a8a':q.k==='shrine'?SHRINES[q.sub].col:q.k==='merchant'?'#d8b4ff':'#cfe8c8')}
   for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+' (alpha)',p.x,p.y,12,'#ff8f80')}

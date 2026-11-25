@@ -1518,6 +1518,9 @@ function pickGoalHero(h){
     }
   }
   const q=h.quest;
+  // rivals use the land's places too: a ready shrine, an unsoaked spring, herbs, or a camp chest left unguarded, within reach
+  {const P=(S.pois||[]).filter(p=>Math.hypot(p.x-h.x,p.y-h.y)<(h.riding?2600:1600)&&inForageRange(home,p)&&(p.k==='shrine'&&S.t>=p.ready&&!(h.buff&&h.buff.until>S.t)||p.k==='spring'&&!(p.used||{})[h.id]||p.k==='herb'&&S.t>=p.ready&&h.hp<h.max*.9||p.k==='camp'&&!campBeasts(p).length&&S.t>=p.ready))
+    .sort((a,b)=>dist(h,a)-dist(h,b))[0];if(P)return{k:'poi',x:P.x,y:P.y,poi:P}}
   if(q?.k==='search'||h.hp>=h.max*.8&&h.gold<60){
     const cache=S.caches.filter(c=>c.ready<=S.t).sort((a,b)=>dist(h,a)-dist(h,b))[0];
     if(cache)return{k:'cache',x:cache.x,y:cache.y,cache};
@@ -2204,6 +2207,7 @@ h.think-=dt;
   if(G.k==='crystal'&&d<C.PICKUP_R*.7)h.goal=null;
   if(G.k==='build'&&d<20){build(h,G.what);h.goal=null}
   if(G.k==='cache'&&(d<120||!h.hero||!G.cache||G.cache.ready>S.t)){if(d<120)searchCache(h,G.cache);h.goal=null}
+  if(G.k==='poi'&&(d<100||!S.pois.includes(G.poi))){if(d<100&&poiAct(h)&&!poiAct(h).why)usePoi(h,G.poi);h.goal=null}
   if(G.k==='raise'&&d<85){if(S.builds.includes(G.property))upgrade(h,G.property.k,G.property);h.goal=null}
   if(G.k==='maintain'&&(d<85||!S.builds.includes(G.property))){
     if(d<85&&S.builds.includes(G.property)){

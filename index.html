@@ -2357,6 +2357,7 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if(e.code==='KeyR'&&!e.repeat&&S.you&&!S.you.dead){toggleRide(S.you);e.preventDefault();return}
   if(e.code==='KeyT'&&!e.repeat&&S.you){openTalents();e.preventDefault();return}
   if((e.code==='KeyI'||e.code==='Tab')&&!e.repeat&&S.you){openSheet();e.preventDefault();return}
+  if(e.code==='KeyM'&&!e.repeat){BIGMAP=!BIGMAP;e.preventDefault();return}
   {const sk=SKILLS.find(k=>'Digit'+k.key===e.code);if(sk&&!e.repeat&&S.you){useSkill(S.you,sk.id);e.preventDefault();return}}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});
@@ -2434,7 +2435,7 @@ function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
   const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
   if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
   if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
-  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
+  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
@@ -3371,8 +3372,9 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   drawMinimap()}
 function labelRivalHeroes(project){for(const h of S.humans){if(!h.hero||h.you||h.dead||h.mode!=='ground')continue;
   const p=project(h.x,h.y,130);if(p&&p.d<2500)lbl(h.name,p.x,p.y,11,TOWNS[h.town].col)}}
-function drawMinimap(){if(FILM)return;drawMinimap0();const tg=goalTarget();if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
-function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UIX.top,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
+let BIGMAP=false;
+function drawMinimap(){if(FILM)return;drawMinimap0();if(BIGMAP&&S.role==='human')drawMinimap0(true);const tg=goalTarget();if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap0(big){const s=big?Math.min(W,H)*.84:Math.min(110*UI,Math.min(W,H)*.26),x0=big?(W-s)/2:8*UI,y0=big?(H-s)/2:UIX.top,k=s/C.MAP;if(big){ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(0,0,W,H)}ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
@@ -3385,7 +3387,13 @@ function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UI
   ctx.fillStyle='#e8dcc4';ctx.beginPath();ctx.arc(x0+S.g.x*k,y0+S.g.y*k,5,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.stroke();
   if(S.you&&!S.you.dead){ctx.fillStyle='#c0392b';ctx.beginPath();ctx.arc(x0+S.you.x*k,y0+S.you.y*k,3,0,7);ctx.fill()}
   // the camera's facing
-  const cx=x0+S.cam.x*k,cy=y0+S.cam.y*k;ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+view.F.x*14,cy+view.F.y*14);ctx.stroke()}
+  const cx=x0+S.cam.x*k,cy=y0+S.cam.y*k;ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+view.F.x*14,cy+view.F.y*14);ctx.stroke();
+  if(big){const L=(tx,x,y,col)=>{ctx.font=`600 ${11*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.85)';ctx.strokeText(tx,x0+x*k,y0+y*k-9*UI);ctx.fillStyle=col||'#eee';ctx.fillText(tx,x0+x*k,y0+y*k-9*UI)};
+    for(const t of S.towns)if(t.alive)L(t.name+' \u00b7 Lv '+lv(t),t.x,t.y,t.col);L('The giant',S.g.x,S.g.y,'#e8dcc4');
+    for(const p of S.pois||[]){if(p.k==='herb')continue;L(p.k==='shrine'?'Shrine ('+{might:'might',swift:'wind',ward:'stone'}[p.sub]+')':p.k==='spring'?'Hot spring':p.k==='stones'?'Stones'+(S.you&&(S.you.lore||{})[p.lore]?' \u2713':''):p.k==='camp'?p.name+(campBeasts(p).length?'':' (cleared)'):p.k==='merchant'?'Merchant':p.ambush?'Ambush!':'Traveller',p.x,p.y,p.k==='camp'&&campBeasts(p).length?'#ff9a8a':'#d8d8d8')}
+    for(const m of S.monsters)if(m.warlord)L('The Rim Warlord',m.x,m.y,'#ff5a4a');if(S.you)L('You',S.you.x,S.you.y,'#ff8f80');
+    ctx.font=`700 ${14*UI}px system-ui`;ctx.textAlign='center';ctx.fillStyle='#ffd27a';ctx.fillText('Map \u00b7 M to close',W/2,y0-8*UI);
+    const tg=goalTarget();if(tg){ctx.strokeStyle='#ffd27a';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(x0+tg.x*k,y0+tg.y*k,9+3*Math.sin(S.t*4),0,7);ctx.stroke()}}}
 // the giant player's view of its own body: who is climbing where
 function renderBodyPanel(){const y0=UIX.top,ph=Math.min(UIX.rb-y0,440*UI),px=ph/ROWS,pw=COLS*px,x0=W-pw-12*UI;S.panelRect={x:x0,y:y0,w:pw,h:ph};
   ctx.fillStyle='rgba(8,10,14,.72)';ctx.fillRect(x0-6,y0-4,pw+12,ph+8);

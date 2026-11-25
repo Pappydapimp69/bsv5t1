@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.155 · c7135f9 · 2026-11-25 07:26 UTC</div>
+  <div id="ver">v1.156 · 5e5d1c0 · 2026-11-25 07:30 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -535,7 +535,7 @@ function mkHuman(ti,you,role,t=S.towns[ti],hero=you){
   return{id:S.nextId++,town:ti,you,hero,role,homeId:role==='folk'?t.id:null,x:t.x+rr(-60,60),y:t.y+rr(-60,60),hp:100,max:100,atk:10,lvl:1,xp:0,gold:hero?40:30,
     kits:{anchor:hero?3:0,wedge:hero&&role==='warden'?1:0,cannon:0,brace:0,ladder:hero?1:0,platform:0},potions:1,gloves:0,def:0,gear:{blade:0,armour:0,pack:0,gloves:0},bigPotions:0,crystals:0,horn:0,pack:{crystals:0,pelts:0,found:0},quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
     tx:null,ty:null,goal:null,think:0,face:0,swing:0,botClimb:null,rest:false,
-    name:you?'You':role==='folk'?t.name+' forager':TOWNS[ti].name+(hero?' hero':' '+role)}}
+    name:you?'You':role==='folk'?t.name+' forager':hero?HERO_NAMES[ti]:TOWNS[ti].name+' '+role}}
 function maxGrip(h){return C.GRIP+h.gloves*25+(h.lvl-1)*5+40*perk(h,'grip')}
 // gear comes in tiers; a town sells a tier only once it has been raised to that level
 const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2},{n:'Starmetal blade',v:11,g:160,t:3},{n:'Giantbone blade',v:16,g:340,t:3},{n:'Skyforged blade',v:22,g:650,t:3}],
@@ -801,7 +801,8 @@ function riseFree(){const g=S.g;if(g.awake||g.dead)return;g.awake=true;chron('Th
   if(!S.headless){giantCall('bellow');setTimeout(()=>giantCall('moan'),2600)}}
 // the match's chronicle: the turning points, each told with its cause where the game knows it, shown at the end
 function chron(text,kind,who){if(!S)return;S.chron=S.chron||[];S.chron.push({t:S.t,text,kind,who})}
-const whoOf=h=>!h?'someone':h.you?'you':h.hero?TOWNS[h.town].name+'\u2019s hero':TOWNS[h.town].name+(h.sol?'\u2019s soldiers':'\u2019s people');
+const HERO_NAMES=['Edda of Ashville','Wren of Brindle','Kael of Corvel'];
+const whoOf=h=>!h?'someone':h.you?'you':h.hero?HERO_NAMES[h.town]:TOWNS[h.town].name+(h.sol?'\u2019s soldiers':'\u2019s people');
 function topGrudge(){let b=-1;for(let i=0;i<3;i++)if(b<0||S.grudge[i]>S.grudge[b])b=i;return S.grudge[b]>0?b:-1}
 const chainWeak=ch=>ch.hp<=ch.max*C.CHAIN_WEAK;const allWeak=()=>S.chains.every(c=>c.hp<=0||chainWeak(c));
 function giantSpeed(){if(!S.g.awake||chained('ankleL')||chained('ankleR'))return 0;const bl=Math.max(C.OWN_BRACE,S.sites.reduce((n,s)=>n+(s.build&&s.build.k==='brace'?lv(s.build):0),0));let s=Math.min(C.G_SPEED,C.G_DORMANT+bl*C.G_PER_BRACE);if(S.joints.kneeL.crip)s*=.5;if(S.joints.kneeR.crip)s*=.5;return s}
@@ -1848,9 +1849,9 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
   if(S.t<c.ready){sayTo(h,'Someone has searched here lately. Come back in '+Math.ceil(c.ready-S.t)+' s.');return false}
   c.ready=S.t+C.CACHE_REFILL;if(rnd()<.5){const t=nearestOwn(h.town,c.x,c.y);if(t)startRaid(t,'Beasts stir in the robbed ruin and march on '+t.name+'!',c)}const gold=50+Math.floor(rnd()*70),cr=2+Math.floor(rnd()*4),kits=['anchor','wedge','brace','cannon'],k=kits[Math.floor(rnd()*4)];
   h.gold+=gold;packAdd(h,'crystals',cr);h.kits[k]+=k==='anchor'?3:1;gainXp(h,25);questTick(h,'search');sfx('coin',h.you);
-  sayTo(h,'In the old giant\u2019s ribs: '+gold+' gold, '+cr+' sky crystals and a '+k+' kit.');return true}
+  sayTo(h,'In the old giant\u2019s ribs: '+gold+' gold, '+cr+' sky crystals and a '+k+' kit.');if(h.you&&!h.ruinCharm&&rnd()<.25){h.ruinCharm=1;giveCharm(h)}return true}
 function gainXp(h,x){h.xp+=Math.round(x*(1+.2*charm(h,'knot')));while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;
-    if(h.hero){h.picks=(h.picks||0)+1;if(!h.you||S.autoplay)autoTalent(h)}
+    if(h.lvl===5)h.rerolls=(h.rerolls??1)+1;if(h.hero){h.picks=(h.picks||0)+1;if(!h.you||S.autoplay)autoTalent(h)}
     while(h.bag&&h.bag.length&&(h.charms||[]).length<charmSlots(h)){const id=h.bag[0];equipCharm(h,id);if(h.you)toast('A new charm slot: you wear the '+CHARMS[id].n+'.')}
     if(h.you){const sk=SKILLS.find(k=>k.lvl===h.lvl);toast('Level '+h.lvl+'! Press T to choose a talent.'+(sk?' New skill: '+sk.name+' ('+sk.key+').':''));sfx('fanfare');S.lvlFx=S.t;S.fx.push({k:'lvl',x:h.x,y:h.y,z:0,t:0,life:1.6});S.fx.push({k:'ring',x:h.x,y:h.y,r:160,t:0,life:.9,col:'#ffd27a'})}}}
 // Talents and skills (owner's request: skills and RPG elements). Each level a hero picks one talent of three, Hades and
@@ -1905,7 +1906,7 @@ function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).
 function openTalents(){const h=S&&S.you;if(!h)return;if(!(h.picks>0)){toast('No talent to choose yet: level up first.');return}
   h.offer=h.offer&&h.offer.length?h.offer:talentChoices(h);const owned=TALENTS.filter(t=>perk(h,t.id)).map(t=>t.name+(perk(h,t.id)>1?' x'+perk(h,t.id):'')).join(', ');
   openMenu({title:'Choose a talent'+(h.picks>1?' ('+h.picks+' to choose)':''),body:'<p class="dim">Level '+h.lvl+'. '+(owned?'Yours: '+owned+'.':'Pick one; you get another every level.')+'</p>',
-    items:h.offer.map(t=>({label:t.name+(perk(h,t.id)?' ('+(perk(h,t.id)+1)+')':''),sub:t.text,act:()=>{takeTalent(h,t);if(h.picks>0)openTalents();else closeMenu()}})),back:()=>closeMenu()})}
+    items:[...h.offer.map(t=>({label:t.name+(perk(h,t.id)?' ('+(perk(h,t.id)+1)+')':''),sub:t.text,act:()=>{takeTalent(h,t);if(h.picks>0)openTalents();else closeMenu()}})),{label:'Reroll the three'+(h.rerolls==null?' (1 left)':' ('+h.rerolls+' left)'),sub:'One reroll a match, another at level 5',why:(h.rerolls??1)<=0?'No rerolls left':null,act:()=>{h.rerolls=(h.rerolls??1)-1;h.offer=talentChoices(h);openTalents()}}],back:()=>closeMenu()})}
 const SKILLS=[
   {id:'cry',key:'1',name:'War cry',lvl:2,cd:20,text:'Staggers and hurts beasts around you; you and nearby friends hit 30% harder for 8 s'},
   {id:'whirl',key:'2',name:'Whirlwind',lvl:3,cd:9,text:'A spinning blow at every beast in reach'},
@@ -2539,7 +2540,7 @@ function menuKey(code){if(!menu)return;const bs=[...card.querySelectorAll('.mb')
   bs.forEach((b,i)=>{if(i===focusI)return;const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,dx=x-cx,dy=y-cy;const along=dx*d[0]+dy*d[1];if(along<=4)return;const off=Math.abs(dx*d[1])+Math.abs(dy*d[0]);const s=along+off*2.5;if(s<bd){bd=s;best=i}});
   if(best>=0)setFocus(best)}
 function heroTable(){if(!S||S.role!=='human')return'';const hs=S.humans.filter(h=>h.hero).sort((a,b)=>b.lvl-a.lvl||b.xp-a.xp);
-  return'<p><b>The heroes</b><br>'+hs.map((h,i)=>(i+1)+'. '+(h.you?'<b>You</b>':TOWNS[h.town].name+'\u2019s hero')+(h.title?' the '+h.title:'')+': level '+h.lvl+', '+(n=>n+' charm'+(n===1?'':'s'))((h.charms||[]).length+(h.bag||[]).length)+', '+(n=>n+' camp'+(n===1?'':'s'))(h.campsBroken||0)+(h.horse?', mounted':'')).join('<br>')+'</p>'}
+  return'<p><b>The heroes</b><br>'+hs.map((h,i)=>(i+1)+'. '+(h.you?'<b>You</b>':HERO_NAMES[h.town])+(h.title?' the '+h.title:'')+': level '+h.lvl+', '+(n=>n+' charm'+(n===1?'':'s'))((h.charms||[]).length+(h.bag||[]).length)+', '+(n=>n+' camp'+(n===1?'':'s'))(h.campsBroken||0)+(h.horse?', mounted':'')).join('<br>')+'</p>'}
 function record(){const R=save.rec;return`<p class="dim">As the giant: ${save.giantWins} won, ${save.giantLosses} lost. As a human: ${save.humanWins} won, ${save.humanLosses} lost.`+(R?` Wins for Ashville ${R.town[0]}, Brindle ${R.town[1]}, Corvel ${R.town[2]}. Highest climb ${R.climb} ft. Most giant tasks in a match ${R.tasks} of 5.`:'')+`</p>`}
 function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
   items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant. Hard: the giant turns on hunters, so lead your town or bring the giant down',act:()=>start('human',null,false,2)},

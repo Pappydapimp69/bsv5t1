@@ -468,9 +468,9 @@ function groan(vol){if(se&&se!=='starting'){if(!save.sound)return;const r=Math.r
 function tone(f,dur,type,vol,slide){if(!actx||!save.sound)return;const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(20,slide),t+dur);g.gain.setValueAtTime(vol||.2,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);o.connect(g).connect(master||actx.destination);o.start(t);o.stop(t+dur+.02)}
 function sfx(k,near){if(near===false||sndBudget>6)return;sndBudget++;
   if(se&&se!=='starting'){if(!save.sound)return;const u=seSrc.ui,b=seSrc.boom;
-    ({step:()=>b.sfx('explosion',{midi:21,duration:.9,velocity:.7}),stomp:()=>b.sfx('explosion',{midi:24,velocity:.95}),smash:()=>b.sfx('explosion',{midi:28,velocity:1}),
-      hit:()=>u.sfx('hit'),coin:()=>u.sfx('coin'),cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))();return}
-  ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),
+    try{({step:()=>b.sfx('explosion',{midi:21,duration:.9,velocity:.7}),stomp:()=>b.sfx('explosion',{midi:24,velocity:.95}),smash:()=>b.sfx('explosion',{midi:28,velocity:1}),
+      hit:()=>u.sfx('hit'),hurt:()=>{b.sfx('crunch',{velocity:.7});u.sfx('hit',{midi:43})},heavy:()=>{u.sfx('hit');b.sfx('explosion',{midi:40,duration:.35,velocity:.55})},kill:()=>{u.sfx('hit',{midi:50});b.sfx('crunch',{velocity:.45})},thud:()=>b.sfx('crunch',{velocity:.5}),coin:()=>u.sfx('coin'),cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))()}catch(e){}return}
+  ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),hurt:()=>tone(160,.18,'sawtooth',.16,70),heavy:()=>tone(200,.22,'square',.14,60),kill:()=>tone(260,.25,'triangle',.14,90),thud:()=>tone(110,.18,'triangle',.14,55),
     coin:()=>tone(880,.12,'sine',.12,1320),cannon:()=>tone(140,.25,'square',.12,60),warn:()=>tone(440,.3,'triangle',.16,300),build:()=>tone(600,.15,'triangle',.15,900),
     fall:()=>tone(500,.6,'sine',.12,120),grip:()=>tone(240,.12,'square',.06,200)}[k]||(()=>{}))()}
 
@@ -865,11 +865,11 @@ function hurtArea(x,y,r,dmg,tdmg,why){
   for(const h of S.humans)if(h.mode==='ground'&&!h.dead&&Math.hypot(h.x-x,h.y-y)<r+10)hurtHuman(h,dmg,why);
   for(const m of S.monsters)if(Math.hypot(m.x-x,m.y-y)<r+m.r)m.hp-=dmg;
   for(const t of S.towns)if(t.alive&&Math.hypot(t.x-x,t.y-y)<r+t.r)hurtTown(t,tdmg,why)}
-function hurtTown(t,d,why){if(!t.alive)return;t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;t.fellBy=why||null;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
+function hurtTown(t,d,why){if(!t.alive)return;if(!S.headless&&S.t-(t.sndT||0)>.6&&nearPlayer(t)){t.sndT=S.t;sfx('thud',true)}t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;t.fellBy=why||null;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
-function hurtHuman(h,d,why,by){if(h.dead)return;if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
+function hurtHuman(h,d,why,by){if(h.dead)return;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));h.hp-=d;h.hurtAt=S.t;h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
 function killHuman(h,why){leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=null;h.gold=Math.floor(h.gold*.75);
@@ -1188,7 +1188,7 @@ function trainSoldier(b){const ti=b.town,j=b.sol.length,h=mkHuman(ti,false,TOWNS
   S.humans.push(h);b.sol.push(h.id);S.fx.push({k:'ring',x:b.x,y:b.y,r:60,t:0,life:.6,col:TOWNS[ti].col});if(S.you&&ti===S.you.town&&S.role==='human')toast('A soldier has finished training at your barracks.')}
 // hit points: every house, tower and barracks has some, kept where it is first hurt; a fallen one takes its gifts with it
 function buildMax(b){return Math.round(ARMY.HP[b.k]*(1+.25*(lv(b)-1)))}
-function damageBuild(b,d,by){if(b.hp==null){b.max=buildMax(b);b.hp=b.max}if(b.hp<=0)return;b.hp-=d;b.hitT=S.t;if(by)S.feud[b.town][by.town]+=d;
+function damageBuild(b,d,by){if(b.hp==null){b.max=buildMax(b);b.hp=b.max}if(b.hp<=0)return;if(!S.headless&&S.t-(b.sndT||0)>.6&&nearPlayer(b)){b.sndT=S.t;sfx('thud',true)}b.hp-=d;b.hitT=S.t;if(by)S.feud[b.town][by.town]+=d;
   S.fx.push({k:'ring',x:b.x,y:b.y,r:34,t:0,life:.25,col:'#ff9a80'});
   if(b.hp<=0){b.hp=0;if(S.you&&S.role==='human'&&b.town===S.you.town)announce('Your '+b.k+' has been destroyed!')}}
 function destroyBuild(b,kept){if(!kept)S.builds=S.builds.filter(x=>x!==b);S.fx.push({k:'ring',x:b.x,y:b.y,r:80,t:0,life:.6,col:'#c9b48a'});
@@ -1537,10 +1537,6 @@ const FIRST_DAY=[
    setup(h){const t=S.towns[h.town];if(!S.crystals.some(c=>c.tut)){let a=rnd()*6.28;for(let k=0;k<12&&inSolid(t.x+Math.cos(a)*520,t.y+Math.sin(a)*520,60);k++)a+=.5;S.crystals.push({id:S.nextId++,x:t.x+Math.cos(a)*520,y:t.y+Math.sin(a)*520,tut:1})}S.tut.base=h.pack.crystals+h.crystals}, // the player's own crystal: bots leave it
    target(h){const t=S.towns[h.town];const own=S.crystals.find(c=>c.tut);if(own)return own;let b=null,bd=1e9;for(const c of S.crystals){const d=Math.hypot(c.x-h.x,c.y-h.y)+.5*Math.hypot(c.x-t.x,c.y-t.y);if(d<bd){bd=d;b=c}}return b},
    check(h){return h.pack.crystals+h.crystals>S.tut.base}},
-  {id:'chain',name:'Strike the ankle chain',text:'The giant is why the towns are here. Follow the road to its feet and press Attack beside an ankle chain: every blow wears it toward breaking.',
-   setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
-  {id:'climb',name:'Climb the giant',text:'Now climb it: beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
-  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip; if nothing is in reach, lunge. Then head home with your crystal.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}},
   {id:'home',name:'Bank it in Ashville',text:'Walk home into Ashville. Your pack’s crystals go into your own store.',target(h){return S.towns[h.town]},check(h){return h.crystals>=1&&!h.pack.crystals}},
   {id:'board',name:'Take the job',text:'In Ashville, press Town and take the job on the Board.',setup(h){if(h.quest&&!h.quest.tut)h.quest=null},target(h){return S.towns[h.town]},check(h){return!!(h.quest&&h.quest.tut)}},
   {id:'strike',name:'Strike down a wolf',text:'Walk up to a wolf and press Attack. It hits the weakest beast in reach.',
@@ -1564,7 +1560,11 @@ const FIRST_DAY=[
   {id:'attack',name:'Order an attack',text:'Beside your barracks, press Barracks and choose Attack Brindle or Attack Corvel. Your soldiers march there to fight defenders and damage buildings and walls. Choose Stand down to stop repeat attacks.',optional:true,
    target:tutBarracks,check(h){const b=tutBarracks(h);return !b||!tutRival(h)||!trainedCount(b)||b.order?.k==='attack'}},
   {id:'order',name:'Send it to the giant',text:'At the barracks, choose Defend giant. Your soldier walks to the giant’s foot and guards it.',
-   target:tutBarracks,check(h){return tutBarracks(h)?.order?.k==='giant'}}];
+   target:tutBarracks,check(h){return tutBarracks(h)?.order?.k==='giant'}},
+  {id:'chain',name:'Strike the ankle chain',text:'Now the giant. Follow the road to its feet and press Attack beside an ankle chain: every blow wears it toward breaking.',
+   setup(h){S.tut.base=h.chainHits||0},target(h){const ch=tutChain(h);if(!ch)return null;const a=bodyWorld(ch.c+.5,ch.r+.5);return{x:a.x,y:a.y,z:a.z}},check(h){return(h.chainHits||0)>S.tut.base||!tutChain(h)}},
+  {id:'climb',name:'Climb the giant',text:'Now climb it: beside the planted foot, press Climb.',target(h){const f=S.g.feet[0];return{x:f.x,y:f.y}},check(h){return h.mode==='climb'}},
+  {id:'knee',name:'Reach the knee',text:'Climb to the knee ledge, 460 feet up. Rest on ledges to refill your grip; if nothing is in reach, lunge.',target(h){return bodyWorld(h.leg?21.5:9.5,46.5,h.cl?.face)},check(h){return h.cl&&h.cl.y>=46}}];
 function tutWolfNear(h){const t=S.towns[h.town];let b=null,bd=1e9;for(const m of S.monsters)if(m.tut){const d=Math.hypot(m.x-h.x,m.y-h.y);if(d<bd){bd=d;b=m}}return b||t}
 function tutCount(h){const q=h.quest;return q&&q.tut&&!q.done?Math.min(q.n,q.need)+'/'+q.need:''}
 function tutBarracks(h){return S.builds.find(b=>b.k==='barracks'&&b.owner===h.id&&b.town===h.town)||null}
@@ -1610,7 +1610,7 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
 function gainXp(h,x){h.xp+=x;while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;if(h.you){toast('Level '+h.lvl+'! Stronger arm, better grip.');sfx('coin')}}}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
-function killMonster(m,h){const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
+function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5);
   {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll')}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.
@@ -1766,7 +1766,7 @@ function heavyStrike(h,k){if(h.cd>0)return false;const at=attackTarget(h);h.swin
   const d=Math.round(h.atk*2.5);if(at.town!=null){strikeHuman(h,at,d,k);return true}
   const m=at;m.hp-=d;m.hitT=S.t;if(k>=1&&m.wind){m.wind=null;m.rec=.6;m.cd=Math.max(m.cd,.6)}onBlow(h,m,d,k);
   if(!S.headless&&(h.you||nearPlayer(m))){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?95:55,text:'-'+d+(k>=1?'!':''),t:0,life:1,col:k>=1?'#ffb347':'#ffd890'});if(k>=1)S.fx.push({k:'ring',x:m.x,y:m.y,r:m.r+26,t:0,life:.35,col:'#ffcf6a'})}
-  sfx(k>=1?'cannon':'hit',h.you||nearPlayer(m));if(m.hp<=0){if(k>=1)h.heavyKills=(h.heavyKills||0)+1;killMonster(m,h)}return true}
+  sfx(k>=1?'heavy':'hit',h.you||nearPlayer(m));if(m.hp<=0){if(k>=1)h.heavyKills=(h.heavyKills||0)+1;killMonster(m,h)}return true}
 // a blow that lands: knockback by its strength (a troll is heavier), a short hit-stop and a small shake for the player
 function onBlow(h,o,d,k){const dx=o.x-h.x,dy=o.y-h.y,l=Math.hypot(dx,dy)||1,pw=(18+150*k)*(o.kind==='troll'?.55:o.town!=null?.6:1);
   o.kb={x:dx/l,y:dy/l,left:pw,by:h.id,dmg:d,k,wet:o.town==null&&lakeAt(o.x,o.y)};

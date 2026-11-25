@@ -288,3 +288,7 @@ large; earlier 6-seed set at the same tuning had one giant death).
 - **Tend** (the anchor button at a hurt, unwedged joint): heals 12 per press (0.6 s apart) and earns +2 regard — the
   mirror of Strike, so a tender has a free verb on the giant. Found by the Brindle tender policy: ladder built, 30–40
   gold, no rival wedges to pull, regard 0 for 7 minutes. About 12 s of tending passes the ±40 lead threshold.
+- Robustness pass 2 (seeds 101–104, all towns + giant, latest build): no page errors or NaNs; giant to dusk 4/4 (falls
+  1–3); bot-played Ashville and Brindle humans won 3/4 each (were 1/4 before Tend — bots sent to pull a wedge that is
+  already gone now Tend instead and earn the dusk honour); bot Corvel fell 4/4 (it never leads its town).
+- Checked and left alone: beasts near the giant's feet (6–12% of the first 15 min, no foot-side bites in two seeds).

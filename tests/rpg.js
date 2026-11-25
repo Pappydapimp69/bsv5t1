@@ -50,6 +50,18 @@ const {chromium} = require('playwright');
       me.lore = {}; for (const st of kinds('stones')) { at(st); humanAct(me, 'X'); closeMenu(); }
       out.lore = Object.keys(me.lore).length === kinds('stones').length;
       me.potions = 0; me.herbs = 0; for (const hb of kinds('herb').slice(0, 3)) { at(hb); humanAct(me, 'X'); } out.herbs = me.potions === 1;
+      // quests: a bounty names a live alpha and pays on its death; the tale starts after two jobs and steps on
+      const Q = __col.newGame('human', 9), q = Q.you; __col.step(2); q.quest = null;
+      const bq = newQuest(q, 'bounty'); out.bountyNamed = bq.k === 'bounty' && liveAlphas().some(m => m.elite === bq.elite);
+      q.quest = bq; const alpha = Q.monsters.find(m => m.elite === bq.elite); out.bountyTarget = !!questTarget(q) && questTarget(q).x === alpha.x;
+      alpha.hp = 1; hitBeast(q, alpha, 5); out.bountyDone = q.quest.done;
+      q.saga = {i: 0, n: 0}; q.lore = {}; for (const st of Q.pois.filter(p => p.k === 'stones').slice(0, 2)) usePoi(q, st); closeMenu();
+      out.sagaSteps = q.saga.i === 1;
+      q.saga.i = 3; q.saga.n = 0; SAGA[3].start(q); const wl = Q.monsters.find(m => m.warlord); out.warlord = !!wl && questTarget(q).x === wl.x;
+      const g1 = q.gold; wl.hp = 1; hitBeast(q, wl, 5); out.sagaEnds = q.saga.done && q.gold >= g1 + 300;
+      // nemesis: an alpha that kills you takes a name and grows
+      const N = __col.newGame('human', 9), n = N.you; __col.step(2); const al = N.monsters.find(m => m.elite); const hp0 = al.max;
+      n.lastBeast = al; killHuman(n, 'beast'); out.nemesis = /Hero-Slayer/.test(al.elite) && al.max > hp0;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

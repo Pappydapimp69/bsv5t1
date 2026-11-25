@@ -444,6 +444,10 @@ Shipped (each published to play/ with its version number on the menu screen):
 | v1.160 | Earthshaker, an ultimate skill at level 7 |
 | v1.161 | What's new and How to play updated |
 | v1.162 | The merchant and travellers talk; the merchant parks on dry ground |
+| v1.164 | Goal progress on the XP line; deeds on the hero sheet |
+| v1.165 | Caravan guard job |
+| v1.166 | A 'You fell' message naming what felled you |
+| v1.167 | Travel between your own settlements from the Hall (15 gold) |
 
 ## Independent review (v1.147)
 
@@ -481,7 +485,7 @@ rules changed behaviour (outposts now need settlers; raising a town sends a trad
 
 ## Final state of this run
 
-- Tests: tests/rpg.js 84 checks; giant 42, sleeper 26, heroes, barracks (soldier supply and tutorial checks), and land
+- Tests: tests/rpg.js 87 checks; giant 42, sleeper 26, heroes, barracks (soldier supply and tutorial checks), and land
   fairness (40 seeds, 0 unfair) all pass.
 - Real-input playtest through key presses and clicks passed: buy a horse, ride, pray at a shrine, fight, level up, pick
   a talent, open the hero sheet and the map. The 2D fallback renderer passed a key-mash run with no errors.

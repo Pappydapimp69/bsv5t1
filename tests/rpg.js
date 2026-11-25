@@ -176,6 +176,9 @@ const {chromium} = require('playwright');
       const car = Cv.events.find(e => e.k === 'caravan' && e.i === cv.town); const cq = newQuest(cv, 'caravan'); cv.quest = cq;
       out.caravanJob = cq.k === 'caravan' && questTarget(cv).x === car.x;
       const dest = Cv.towns.find(t => t.id === car.to); car.x = dest.x; car.y = dest.y; cv.x = car.x + 100; cv.y = car.y; stepEvents(C.DT); out.caravanDone = cv.quest.done;
+      // travel between your own settlements from the Hall
+      const Tv = __col.newGame('human', 35), tv = Tv.you, h0 = Tv.towns[tv.town]; const op = foundVillage(tv.town, h0.x + 2500, h0.y); tv.gold = 50; tv.x = h0.x; tv.y = h0.y;
+      openTown(h0, 'Hall'); const goT = menu.items.find(i => /^Travel to/.test(i.label)); goT.act(); out.travel = Math.hypot(tv.x - op.x, tv.y - op.y) < 100 && tv.gold === 35;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

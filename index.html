@@ -486,7 +486,7 @@ const OMENS=[{id:'clear',name:'A clear sky',text:'no omen: the day runs as it al
 let OMEN_BASE=null;
 function resetOmen(){if(OMEN_BASE)Object.assign(C,OMEN_BASE)}
 // what the giant remembers of the last day becomes a lasting baseline its feelings settle back to
-C.MEM_FRIEND=-40;C.MEM_WARY=150;
+C.MEM_FRIEND=-40;C.MEM_WARY=150;C.MEM_MIN=100;
 function applyMemory(){const m=save.memory;if(!m||m.v!==1)return;const ok=i=>Number.isInteger(i)&&i>=0&&i<3;S.grudgeBase=[0,0,0];const parts=[];
   if(ok(m.honoured)){S.grudgeBase[m.honoured]=C.MEM_FRIEND;parts.push('it lay down beside '+TOWNS[m.honoured].name+' at the last dusk')}
   if(ok(m.hurt)&&m.hurt!==m.honoured){S.grudgeBase[m.hurt]=C.MEM_WARY;parts.push((m.slain?TOWNS[m.hurt].name+'\u2019s people slew it':TOWNS[m.hurt].name+'\u2019s people hurt it most')+', and it is wary of them')}
@@ -764,7 +764,8 @@ function zoneAt(r,c){r=Math.floor(r);c=Math.floor(c);return r<92?'legs':r>=130?'
 const JOINT_ZONE={kneeL:'legs',kneeR:'legs',elbowL:'left',elbowR:'right',heart:'top',neck:'top'};
 const CHAIN_ZONE={ankleL:'legs',ankleR:'legs',wristL:'left',wristR:'right'}; // which chain a strain aimed at a part pulls (the wrists sit low in the legs box)
 // how much a part of the body is being worked against the giant: climbers whose town it has a grudge with or who hunt it, and wedges in its joints
-function hunter(h){return h.role==='warden'||h.kits&&h.kits.wedge>0||S.grudge[h.town]>60}
+const grudgeNow=i=>S.grudge[i]-(S.grudgeBase?S.grudgeBase[i]:0); // what this day's people did, above what the giant remembers
+function hunter(h){return h.role==='warden'||h.kits&&h.kits.wedge>0||grudgeNow(h.town)>60}
 function zoneScore(z){let s=0;for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===z)s+=hunter(h)?1:-.6;
   for(const id in S.joints)if(JOINT_ZONE[id]===z)s+=S.joints[id].wedges.length*1.5;return s}
 // what a sleeper feels: wedges in its joints and blows landed in the last few seconds, not who means it harm
@@ -827,13 +828,13 @@ function giantDo(k){const why=canGiant(k);if(why!=null){if(why&&S.role==='giant'
   if(!S.headless)giantCall(k==='shake'||k==='twitch'?'rumble':k==='strain'?'pain':'bellow');
   g.wind=w;g.cd[k]=C[k.toUpperCase()+'_CD'];(S.acts||(S.acts={}))[k]=(S.acts[k]||0)+1;return true}
 function resolveWind(){const g=S.g,w=g.wind;g.wind=null;S.windAt=S.t;
-  if(w.k==='twitch'){shake(7);let n=0,fell=0,lost=0;
-    for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===w.zone){const braced=S.t-h.lastMove>w.dur*.8&&!h.cl.move,onL=restful(cellT(h.cl.x,h.cl.y));
+  if(w.k==='twitch'){shake(7);let n=0,fell=0,lost=0;const inZ=[];
+    for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===w.zone&&h.grip>0){inZ.push(h);const braced=S.t-h.lastMove>w.dur*.8&&!h.cl.move,onL=restful(cellT(h.cl.x,h.cl.y));
       const d=onL?(braced?0:6):braced?C.TWITCH_BRACED:C.TWITCH_GRIP;h.grip-=d;n++;if(h.you)toast(d<=10?'Braced. The twitch passes under you.':'A jerk runs through the giant\u2019s '+ZONES[w.zone]+'! Your grip slips.')}
     S.anchors=S.anchors.filter(a=>{if(zoneAt(a.r,a.c)===w.zone&&rnd()<C.TWITCH_ANCHOR){lost++;return false}return true});
     for(const id in S.joints)if(JOINT_ZONE[id]===w.zone){const j=S.joints[id],b=j.wedges.length;j.wedges=j.wedges.filter(()=>rnd()>C.TWITCH_WEDGE);fell+=b-j.wedges.length}
     S.fx.push({k:'twitch',zone:w.zone,t:0,life:.7});S.twitches=(S.twitches||0)+1;
-    if(S.role==='giant'&&!S.autoplay&&(climbers().some(h=>h.grip<=0)||fell||lost||!n))toast(!n?'A twitch runs through your '+ZONES[w.zone]+', but no one is there.':'A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+climbers().filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
+    if(S.role==='giant'&&!S.autoplay&&(inZ.some(h=>h.grip<=0)||fell||lost||!n))toast(!n?'A twitch runs through your '+ZONES[w.zone]+', but no one is there.':'A twitch runs through your '+ZONES[w.zone]+': '+n+' shaken, '+inZ.filter(h=>h.grip<=0).length+' knocked loose, '+fell+' wedge'+(fell===1?'':'s')+' and '+lost+' rope'+(lost===1?'':'s')+' loose.');
     return}
   if(w.k==='dream'){const t=S.towns.find(x=>x.id===w.town);if(!t||!t.alive)return;
     chron('Because '+TOWNS[t.i].name+'\u2019s people had hurt it, the sleeping giant dreamed of '+t.name+' and beasts marched on it.');
@@ -915,7 +916,7 @@ function damageJoint(id,d,by){const g=S.g,j=S.joints[id];if(g.dead||!g.awake&&!h
   if(id==='heart'&&g.fallen>0)d*=C.FALLEN_HEART;
   if(by&&by.town!=null){S.grudge[by.town]+=d;regard(by.who!=null?S.humans.find(x=>x.id===by.who):by.id!=null?by:null,-d)} // the giant remembers whose people hurt it
   j.hurtT=S.t;j.hp-=d;if(j.hp>0)return;j.hp=0;
-  if(id==='heart'){g.dead=true;chron((by&&by.town!=null?whoOf(by.hp!=null?by:S.humans.find(x=>x.id===by.who)||{town:by.town,sol:1}):'Its hunters').replace(/^./,c=>c.toUpperCase())+' shattered the Heart-stone. The giant died.');announce('The Heart-stone shatters. The giant is slain!');return}
+  if(id==='heart'){g.dead=true;S.slayer=by&&by.town!=null?by.town:null;chron((by&&by.town!=null?whoOf(by.hp!=null?by:S.humans.find(x=>x.id===by.who)||{town:by.town,sol:1}):'Its hunters').replace(/^./,c=>c.toUpperCase())+' shattered the Heart-stone. The giant died.');announce('The Heart-stone shatters. The giant is slain!');return}
   if(!j.crip){j.crip=true;j.wedges=[];announce(JOINTS[id].name+' crippled!');if(!S.headless)giantCall('pain');
     if(S.joints.kneeL.crip&&S.joints.kneeR.crip&&g.fallen<=0){S.falls=(S.falls||0)+1;{const b=topGrudge();chron((b>=0?'Because '+TOWNS[b].name+'\u2019s hunters bled its knees, the':'The')+' giant fell to its knees'+(S.falls>1?' (fall '+S.falls+')':'')+'.')}g.fallen=C.FALL_TIME;g.wind=null;g.v=0;shake(30);sfx('stomp');
       announce('The giant falls to its knees! No grip is lost, climbing is twice as fast and the Heart-stone takes half again as much damage.')}}}
@@ -980,7 +981,7 @@ function humanCtx(h){
     if(!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||!j&&!s))A={l:h.waking?'Waking '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':'Sound the wake horn',why:busy||(h.waking?'Hold still':S.waker&&S.waker!==h&&S.waker.waking?'Another horn is sounding':!h.horn?'Needs a wake horn: forge one in town from '+C.HORN_CRYSTALS+' sky crystals':!allWeak()?'The chains still hold: break all four first ('+S.chains.filter(c=>c.hp>0&&!chainWeak(c)).length+' left)':null)};
     const siteFree=s&&!s.build;
     const hasA=S.anchors.some(a=>a.r===Math.floor(cl.y)&&a.c===Math.floor(cl.x));
-    const X=j&&S.joints[j].wedges.length?{l:'Pull wedge',why:busy}:j&&S.joints[j].hp<S.joints[j].max-1&&!S.joints[j].crip?{l:'Tend the '+JOINTS[j].name.toLowerCase(),why:busy||(h.cd>0?'':null)}:{l:'Anchor ('+h.kits.anchor+')',why:busy||(!h.kits.anchor?'No anchor kits':hasA?'Anchor already here':null)};
+    const X=j&&S.joints[j].wedges.length?{l:'Pull wedge',why:busy}:j&&tends(h)&&S.joints[j].hp<S.joints[j].max-1&&!S.joints[j].crip?{l:'Tend the '+JOINTS[j].name.toLowerCase(),why:busy||(h.cd>0?'':null)}:{l:'Anchor ('+h.kits.anchor+')',why:busy||(!h.kits.anchor?'No anchor kits':hasA?'Anchor already here':null)};
     let Y;if(j){const jj=S.joints[j];Y={l:'Wedge ('+h.kits.wedge+')',why:busy||(!huntOpen()?'It sleeps as stone':null)||(!h.kits.wedge?'No wedges':jj.crip?'Already crippled':jj.wedges.length>=C.WEDGE_MAX?'No room for more':null)}}
     else Y={l:'Potion ('+(h.potions+h.bigPotions)+')',why:!(h.potions||h.bigPotions)?'No potions':h.hp>=h.max?'Full health':null};
     return{A,B:{l:'Lunge',why:busy||(h.grip<C.LUNGE_GRIP?'Grip too low':null)},X,Y}}
@@ -993,6 +994,11 @@ function shoveTarget(h){if(h.mode!=='climb'||!h.cl||h.waking)return null;let b=n
 function shove(h,o){if(h.cd>0||h.grip<C.SHOVE_COST+5)return false;h.cd=C.SHOVE_CD;h.swing=.2;h.grip-=C.SHOVE_COST;o.grip-=C.SHOVE_GRIP;if(o.waking)interruptWake(o);
   S.feud[o.town][h.town]+=C.SHOVE_FEUD;S.shoves=(S.shoves||0)+1;sfx('hit',h.you||o.you);
   sayTo(h,'You shove '+(o.hero?TOWNS[o.town].name+'\u2019s hero':'a '+TOWNS[o.town].name+' climber')+'.');sayTo(o,whoOf(h).replace(/^./,c=>c.toUpperCase())+' shoves you! Your grip slips.');return true}
+function placeAnchor(h){if(h.mode!=='climb'||!h.kits.anchor)return false;const r=Math.floor(h.cl.y),c=Math.floor(h.cl.x);if(S.anchors.some(a=>a.r===r&&a.c===c))return false;
+  h.kits.anchor--;S.anchors.push({r,c,town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+r*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',r);return true}
+// tending is offered to those who are on the giant's side (their town's way, or their own standing with it), so a hunter's
+// anchor button stays an anchor beside the joints it is attacking
+function tends(h){return townWay(h.town)==='tend'||(S.reg&&S.reg[h.id]||0)>0}
 function drinkPotion(h){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.')}
   else{h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.')}return true}
 function humanAct(h,slot,dir){const r=humanAct0(h,slot,dir);if(r&&h.sol&&h.ord&&(h.mode==='climb'||slot==='A'&&footChain(h)))h.workedAt=S.t;return r}
@@ -1014,8 +1020,10 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
     if(slot==='X'&&reachT(h).j&&S.joints[reachT(h).j].wedges.length){const ws=S.joints[reachT(h).j].wedges;let i=ws.findIndex(w=>w.town!==h.town);if(i<0)i=0;ws.splice(i,1);
       h.kits.wedge++;S.grudge[h.town]-=C.PULL_FAVOR;regard(h,C.PULL_FAVOR);questTick(h,'tend');gainXp(h,8);sfx('build',h.you);sayTo(h,'You pull out a wedge. The giant remembers '+TOWNS[h.town].name+' kindly.');return true}
     // tending, the mirror of striking: soothe a hurt joint a little, and the giant remembers the kindness
-    if(slot==='X'&&reachT(h).j){const id=reachT(h).j,jj=S.joints[id];if(!jj.wedges.length&&jj.hp<jj.max-1&&!jj.crip){if(h.cd>0)return false;h.cd=.6;h.swing=.2;
-      jj.hp=Math.min(jj.max,jj.hp+C.TEND_HEAL);S.grudge[h.town]-=C.TEND_FAVOR;regard(h,C.TEND_FAVOR);gainXp(h,1);sfx('build',h.you);
+    if(slot==='X'&&reachT(h).j){const id=reachT(h).j,jj=S.joints[id];if(tends(h)&&!jj.wedges.length&&jj.hp<jj.max-1&&!jj.crip){if(h.cd>0)return false;h.cd=.6;h.swing=.2;
+      const hs=jj.hands||(jj.hands=new Map());hs.set(h.id,S.t);let n=0;for(const[k,t]of hs){if(S.t-t>1.2)hs.delete(k);else n++}
+      const heal=Math.min(jj.max-jj.hp,C.TEND_HEAL*(n>C.JOINT_HANDS?C.JOINT_HANDS/n:1)*(id==='heart'&&S.g.fallen>0?.25:1)),fav=heal/C.TEND_HEAL*C.TEND_FAVOR;
+      jj.hp+=heal;S.grudge[h.town]-=fav;regard(h,fav);gainXp(h,1);sfx('build',h.you);
       if(h.you&&S.t-(h.tendSaid||-99)>8){h.tendSaid=S.t;sayTo(h,'You tend the '+JOINTS[id].name.toLowerCase()+'. The giant feels it, and remembers '+TOWNS[h.town].name+' kindly.')}return true}}
     if(slot==='X'){h.kits.anchor--;S.anchors.push({r:Math.floor(cl.y),c:Math.floor(cl.x),town:h.town});sfx('build',h.you);sayTo(h,'Anchor set at '+Math.floor(cl.y)*FT+' ft. It catches your people if they fall.');questTick(h,'anchor',Math.floor(cl.y));return true}
     if(slot==='Y'){const j=reachT(h).j;if(j){h.kits.wedge--;if(h.you)h.wedged=(h.wedged||0)+1;S.firstWedge=S.firstWedge||{};if(!S.firstWedge[h.town]){S.firstWedge[h.town]=1;chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' drove '+(Object.keys(S.firstWedge).length===1?'the first':TOWNS[h.town].name+'\u2019s first')+' wedge into the '+(S.g.awake?'':'sleeping ')+'giant\u2019s '+JOINTS[j].name.toLowerCase()+'.')}S.joints[j].wedges.push({town:h.town,who:h.id});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
@@ -1234,7 +1242,9 @@ function soldierMove(h,dt){const b=h.sol.b,o=h.ord,mv={x:0,y:0};if(!S.builds.inc
 // bot towns use their barracks too: they train from the folk's gold, answer an attack on their walls, and take revenge on a feud
 // the player's own town follows the player's lead: once the giant clearly likes or hates what you do, your town's
 // barracks tend or hunt it the same way; until then they keep the town's habit
-function townWay(i){if(S.you&&S.role==='human'&&i===S.you.town){const r=S.reg&&S.reg[S.you.id]||0;if(r>C.LEAD_REG)return'tend';if(r<-C.LEAD_REG)return'hunt'}return townHabit(i)}
+function townWay(i){if(S.you&&S.role==='human'&&i===S.you.town){const r=S.reg&&S.reg[S.you.id]||0;let L=S.leadState||null;
+    // a lead is taken past ±40 and let go only inside ±30, so the soldiers do not flip back and forth
+    if(r>C.LEAD_REG)L='tend';else if(r<-C.LEAD_REG)L='hunt';else if(L==='tend'&&r<C.LEAD_REG-10||L==='hunt'&&r>-(C.LEAD_REG-10))L=null;S.leadState=L;if(L)return L}return townHabit(i)}
 C.LEAD_REG=40;
 function townHabit(i){return i===1?'tend':i===2?'hunt':(mood(i)==='calm'||mood(i)==='friendly')?'tend':'hunt'}
 function botOrders(b){const rs=readySoldiers(b);if(!rs.length)return;const home=barracksTown(b);
@@ -1242,8 +1252,8 @@ function botOrders(b){const rs=readySoldiers(b);if(!rs.length)return;const home=
   if(rs.some(readyToWake)){giveOrder(b,'tend');return}
   b.way=townWay(b.town);
   // when your lead turns your own town's soldiers, you are told, and the chronicle remembers
-  if(S.you&&S.role==='human'&&b.town===S.you.town){const lead=b.way!==townHabit(b.town)?b.way:null;if(lead!==S.leadWay){S.leadWay=lead;
-    if(lead){toast('Your lead: '+TOWNS[b.town].name+'\u2019s soldiers now '+(lead==='tend'?'tend':'hunt')+' the giant, as you do.');chron('Following your lead, '+TOWNS[b.town].name+'\u2019s soldiers turned to '+(lead==='tend'?'tending':'hunting')+' the giant.')}
+  if(S.you&&S.role==='human'&&b.town===S.you.town){const lead=S.leadState&&S.leadState!==townHabit(b.town)?S.leadState:null;if(S.leadWay===undefined)S.leadWay=null;if(lead!==S.leadWay){S.leadWay=lead;S.leadSaid=S.leadSaid||{};if(lead&&S.leadSaid[lead])toast('Your lead: '+TOWNS[b.town].name+'\u2019s soldiers '+(lead==='tend'?'tend':'hunt')+' the giant again.');else
+    if(lead){S.leadSaid[lead]=1;toast('Your lead: '+TOWNS[b.town].name+'\u2019s soldiers now '+(lead==='tend'?'tend':'hunt')+' the giant, as you do.');chron('Following your lead, '+TOWNS[b.town].name+'\u2019s soldiers turned to '+(lead==='tend'?'tending':'hunting')+' the giant.')}
     else toast(TOWNS[b.town].name+'\u2019s soldiers go back to their old habit.')}}
   if(S.t<(S.revT[b.town]||0))return;for(let j=0;j<3;j++)if(j!==b.town&&factionAlive(j)&&S.feud[b.town][j]>ARMY.REVENGE&&S.towns[j].hp>S.towns[j].max*.6){S.revT[b.town]=S.t+ARMY.REVENGE_CD;giveOrder(b,'attack',j);
     if(S.you&&S.role==='human'&&j===S.you.town)announce(TOWNS[b.town].name+' soldiers march on '+TOWNS[j].name+'!');return}
@@ -1831,10 +1841,10 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
     if(!h.seekRest){h.seekRest=true;cl.path=bfs(r,c,(rr2,cc)=>restful(S.body.g[rr2*COLS+cc])||S.anchors.some(a=>a.town===h.town&&a.r===rr2&&a.c===cc),4000)}
     if(cl.path)return mv}
   else h.seekRest=false;
-  if(h.grip<mg*.35&&!cl.path&&h.kits.anchor>0&&!S.anchors.some(a=>a.r===r&&a.c===c)&&humanAct(h,'X')){h.rest=true;return mv}
+  if(h.grip<mg*.35&&!cl.path&&h.kits.anchor>0&&!S.anchors.some(a=>a.r===r&&a.c===c)&&placeAnchor(h)){h.rest=true;return mv}
   const goal=botGoalCells(h);
   const j=jointAt(cl.x,cl.y);
-  if(goal.kind==='pull'&&j===goal.id){cl.path=null;humanAct(h,'X');return mv}
+  if(goal.kind==='pull'&&j===goal.id){cl.path=null;if(S.joints[j].wedges.length)humanAct(h,'X');return mv}
   if(goal.kind==='joint'&&j===goal.id){cl.path=null;if(h.kits.wedge>0&&S.joints[j].wedges.length<C.WEDGE_MAX&&!S.joints[j].crip)humanAct(h,'Y');else humanAct(h,'A');return mv}
   const s=siteAt(cl.x,cl.y);
   if(s&&goal.kind==='site'&&!s.build){placeOnSite(h,s,'cannon');return mv}
@@ -1844,14 +1854,14 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   if(goal.kind==='chain'){const ch=S.chains.find(q=>q.id===goal.id);if(ch&&ch.r===r&&ch.c===c){cl.path=null;humanAct(h,'A');return mv}}
   if(s&&goal.kind==='wreck'&&s.build&&s.build.town!==h.town){humanAct(h,'A');return mv}
   if(goal.kind==='down'&&r<=1){dismount(h,0);return mv}
-  if(goal.kind==='down'&&!cl.path&&h.kits.anchor>0&&r>40&&!S.anchors.some(a=>a.town===h.town&&a.r===r)&&rnd()<.01)humanAct(h,'X');
+  if(goal.kind==='down'&&!cl.path&&h.kits.anchor>0&&r>40&&!S.anchors.some(a=>a.town===h.town&&a.r===r)&&rnd()<.01)placeAnchor(h);
   if(!cl.path||h.botGoal!==goal.kind+(goal.id||'')){h.botGoal=goal.kind+(goal.id||'');
     const test=goal.kind==='joint'||goal.kind==='pull'?(rr2,cc)=>{const J=JOINTS[goal.id];return rr2>=J.r0&&rr2<=J.r1&&cc>=J.c0&&cc<=J.c1}:goal.test;
     cl.path=bfs(r,c,test,8000);
     if(!cl.path&&h.hero&&h.grip>=C.LUNGE_GRIP)cl.path=bfs(r,c,test,8000,LUNGE_OFFS);
     if(!cl.path){h.botGoal=null;if(r<=1)dismount(h,0);else{const p=bfs(r,c,rr2=>rr2===0,8000);cl.path=p}}}
   // drop an anchor every so often on the way up
-  if(h.kits.anchor>0&&r>20&&r%35===0&&!S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<20))humanAct(h,'X');
+  if(h.kits.anchor>0&&r>20&&r%35===0&&!S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<20))placeAnchor(h);
   return mv}
 function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.you&&h.role==='you')h.role='keeper'; // a played person tends the giant: the bot standing in for one wins its regard
 h.think-=dt;
@@ -1997,8 +2007,9 @@ function checkEnd(){const alive=TOWNS.map((_,i)=>standingTown(i)).filter(Boolean
   if(S.role==='giant'){const n=giantTasks().filter(x=>x.done).length;over.win=!!over.dusk&&n>=C.GIANT_TASKS;if(over.dusk)over.text+=' You completed '+n+' of the tasks; '+C.GIANT_TASKS+' were needed.'}else over.win=factionAlive(S.you.town)&&(!(over.dusk||over.left)||S.favoredH===S.you.id);
   if(S.role==='giant'){if(over.win)save.giantWins++;else save.giantLosses++}else{if(over.win)save.humanWins++;else save.humanLosses++}
   // the giant remembers the day: whom it honoured at dusk and which town hurt it most (a discrete, named memory, not a score)
-  {let worst=-1;for(let i=0;i<3;i++)if(S.grudge[i]>0&&(worst<0||S.grudge[i]>S.grudge[worst]))worst=i;
-    save.memory={v:1,honoured:over.dusk&&S.favored!=null?S.favored:null,hurt:worst>=0&&S.grudge[worst]>=C.DREAM_MIN*2?worst:null,slain:!!S.g.dead}}
+  {let worst=-1;for(let i=0;i<3;i++)if(grudgeNow(i)>0&&(worst<0||grudgeNow(i)>grudgeNow(worst)))worst=i;
+    const slayer=S.g.dead&&S.slayer!=null?S.slayer:null,hurt=slayer!=null?slayer:worst>=0&&grudgeNow(worst)>=C.MEM_MIN?worst:null;
+    save.memory={v:1,honoured:over.dusk&&S.favored!=null?S.favored:null,hurt,slain:slayer!=null}}
   // records worth coming back for: wins for each town, the highest climb, the most giant tasks in one match
   {const R=save.rec=save.rec||{town:[0,0,0],climb:0,tasks:0};if(S.role==='giant')R.tasks=Math.max(R.tasks,giantTasks().filter(x=>x.done).length);
     else if(S.you){if(over.win)R.town[S.you.town]++;R.climb=Math.max(R.climb,Math.round((S.you.best||0)*FT))}}persist();
@@ -3078,7 +3089,7 @@ function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=sa
   const say=(id,text)=>{if(seen[id]||S.hintAt>S.t-6)return;seen[id]=1;S.hintAt=S.t;persist();toast(text)};
   if(!g.awake){say('strain','You are chained. Strain ('+k.B+') pulls at your chains; until minute '+Math.round(C.CHAIN_OPEN/60)+' it only weakens them.');
     if(climbers().some(hunter))say('twitch','Someone is climbing you to hurt you (red edge on your body panel). '+(device==='touch'?'Tap that part of your body panel':'Pick that part with the arrows or a click on the panel')+', then Twitch ('+k.A+').');
-    if(dreamTarget())say('dream','A town has hurt you. Nightmare ('+k.X+') sends the beasts of the land against it.');
+    if(dreamTarget())say('dream','You hold a grudge against '+TOWNS[dreamTarget().i].name+'. Nightmare ('+k.X+') sends the beasts of the land against it.');
     if(chainsOpen())say('open','The chains weaken now: Strain can tear them loose, and once all four are gone you can rise.')}
   else if(g.fallen>0)say('struggle','You are down! Press any action fast to Struggle up sooner.');
   else say('awake','You are awake. Walk with the stick or WASD; Stomp ('+k.A+') crushes around your feet, Shake ('+k.X+') throws off climbers, Smash ('+k.B+') and Swipe ('+k.Y+') need towns to brace you.')}

@@ -289,6 +289,25 @@ large; earlier 6-seed set at the same tuning had one giant death).
   mirror of Strike, so a tender has a free verb on the giant. Found by the Brindle tender policy: ladder built, 30–40
   gold, no rival wedges to pull, regard 0 for 7 minutes. About 12 s of tending passes the ±40 lead threshold.
 - Robustness pass 2 (seeds 101–104, all towns + giant, latest build): no page errors or NaNs; giant to dusk 4/4 (falls
-  1–3); bot-played Ashville and Brindle humans won 3/4 each (were 1/4 before Tend — bots sent to pull a wedge that is
-  already gone now Tend instead and earn the dusk honour); bot Corvel fell 4/4 (it never leads its town).
+  1–3); bot-played Ashville and Brindle won 3/4 each; bot Corvel fell 4/4 (it never leads its town). *Correction:* I first
+  attributed the higher human win rate to bots tending by accident, but pass 1 used different seeds. Like-for-like on
+  seeds 21–24 after the review fixes: Ashville 1/4 → 3/4, Brindle 1/4 → 2/4; cause not isolated (lead, Tend, Shove).
 - Checked and left alone: beasts near the giant's feet (6–12% of the first 15 min, no foot-side bites in two seeds).
+
+### 17. Second independent review (checkpoint 17)
+
+Six findings since the first review, all fixed:
+1. The remembered "wary" grudge (150) sat permanently above the hunter (60) and Nightmare (50) thresholds and re-selected
+   itself as "hurt it most" every match. Thresholds now measure today's grudge above the remembered floor (`grudgeNow`);
+   Nightmare may still use the remembered grudge (the hint now says "You hold a grudge against X").
+2. Tend hijacked the anchor button at any hurt joint, for players and for bots (a Corvel warden tended the Heart instead
+   of anchoring). Bots now place anchors through `placeAnchor`; Tend is offered only to those on the giant's side
+   (town way or own standing).
+3. A false "go back to their old habit" message on the first barracks order, and flip-flopping near ±40: the lead now
+   has hysteresis (taken past ±40, let go inside ±30) and each direction is chronicled once.
+4. Tend favour was flat (+2 even for a 1 hp heal), ignored crowding and fully healed the downed Heart: favour now scales
+   with hp healed, the three-hands rule applies, and the downed Heart heals at a quarter.
+5. "X's people slew it" named the highest-grudge town, not the slayer; the slayer is now recorded where the Heart breaks,
+   and the memory cutoff is a fixed constant.
+6. Twitch reports counted climbers already falling elsewhere; now only those in the twitched part.
+tests/sleeper.js 22 checks; all suites pass.

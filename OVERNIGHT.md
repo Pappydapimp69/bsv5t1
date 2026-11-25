@@ -348,6 +348,14 @@ tests/sleeper.js 22 checks; all suites pass.
   start for players on the giant's side (owner's rule kept: the giant is never a job you must take, never one to strike).
   20 seeds at 1:00: Brindle boards 23 of 60 slots are giant jobs; Corvel 0.
 
+- GPTBS (BS@f2e1c58, a35d03e, 762f556): `project NAME` lists a project's entries and open questions newest first
+  (Colossus: 19 entries, all still open); AGENTS.md points agents at `project`, `queue` and `finish --check`; a real
+  `finish` refreshes the index so `verify` passes straight after (it failed until `index` before).
+- A third container restart cost ~90 minutes (01:22–02:55Z). Wrap-up started early at 03:00Z to avoid losing work; a
+  final keys-only giant match was still running (1:55 of game time) and is not reported.
+- Final checks (03:00Z): all suites pass (sleeper 22, giant 42, heroes, barracks, land fairness 0 unfair/40); Brindle
+  menu start shows a giant job on the board at 0:46 and the Now line.
+
 ## What I would build next
 
 1. **Put a person in each role.** Every claim here rests on bots, key-press policies and my own hand play. The open GPTBS

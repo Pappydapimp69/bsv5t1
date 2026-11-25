@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.133 · e749253 · 2026-11-25 06:05 UTC</div>
+  <div id="ver">v1.134 · b26bc74 · 2026-11-25 06:07 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1051,7 +1051,7 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
       return drinkPotion(h)}
     return false}
   if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(!at&&h.hero&&critterNear(h)){huntCritter(h,critterNear(h));return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1+.1*charm(h,'tooth');h.critNext=0;
-    const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+    const dm=Math.round((m.affix==='armoured'&&m.hp>m.max/2?.5:1)*h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&h.hero&&poiAct(h))return usePoi(h,poiNear(h));if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1745,10 +1745,13 @@ function layPois(){if(S.pois)return;const R=mulberry32((S.seed^0x51ED27)>>>0),M=
 function poiNear(h,r=120){let best=null,d=r;for(const p of S.pois||[]){if(p.gone)continue;const e=Math.hypot(p.x-h.x,p.y-h.y)-(p.k==='camp'?60:0);if(e<d){best=p;d=e}}return best}
 function campBeasts(p){return S.monsters.filter(m=>m.camp===p.id)}
 const CHIEFS=['Black Hal','Mother Crow','Two-Bows Ned','Red Wenna'];
+// alphas and chiefs roll a trait (Diablo's elite affixes, one at a time so each reads clearly)
+const AFFIX={swift:{n:'Swift',t:'moves and strikes faster'},armoured:{n:'Armoured',t:'takes half damage until below half health'},vampiric:{n:'Vampiric',t:'heals when it hits'},frenzied:{n:'Frenzied',t:'hits harder as it bleeds'}};
+function rollAffix(m){const ks=Object.keys(AFFIX);m.affix=ks[(m.id*7)%ks.length];if(m.affix==='swift')m.swift=1}
 function spawnCamp(p){p.alive=true;if(p.id%2===0){p.bandits=1;p.name=p.name&&!ALPHAS.includes(p.name)?p.name:CHIEFS[p.id%CHIEFS.length];
     for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*110,y=p.y+Math.sin(a)*110;S.monsters.push({id:S.nextId++,kind:'archer',x,y,hx:x,hy:y,hp:40,max:40,atk:8,gold:16,xp:20,r:14,cd:1+k*.7,camp:p.id})}
-    S.monsters.push({id:S.nextId++,kind:'archer',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:130,max:130,atk:12,gold:45,xp:70,r:16,cd:0,camp:p.id,elite:p.name});return}for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*90,y=p.y+Math.sin(a)*90;S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:p.x,hy:p.y,hp:40,max:40,atk:7,gold:10,xp:14,r:13,cd:0,camp:p.id})}
-  S.monsters.push({id:S.nextId++,kind:'wolf',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:150,max:150,atk:12,gold:40,xp:70,r:19,cd:0,camp:p.id,elite:p.name})}
+    S.monsters.push({id:S.nextId++,kind:'archer',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:130,max:130,atk:12,gold:45,xp:70,r:16,cd:0,camp:p.id,elite:p.name});rollAffix(S.monsters[S.monsters.length-1]);return}for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*90,y=p.y+Math.sin(a)*90;S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:p.x,hy:p.y,hp:40,max:40,atk:7,gold:10,xp:14,r:13,cd:0,camp:p.id})}
+  S.monsters.push({id:S.nextId++,kind:'wolf',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:150,max:150,atk:12,gold:40,xp:70,r:19,cd:0,camp:p.id,elite:p.name});rollAffix(S.monsters[S.monsters.length-1])}
 function poiLabel(p,h){const left=s=>{s=Math.ceil(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   if(p.k==='shrine'){const D=SHRINES[p.sub];return D.n+(S.t<p.ready?' (resting '+left(p.ready-S.t)+')':': '+D.t)}
   if(p.k==='spring')return'Hot spring'+(h&&!(p.used||{})[h.id]?': +10 most health':S.t<p.ready?' (warming '+left(p.ready-S.t)+')':': heals');
@@ -1872,7 +1875,8 @@ function openTalents(){const h=S&&S.you;if(!h)return;if(!(h.picks>0)){toast('No 
 const SKILLS=[
   {id:'cry',key:'1',name:'War cry',lvl:2,cd:20,text:'Staggers and hurts beasts around you; you and nearby friends hit 30% harder for 8 s'},
   {id:'whirl',key:'2',name:'Whirlwind',lvl:3,cd:9,text:'A spinning blow at every beast in reach'},
-  {id:'mend',key:'3',name:'Mend',lvl:5,cd:45,text:'Heal 40% of your health'}];
+  {id:'mend',key:'3',name:'Mend',lvl:5,cd:45,text:'Heal 40% of your health'},
+  {id:'spear',key:'4',name:'Spear',lvl:4,cd:6,text:'Throw a spear at the nearest beast within 450: double damage, staggers it'}];
 function skillWhy(h,k){if(h.lvl<k.lvl)return'Unlocks at level '+k.lvl;if(h.dead)return'Dead';if(h.mode!=='ground')return'Not on the giant';const c=(h.skCd&&h.skCd[k.id]||0)-S.t;return c>0?'Ready in '+Math.ceil(c)+' s':null}
 function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){if(h.you)toast(k.name+': '+w);return false}
   (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'))*(1-.15*charm(h,'moon'));h.swing=.2;
@@ -1880,10 +1884,12 @@ function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){
   if(id==='cry'){const cr=perk(h,'thunder')?330:220;for(const m of near(cr)){hitBeast(h,m,Math.round(h.atk*.8*(perk(h,'thunder')?2:1)));m.wind=null;m.rec=Math.max(m.rec||0,1.2);m.cd=Math.max(m.cd||0,1.2)}
     for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:perk(h,'thunder')?330:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('cry',h.you||nearPlayer(h))}
   if(id==='whirl'){const wr=perk(h,'storm')?133:95;for(const m of near(wr))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:wr,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('whoosh',h.you||nearPlayer(h))}
+  if(id==='spear'){const tg=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<450).sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];if(!tg){h.skCd.spear=S.t+.5;if(h.you)toast('Spear: no beast within 450');return false}
+    if(!S.headless)S.fx.push({k:'arrow',x:h.x,y:h.y,x2:tg.x,y2:tg.y,t:0,life:.2});h.face=Math.atan2(tg.y-h.y,tg.x-h.x);tg.wind=null;tg.rec=Math.max(tg.rec||0,.9);hitBeast(h,tg,Math.round(h.atk*2));if(!S.headless)sfx('whoosh',h.you)}
   if(id==='mend'){const a=Math.round(h.max*(perk(h,'deep')?.7:.4));h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
-function hitBeast(h,m,d){if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
+function hitBeast(h,m,d){if(m.affix==='armoured'&&m.hp>m.max/2)d=Math.ceil(d/2);if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
 function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;{const gg=Math.round(m.gold*.5*(1+.5*perk(h,'plunder'))*(1+.25*charm(h,'coin')));h.gold+=gg;if(h.you&&!S.headless)S.fx.push({k:'txt',x:m.x+20,y:m.y,z:70,text:'+'+gg+' gold',t:0,life:1.2,col:'#ffd27a'})}if(perk(h,'blood'))h.hp=Math.min(h.max,h.hp+8*perk(h,'blood'));
@@ -2037,9 +2043,9 @@ function beastFight(m,tg,dt){const dx=tg.x-m.x,dy=tg.y-m.y,d=Math.hypot(dx,dy)||
     const want=d<200?-1:d>320?1:0,sx=-dy/d*(m.id%2?1:-1);m.x+=(dx/d*want*.9+sx*.5)*90*dt;m.y+=(dy/d*want*.9+(dx/d)*(m.id%2?1:-1)*.5)*90*dt;return}
   m.eng=tg.id;m.engT=S.t;const free=m.cd<=0&&tokenFree(m,tg);
   // the turn is ours and the target is in reach: lock the spot where it stands and wind up
-  if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:CB.WIND[m.kind]||.7,x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};tg.lunges=(tg.lunges||0)+1;cstat('winds');if(two)cstat('two');
+  if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:(CB.WIND[m.kind]||.7)*(m.swift?.7:1),x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};tg.lunges=(tg.lunges||0)+1;cstat('winds');if(two)cstat('two');
     if(tg.you&&!S.headless)sfx('warn',true);return}
-  if(free){m.x+=dx/d*sp*dt;m.y+=dy/d*sp*dt;return}
+  if(free){const sp2=sp*(m.swift?1.4:1);m.x+=dx/d*sp2*dt;m.y+=dy/d*sp2*dt;return}
   // waiting for a turn: circle at a slot round the target, kept apart from the rest of the pack; a person who walks in is not fled
   if(m.slotFor!==tg.id){m.slot=Math.atan2(-dy,-dx);m.slotFor=tg.id}m.slot+=(m.id%2?1:-1)*.55*dt;
   const RR=CB.CIRCLE[m.kind]||80;let gx=tg.x+Math.cos(m.slot)*RR-m.x,gy=tg.y+Math.sin(m.slot)*RR-m.y;
@@ -2056,7 +2062,7 @@ function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.C
   const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
   if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
   if(!hit.includes(tg)){cstat('missed');if(tg.you&&!S.headless)S.fx.push({k:'txt',x:tg.x,y:tg.y,z:95,text:'Missed',t:0,life:.8,col:'#d8f0ff'})}
-  for(const h of hit){if(untouchable(h)){cstat('dodged');h.dodgedN=(h.dodgedN||0)+1;if(h.dodge.t<.14){m.rec=Math.max(m.rec,1.4);m.cd+=1;h.critNext=1;h.perfects=(h.perfects||0)+1;if(h.you&&!S.headless){S.fx.push({k:'txt',x:h.x,y:h.y,z:100,text:'Perfect! Next hit crits',t:0,life:1.1,col:'#9fe8ff',big:1});slowMo(450)}}else dodgedFx(h);continue}cstat('hits');h.lastBeast=m;hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
+  for(const h of hit){if(untouchable(h)){cstat('dodged');h.dodgedN=(h.dodgedN||0)+1;if(h.dodge.t<.14){m.rec=Math.max(m.rec,1.4);m.cd+=1;h.critNext=1;h.perfects=(h.perfects||0)+1;if(h.you&&!S.headless){S.fx.push({k:'txt',x:h.x,y:h.y,z:100,text:'Perfect! Next hit crits',t:0,life:1.1,col:'#9fe8ff',big:1});slowMo(450)}}else dodgedFx(h);continue}cstat('hits');h.lastBeast=m;hurtHuman(h,Math.round(m.atk*CB.HIT*(m.affix==='frenzied'?1+(1-m.hp/m.max):1)),'beast');if(m.affix==='vampiric')m.hp=Math.min(m.max,m.hp+m.atk*2)}}
 // a dodge: a quick sidestep, untouchable for its first part, then a short cooldown; no stamina
 function threatOf(h){let b=null,bd=1e9;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-(m.wind&&m.wind.id===h.id?1e4:0);if(d<bd&&d<300){bd=d;b=m}}if(!b)b=rivalNear(h,200);return b}
 function humanDodge(h,dir){if(h.dead||h.mode!=='ground'||h.job)return false;if(h.dodge||(h.dodgeCd||0)>0)return false;
@@ -2180,7 +2186,7 @@ function botClimb(h){const cl=h.cl,g=S.g,mv={x:0,y:0};if(cl.fall||cl.move)return
   // drop an anchor every so often on the way up
   if(h.kits.anchor>0&&r>20&&r%35===0&&!S.anchors.some(a=>a.town===h.town&&Math.abs(a.r-r)<20))placeAnchor(h);
   return mv}
-function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.hero&&h.mode==='ground'&&(!h.you||S.autoplay)&&S.t%1<dt){const n=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<120).length;if(h.hp<h.max*.4&&!skillWhy(h,SKILLS[2]))useSkill(h,'mend');else if(n>=3&&!skillWhy(h,SKILLS[0]))useSkill(h,'cry');else if(n>=2&&!skillWhy(h,SKILLS[1]))useSkill(h,'whirl')}
+function botHuman(h,dt){const mv={x:0,y:0};if(h.dead||h.job)return mv;const g=S.g;if(h.hero&&h.mode==='ground'&&(!h.you||S.autoplay)&&S.t%1<dt){const n=S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<120).length;if(h.hp<h.max*.4&&!skillWhy(h,SKILLS[2]))useSkill(h,'mend');else if(n>=3&&!skillWhy(h,SKILLS[0]))useSkill(h,'cry');else if(n>=2&&!skillWhy(h,SKILLS[1]))useSkill(h,'whirl');else if(!n&&!skillWhy(h,SKILLS[3])&&S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<400&&m.eng===h.id))useSkill(h,'spear')}
   if(h.horse&&h.mode==='ground'&&(!h.you||S.autoplay)){const foe=S.monsters.some(m=>Math.hypot(m.x-h.x,m.y-h.y)<320);if(foe&&h.riding)setRide(h,false);else if(!foe&&!h.riding&&horseReady(h))setRide(h,true)}if(h.you&&h.role==='you')h.role='keeper'; // a played person tends the giant: the bot standing in for one wins its regard
 h.think-=dt;
   if(h.mode==='climb')return botClimb(h);
@@ -2435,7 +2441,7 @@ function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
   const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
   if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
   if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges.';
-  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
+  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>4</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 
@@ -2827,6 +2833,7 @@ function g3Update(){const g=S.g,t=S.t;
     else if(b.k==='well'){B(b.x,b.y,z+10,34,20,34,'#8d8f94');B(b.x,b.y,z+21,24,2,24,'#4f86a8');B(b.x-15,b.y,z+34,4,30,4,'#6b5a44');B(b.x+15,b.y,z+34,4,30,4,'#6b5a44');RF(b.x,b.y,z+54,26,14,'#7a4e38')}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
   const dk=clamp((phase()/C.DUSK-.7)/.3,0,1)+(isNight()?1:0);
+  for(const tw of S.towns){if(!tw.alive||lv(tw)<2||Math.hypot(tw.x-S.cam.x,tw.y-S.cam.y)>5000)continue;const n=Math.min(40,Math.round(tw.r/14)),hh=lv(tw)>=3?44:30;for(let k=0;k<n;k++){if(k%10===0)continue;const a=k/n*6.283,px=tw.x+Math.cos(a)*(tw.r+20),py=tw.y+Math.sin(a)*(tw.r+20),pz=groundH(px,py);B(px,py,pz+hh/2,10,hh,10,lv(tw)>=3?'#8d8f94':'#7a5a3c')}}
   for(const tw of S.towns){if(!tw.alive||Math.hypot(tw.x-S.cam.x,tw.y-S.cam.y)>9000)continue;const z=groundH(tw.x,tw.y),hh=tw.outpost?90:130;if(dk>0)for(let k=0;k<8;k++){const a=k*.785,lx=tw.x+Math.cos(a)*tw.r*.95,ly=tw.y+Math.sin(a)*tw.r*.95,lz=groundH(lx,ly);B(lx,ly,lz+22,4,44,4,'#4a3a2a');B(lx,ly,lz+50,12+Math.sin(t*7+k)*1.5,14,12,dk>=.5?'#ffd27a':'#c8a860')}B(tw.x+tw.r*.35,tw.y,z+hh/2,7,hh,7,'#5a4a36');for(let k=0;k<3;k++)B(tw.x+tw.r*.35+8+k*10,tw.y,z+hh-14+Math.sin(t*3+k*.9)*3,10,22-k*3,2,tw.col,Math.sin(t*2+k)*.25)}
   for(const p of S.pois||[]){if(Math.hypot(p.x-S.cam.x,p.y-S.cam.y)>9000)continue;const z=groundH(p.x,p.y),rd=S.t>=p.ready;
     if(p.k==='shrine'){const c=SHRINES[p.sub].col;B(p.x,p.y,z+6,70,12,70,'#8f8a80');B(p.x-24,p.y,z+40,12,70,12,'#a39d92');B(p.x+24,p.y,z+40,12,70,12,'#a39d92');B(p.x,p.y,z+80,70,10,16,'#6b665e');B(p.x,p.y,z+48+(rd?Math.sin(t*2)*6:0),16,16,16,rd?c:'#555',t*1.5)}
@@ -3062,7 +3069,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;{const y=S.you,mk=y&&t.alive&&!t.outpost?(y.quest&&y.quest.done?'!':!y.quest&&!tutStep()?'?':''):'';if(mk){ctx.font=`900 ${30*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(0,0,0,.8)';const by=p.y-44*UI-Math.abs(Math.sin(S.t*3))*6*UI;ctx.strokeText(mk,p.x,by);ctx.fillStyle=mk==='!'?'#ffd24a':'#cfe8c8';ctx.fillText(mk,p.x,by)}}lbl(t.name+(t.alive?' \u00b7 Lv '+lv(t)+(p.d<6000?' \u00b7 prosperity '+(t.prosp??prosperity(t)):''):' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
   for(const q of S.pois||[]){const tx=poiLabel(q,S.you);if(!tx)continue;const p=p3(q.x,q.y,q.k==='herb'?30:110);if(p&&p.d<(q.k==='herb'?1600:4200))lbl(tx,p.x,p.y,11,q.k==='camp'&&campBeasts(q).length?'#ff9a8a':q.k==='shrine'?SHRINES[q.sub].col:q.k==='merchant'?'#d8b4ff':'#cfe8c8')}
-  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+(m.kind==='archer'?' (bandit chief)':m.warlord?'':' (alpha)'),p.x,p.y,12,'#ff8f80')}
+  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+(m.kind==='archer'?' (bandit chief)':m.warlord?'':' (alpha)')+(m.affix?' \u00b7 '+AFFIX[m.affix].n+': '+AFFIX[m.affix].t:''),p.x,p.y,12,'#ff8f80')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<4200)lbl(cacheLabel(c),p.x,p.y,11,S.t>=c.ready?'#ffcf6a':'#a9afbb')}
   mapLabels();
   upgradeReady();barracksFlags();
@@ -3542,7 +3549,7 @@ function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f|
   else if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)<=20){}else S.eyeOn=me}
 const skillEl=document.getElementById('skillbar');let skSig='';
 function paintSkills(){const h=S&&S.you;if(!h||FILM||S.role!=='human'){if(skSig){skSig='';skillEl.innerHTML=''}return}
-  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
+  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
     return `<div class="sk${lock?' off':c<=0&&h.mode==='ground'?' ready':''}" title="${k.text}"><span class="ky">${k.key}</span><span class="ic">${ic[k.id]}</span>${lock?'Lv '+k.lvl:k.name}${!lock&&c>0?`<div class="cdv" style="height:${Math.round(c/tot*100)}%"></div><div class="cdn">${Math.ceil(c)}</div>`:''}</div>`});
   if(h.picks>0)parts.push(`<div class="sk tal"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
   if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);

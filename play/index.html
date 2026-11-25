@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.124 · c16ae26 · 2026-11-25 05:32 UTC</div>
+  <div id="ver">v1.125 · fa678ed · 2026-11-25 05:33 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -3429,7 +3429,10 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   const w=wedgedJoints().filter(id=>J[id].wedges.some(x=>x.town!==h.town));
   if(S.grudge[h.town]>=C.ANGER*.6)return'the giant is angry with '+TOWNS[h.town].name+': pull wedges or brace it to calm it, or bring it down';
   if(kin('wedge'))return'drive your wedge into a knee ('+JOINTS.kneeL.r0*FT+' ft up) or another joint'+(g.awake?'':': asleep it bruises, it cannot be crippled');
-  if(kin('brace')||kin('cannon')||kin('ladder')||kin('platform'))return'bolt your kit onto a free build spot on the giant';
+  if(h.picks>0&&!climb)return'you levelled up: press T to choose a talent';
+  if(!climb&&h.hero&&!h.horse&&h.gold>=C.HORSE_COST)return'buy a horse in town ('+C.HORSE_COST+' gold) and ride with R: almost twice as fast';
+  if(kin('brace')||kin('cannon')||(kin('ladder')||kin('platform'))&&S.t>420)return'bolt your kit onto a free build spot on the giant';
+  if(!climb&&h.hero){const p=poiAim(h);if(p)return p}
   if(w.length&&!climb)return'rivals\u2019 wedges bleed the giant\u2019s '+JOINTS[w[0]].name.toLowerCase()+': pull them out and it will remember you';
   if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
   // a forward base: an outpost near the giant shortens every walk (you shop and come back to life at your nearest settlement)
@@ -3442,6 +3445,11 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   {const o=outpostAim(h);if(o)return o}
   if(!climb&&h.hero){const c=(S.caches||[]).filter(c=>S.t>=c.ready&&dist(c,h)<3500).sort((a,b)=>dist(a,h)-dist(b,h))[0];if(c)return'a chest is ready in the ruins nearby (marked on the land): gold, crystals and a kit; beasts may follow you home'}
   return!climb?'earn gold: take a job on the Board, hunt beasts or gather sky crystals':''}
+// the nearest worthwhile place within reach: a ready shrine, an unread stone, an unsoaked spring, a camp to break, a traveller
+function poiAim(h){const near=(S.pois||[]).filter(p=>Math.hypot(p.x-h.x,p.y-h.y)<(h.riding?4200:2800)&&(p.k==='shrine'&&S.t>=p.ready&&!buffOf(h,p.sub)||p.k==='stones'&&!(h.lore||{})[p.lore]||p.k==='spring'&&!(p.used||{})[h.id]||p.k==='camp'&&(campBeasts(p).length?h.lvl>=2:S.t>=p.ready)||p.k==='traveller'&&!p.follow))
+    .sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0];if(!near)return'';const d=Math.round(Math.hypot(near.x-h.x,near.y-h.y)/100)*10,dir=['east','south-east','south','south-west','west','north-west','north','north-east'][Math.round(Math.atan2(near.y-h.y,near.x-h.x)/(Math.PI/4)+8)%8];
+  const what={shrine:SHRINES[near.sub]&&SHRINES[near.sub].n+' ('+SHRINES[near.sub].t.toLowerCase()+')',stones:'standing stones to read (lore and XP)',spring:'a hot spring (+10 most health)',camp:near.name+'\u2019s camp'+(campBeasts(near).length?' (an alpha guards a chest)':' (its chest is ready)'),traveller:'a lost traveller to walk home (50 gold)'}[near.k];
+  return what+', '+d+' paces '+dir}
 function outpostAim(h){const g=S.g,climb=h.mode==='climb';
   {const near=nearestOwn(h.town,g.x,g.y),site=()=>{for(let k=0;k<12;k++){const a=k/12*6.283,x=g.x+Math.cos(a)*1400,y=g.y+Math.sin(a)*1400;if(outpostSiteOpen(x,y)&&!inSolid(x,y,60)&&!S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))return true}return false};
     if(!climb&&!g.awake&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000)&&site())return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}

@@ -129,6 +129,10 @@ const {chromium} = require('playwright');
       const Go = __col.newGame('human', 23), go = Go.you; const gs = matchGoals(); out.threeGoals = gs.length === 3 && new Set(gs.map(g => g.id)).size === 3;
       go.lvl = 5; go.perfects = 3; go.stat = {camp: 1, bounty: 1, hunt: 3, pray: 2, lore: 2, escort: 1, civic: 2, charm: 1}; Go.t = 10; stepGoals();
       out.goalsDone = gs.every(g => g.done); Go.over = {giantWon: true, text: 'x'}; out.goalRenown = renownEarned(go, Go.over).n >= 15;
+      // crafting: your pelts go to a hide store at home; the Forge turns them into a cloak
+      const Cr = __col.newGame('human', 24), cr = Cr.you, ct = Cr.towns[cr.town]; cr.pack.pelts = 4; cr.x = ct.x; cr.y = ct.y; unloadPack(cr, ct);
+      out.hideStore = cr.hides === 4; const m0c = cr.max; openTown(ct, 'Forge'); const it = menu.items.find(i => /^Fur cloak/.test(i.label)); it.act(); closeMenu();
+      out.crafted = cr.max === m0c + 25 && cr.hides === 0;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

@@ -542,7 +542,7 @@ const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2
   armour:[{n:'Hide armour',v:3,g:40,t:1},{n:'Mail',v:6,g:90,t:2},{n:'Plate',v:10,g:160,t:3},{n:'Giantbone plate',v:14,g:340,t:3},{n:'Skyforged plate',v:18,g:650,t:3}],
   pack:[{n:'Larger pack',v:2,g:60,t:2},{n:'Great pack',v:2,g:120,t:3}],
   gloves:[{n:'Climbing gloves',v:1,g:50,t:1},{n:'Clawed gloves',v:1,g:110,t:2}]};
-const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0);
+const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0)+(h.packBonus||0);
 function nextGear(h,k){const i=h.gear[k],it=GEAR[k][i]||null;if(!it||!S.builds)return it;const t=townAt(h);return t&&t.i===h.town&&civicIn(t,'smithy')?{...it,g:Math.round(it.g*.8)}:it}
 function buyGear(h,k,payer=h){const it=nextGear(h,k);payer.gold-=it.g;h.gear[k]++;if(k==='blade')h.atk+=it.v;if(k==='armour')h.def=(h.def||0)+it.v;if(k==='gloves')h.gloves++}
 // beasts live somewhere: trolls by the ruins, wolves at their dens (both wander back there), the rest roam the open land
@@ -1601,9 +1601,9 @@ function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();
 function packCount(h){return h.pack.crystals+h.pack.pelts}
 function packAdd(h,what,n){let got=0;while(got<n&&packCount(h)<packCap(h)){h.pack[what]++;got++}if(got<n)sayTo(h,'Your pack is full. Go home to empty it.');if(what==='crystals'&&got)for(let i=0;i<got;i++)questTick(h,'gather');return got}
 function unloadPack(h,t=townAt(h)){if(isForager(h)&&(!t||t!==foragerHome(h)))return;
-  const k=h.pack;if(!k.crystals&&!k.pelts&&!k.found)return;const c=k.crystals,n=k.pelts,pg=n*C.PELT_GOLD,bank=isForager(h)?t:h;bank.crystals+=c;h.gold+=pg;k.crystals=0;k.pelts=0;k.found=0;
+  const k=h.pack;if(!k.crystals&&!k.pelts&&!k.found)return;const c=k.crystals,keep=h.you&&!S.autoplay,n=keep?0:k.pelts,pg=n*C.PELT_GOLD,bank=isForager(h)?t:h;bank.crystals+=c;h.gold+=pg;if(keep)h.hides=(h.hides||0)+k.pelts;const kept=keep?k.pelts:0;k.crystals=0;k.pelts=0;k.found=0;
   if(c&&isForager(h)&&S.you?.town===t.i)toast(t.name+' received '+c+' sky crystal'+(c===1?'':'s')+'.');
-  const parts=[];if(c)parts.push(c+' sky crystal'+(c>1?'s':'')+' stored');if(n)parts.push(n+' pelt'+(n>1?'s':'')+' sold for '+pg+' gold');if(parts.length)sayTo(h,'You empty your pack: '+parts.join(', ')+'.')}
+  const parts=[];if(c)parts.push(c+' sky crystal'+(c>1?'s':'')+' stored');if(n)parts.push(n+' pelt'+(n>1?'s':'')+' sold for '+pg+' gold');if(kept)parts.push(kept+' pelt'+(kept>1?'s':'')+' to your hide store ('+h.hides+'; craft or sell them at the Forge)');if(parts.length)sayTo(h,'You empty your pack: '+parts.join(', ')+'.')}
 // the giant's tasks: it wins by surviving until dusk and completing three of these five
 function giantTasks(){const g=S.g;return[
   {name:'Freed',done:S.chains.every(c=>c.hp<=0),note:S.chains.filter(c=>c.hp<=0).length+'/4 chains'},
@@ -1861,6 +1861,9 @@ const CHARMS={tooth:{n:'Wolf-tooth charm',t:'+10% chance to crit'},hide:{n:'Boar
   feather:{n:'Hawk feather',t:'Move 10% faster'},ember:{n:'Ember stone',t:'Whirlwind hits 50% harder'},knot:{n:'Elder\u2019s knot',t:'+20% XP'},bell:{n:'Rider\u2019s bell',t:'Your horse never throws you'},
   coin:{n:'Miser\u2019s coin',t:'+25% gold from beasts and chests'},moon:{n:'Moon shard',t:'Skills come back 15% sooner'},blood:{n:'Bloodstone',t:'Heal 3 on every strike that lands'},
   crown:{n:'Warlord\u2019s crown',t:'+8 damage and +60 most health',on:[8,60],rare:1}};
+// crafting at the Forge from the hides you bring home (pelts from beasts and deer): a reason to hunt
+const CRAFTS=[{id:'cloak',n:'Fur cloak',t:'+25 most health',hides:4,once:1,on:h=>{h.max+=25;h.hp+=25}},{id:'satchel',n:'Trapper\u2019s satchel',t:'Carry 2 more in your pack',hides:3,once:1,on:h=>{h.packBonus=(h.packBonus||0)+2}},
+  {id:'boots',n:'Hide boots',t:'Move 8% faster',hides:5,once:1,on:h=>{h.boots=1}},{id:'fetish',n:'Bone fetish',t:'A random charm',hides:6,cr:4,on:h=>giveCharm(h)}];
 const charmSlots=h=>2+(h.lvl>=4?1:0)+(h.lvl>=7?1:0)+(h.extraSlot||0);
 const charm=(h,id)=>h.charms&&h.charms.includes(id)?1:0;
 function giveCharm(h,id){if(!id){const pool=Object.keys(CHARMS).filter(k=>!CHARMS[k].rare&&!(h.charms||[]).includes(k)&&!(h.bag||[]).includes(k));if(!pool.length){h.gold+=40;return null}id=pool[Math.floor(rnd()*pool.length)]}
@@ -1968,7 +1971,7 @@ function stepHuman(h,dt,mv){
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
   ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
   const x=h.x,y=h.y;
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider'))*(1+.06*((h.horse&&h.horse.lv||1)-1)):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1)*(1+.1*charm(h,'feather'));h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;if(h.riding)horseGrow(h,Math.hypot(vx,vy)*C.H_SPEED*wade*ride*dt);h.face=Math.atan2(vy,vx)}solidPush(h,12);
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider'))*(1+.06*((h.horse&&h.horse.lv||1)-1)):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1)*(1+.1*charm(h,'feather'))*(h.boots?1.08:1);h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;if(h.riding)horseGrow(h,Math.hypot(vx,vy)*C.H_SPEED*wade*ride*dt);h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   if(assigned&&dist(h,assigned)>Math.max(C.FORAGE_RANGE,dist(assigned,{x,y}))){h.x=x;h.y=y;h.goal=null;h.returnHome=true}
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered>=(S.nextStar||C.STAR_EVERY)){S.nextStar=S.gathered+C.STAR_EVERY+4*S.evc.star;if(S.events.filter(e=>e.k==='star').length<2)startStar()};
@@ -2624,7 +2627,9 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
       ...(huntOpen()?[buy('Wedge',C.COST.wedge,()=>h.kits.wedge++,S.g.awake?'Bleeds a joint':'Bruises the sleeper (half, never crippling)'),buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++,'Fires on rival towns'),buy('Brace kit',C.COST.brace,()=>h.kits.brace++,'Lets the giant walk')]:[{label:'Giant’s kits',why:'On sale in '+Math.max(1,Math.ceil(C.HUNT_OPEN-S.t))+' s',act:()=>{}}])]}
   else if(tb==='Forge'){body=`<p class="dim">${h.crystals} sky crystals in your store.</p>`;
     items=[{label:h.horn?'You carry a wake horn':'Forge a wake horn – '+C.HORN_CRYSTALS+' crystals',sub:h.horn?'Sound it at the giant’s head':'The only way to wake the giant',why:h.horn?'Already carried':S.g.awake?'The giant is already awake':h.crystals<C.HORN_CRYSTALS?'Need '+(C.HORN_CRYSTALS-h.crystals)+' more crystals':null,act:()=>{h.crystals-=C.HORN_CRYSTALS;h.horn=1;sfx('build');announce('You have forged a wake horn. Sound it at the giant’s head.');openTown(t)}},
-      {label:'Sell sky crystals – 4 gold each',sub:'You have '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}}]}
+      {label:'Sell sky crystals – 4 gold each',sub:'You have '+h.crystals,why:h.crystals?null:'No crystals',act:()=>{h.gold+=h.crystals*4;h.crystals=0;sfx('coin');openTown(t)}},
+      ...CRAFTS.map(r=>({label:r.n+' \u2013 '+r.hides+' hides'+(r.cr?' + '+r.cr+' crystals':''),sub:r.t,why:r.once&&(h.crafted||{})[r.id]?'Already made':(h.hides||0)<r.hides?'Need '+(r.hides-(h.hides||0))+' more hides':h.crystals<(r.cr||0)?'Need '+((r.cr||0)-h.crystals)+' more crystals':null,act:()=>{h.hides-=r.hides;h.crystals-=r.cr||0;(h.crafted=h.crafted||{})[r.id]=1;r.on(h);sfx('build');toast('Crafted: '+r.n+'.');openTown(t)}})),
+      {label:'Sell hides \u2013 '+C.PELT_GOLD+' gold each',sub:'You have '+(h.hides||0),why:h.hides?null:'No hides',act:()=>{h.gold+=h.hides*C.PELT_GOLD;h.hides=0;sfx('coin');openTown(t)}}]}
   else{body=`<p class="dim">${t.name} ${t.outpost?'outpost':'town'}, level ${lv(t)}. Walls ${Math.ceil(t.hp)}/${t.max}. ${t.houses||0} houses. ${foragersIn(t).length}/${foragerCapacity(t)} foragers housed. The giant is ${mood(t.i)} toward ${TOWNS[t.i].name}.</p><p><b>Prosperity ${prosperity(t)}</b>${prosperity(t)>40?' \u00b7 rent +'+(prosperity(t)-40)+'%':' \u00b7 above 40 it raises rent'}${civicIn(t,'market')?' \u00b7 market +25%':''}</p><p class="dim">${(t.prospParts||[]).map(p=>p[0]+' '+(p[1]>0?'+':'')+p[1]).join(' \u00b7 ')}${Math.max(0,(t.houses||0)-2*civicIn(t,'farm')-1)?' \u2014 build farms: each feeds two houses':''}</p>`;
     items=[{label:(t.outpost?'Raise outpost to town':'Raise '+t.name)+(upCost('town',t)!=null?' – '+upCost('town',t)+' crystals':''),sub:t.outpost?'Becomes a level 2 town with stronger walls and a wider build area':'+600 walls and a wider build area',why:canUpgrade(h,'town',t),act:()=>{upgrade(h,'town',t);openTown(t)}},
       ...(t.i===h.town?[{label:'Withdraw crystals',sub:t.crystals+' in '+t.name+'’s stockpile',why:t.crystals?null:'Stockpile is empty',act:()=>{if(t.alive&&townAt(h)===t){h.crystals+=t.crystals;t.crystals=0;sfx('coin')}openTown(t)}},{label:'Build here',act:openBuild}]:[]),...repairItems(h,t)]}

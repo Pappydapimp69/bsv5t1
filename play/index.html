@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.129 · 5ba28d4 · 2026-11-25 05:57 UTC</div>
+  <div id="ver">v1.130 · 1f44463 · 2026-11-25 06:00 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1095,6 +1095,7 @@ function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
   if(!perk(h,'rider')&&!charm(h,'bell')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
+function horseGrow(h,d){const H=h.horse;if(!H||(H.lv||1)>=3)return;H.ride=(H.ride||0)+d;if(H.ride>=6000*(H.lv||1)){H.ride=0;H.lv=(H.lv||1)+1;H.max+=20;H.hp=H.max;if(h.you){toast('Your horse grows stronger: level '+H.lv+' (faster, tougher).');sfx('coin')}}}
 function stepHorse(h,dt){if(!h.horse)return;if(h.riding&&!S.headless&&(h.you||nearPlayer(h))){const w=Math.hypot(h.x-(h.px??h.x),h.y-(h.py??h.y));h.px=h.x;h.py=h.y;if(w>.5){h.hoofT=(h.hoofT||0)+dt;if(h.hoofT>.22){h.hoofT=0;if(h.you)sfx('hoof',true);S.fx.push({k:'dust',x:h.x-Math.cos(h.face||0)*26,y:h.y-Math.sin(h.face||0)*26,t:0,life:.9})}}}if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
@@ -1770,7 +1771,7 @@ function usePoi(h,p){const D=SHRINES[p.sub];
   if(p.k==='stones'){h.lore=h.lore||{};const first=!h.lore[p.lore];h.lore[p.lore]=1;if(h.you)openMenu({title:'Standing stones',body:'<p>'+LORE[p.lore]+'</p><p class="dim">'+Object.keys(h.lore).length+' of '+LORE.length+' stones read.</p>',items:[{label:'Go on',act:closeMenu}],back:closeMenu});
     if(first){gainXp(h,25);questTick(h,'lore');if(Object.keys(h.lore).length===LORE.length){h.picks=(h.picks||0)+1;if(h.you)toast('Every stone read: a free talent (T)!');else autoTalent(h)}}return true}
   if(p.k==='herb'){if(S.t<p.ready)return false;p.ready=S.t+150;h.herbs=(h.herbs||0)+1;h.hp=Math.min(h.max,h.hp+10);if(h.herbs>=3){h.herbs-=3;h.potions++;if(h.you)toast('Three herbs: you brew a potion.')}else if(h.you)toast('Healing herbs ('+h.herbs+'/3 for a potion).');sfx('coin',h.you);return true}
-  if(p.k==='camp'){if(campBeasts(p).length||S.t<p.ready)return false;p.ready=S.t+300;p.alive=false;const g=Math.round((80+Math.floor(rnd()*60))*(1+.25*charm(h,'coin'))),c=packAdd(h,'crystals',3);h.gold+=g;if(rnd()<.45)giveCharm(h);gainXp(h,40);questTick(h,'camp');
+  if(p.k==='camp'){if(campBeasts(p).length||S.t<p.ready)return false;p.ready=S.t+300;p.alive=false;h.campsBroken=(h.campsBroken||0)+1;const g=Math.round((80+Math.floor(rnd()*60))*(1+.25*charm(h,'coin'))),c=packAdd(h,'crystals',3);h.gold+=g;if(rnd()<.45)giveCharm(h);gainXp(h,40);questTick(h,'camp');
     if(h.you){toast(p.name+'\u2019s camp: +'+g+' gold'+(c?', '+c+' crystals':'')+'. The pack will return.');sfx('coin');shake(4)}return true}
   if(p.k==='traveller'){p.follow=h.id;if(h.you)toast('"Thank you! Take me to any of '+TOWNS[h.town].name+'\u2019s towns."');return true}
   if(p.k==='merchant'){if(h.you)openMerchant(h,p);return true}return false}
@@ -1833,9 +1834,10 @@ const TALENTS=[
   {id:'wind',name:'Second wind',text:'Once a minute, falling under a quarter of health heals you 40',max:1},
   {id:'grip',name:'Iron grip',text:'+40 grip on the giant',max:2},
   {id:'focus',name:'Battle focus',text:'Skills come back 25% sooner',max:2},
-  {id:'rider',name:'Horse lord',text:'Your horse runs 20% faster and never throws you',max:1}];
+  {id:'rider',name:'Horse lord',text:'Your horse runs 20% faster and never throws you',max:1},
+  {id:'thunder',name:'Thunder cry',text:'War cry reaches half again as far and hurts twice as much',max:1,lvl:2},{id:'storm',name:'Blade storm',text:'Whirlwind reaches 40% further',max:1,lvl:3},{id:'deep',name:'Deep mend',text:'Mend heals 70% instead of 40%',max:1,lvl:5}];
 const perk=(h,id)=>(h.perks&&h.perks[id])||0;
-function talentChoices(h){const pool=TALENTS.filter(t=>perk(h,t.id)<t.max&&(t.id!=='rider'||h.horse));const out=[];while(out.length<3&&pool.length)out.push(pool.splice(Math.floor(rnd()*pool.length),1)[0]);return out}
+function talentChoices(h){const pool=TALENTS.filter(t=>perk(h,t.id)<t.max&&(t.id!=='rider'||h.horse)&&(!t.lvl||h.lvl>=t.lvl));const out=[];while(out.length<3&&pool.length)out.push(pool.splice(Math.floor(rnd()*pool.length),1)[0]);return out}
 function takeTalent(h,t){if(!(h.picks>0))return false;h.picks--;h.perks=h.perks||{};h.perks[t.id]=(h.perks[t.id]||0)+1;if(t.on)t.on(h);h.offer=null;if(h.you){toast('Talent: '+t.name+'. '+t.text+'.');sfx('coin')}return true}
 function autoTalent(h){const c=talentChoices(h);if(c.length)takeTalent(h,c[0])}
 // charms (Ghost of Tsushima's charm slots): loot that changes how you play, worn in 2 slots, 3 at level 4, 4 at level 7.
@@ -1844,7 +1846,7 @@ const CHARMS={tooth:{n:'Wolf-tooth charm',t:'+10% chance to crit'},hide:{n:'Boar
   feather:{n:'Hawk feather',t:'Move 10% faster'},ember:{n:'Ember stone',t:'Whirlwind hits 50% harder'},knot:{n:'Elder\u2019s knot',t:'+20% XP'},bell:{n:'Rider\u2019s bell',t:'Your horse never throws you'},
   coin:{n:'Miser\u2019s coin',t:'+25% gold from beasts and chests'},moon:{n:'Moon shard',t:'Skills come back 15% sooner'},blood:{n:'Bloodstone',t:'Heal 3 on every strike that lands'},
   crown:{n:'Warlord\u2019s crown',t:'+8 damage and +60 most health',on:[8,60],rare:1}};
-const charmSlots=h=>2+(h.lvl>=4?1:0)+(h.lvl>=7?1:0);
+const charmSlots=h=>2+(h.lvl>=4?1:0)+(h.lvl>=7?1:0)+(h.extraSlot||0);
 const charm=(h,id)=>h.charms&&h.charms.includes(id)?1:0;
 function giveCharm(h,id){if(!id){const pool=Object.keys(CHARMS).filter(k=>!CHARMS[k].rare&&!(h.charms||[]).includes(k)&&!(h.bag||[]).includes(k));if(!pool.length){h.gold+=40;return null}id=pool[Math.floor(rnd()*pool.length)]}
   h.bag=h.bag||[];h.charms=h.charms||[];if(h.charms.length<charmSlots(h))equipCharm(h,id);else h.bag.push(id);
@@ -1858,7 +1860,7 @@ function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).
   const bf=h.buff&&h.buff.until>S.t?SHRINES[h.buff.k].n.replace('Shrine of ','Blessing of ')+' ('+Math.ceil(h.buff.until-S.t)+' s)':'none';
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i];
   openMenu({title:'Your hero \u00b7 level '+h.lvl,body:`<p><b>Health</b> ${Math.ceil(h.hp)}/${h.max} \u00b7 <b>Damage</b> ${h.atk} \u00b7 <b>Armour</b> ${h.def||0} \u00b7 <b>XP</b> ${h.xp}/${h.lvl*50}</p>
-    <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}.</p>
+    <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?'level '+(h.horse.lv||1)+', '+Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}.</p>
     <p class="dim"><b>Charms</b> (${(h.charms||[]).length}/${charmSlots(h)} worn)<br>${(h.charms||[]).map(k=>'<b>'+CHARMS[k].n+'</b> '+CHARMS[k].t.toLowerCase()).join('<br>')||'None: alphas, camp chests and the merchant have them'}</p>
     <p class="dim"><b>Talents</b><br>${tal}</p><p class="dim"><b>Skills</b><br>${sk}</p>
     <p class="dim"><b>Job</b> ${h.quest?h.quest.text+' '+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need:'none (the board in town)'}. <b>Tale</b> ${h.saga?h.saga.done?'told':g.text.replace(/^The elders\u2019 tale: /,''):'offered after two jobs'}. <b>Stones read</b> ${Object.keys(h.lore||{}).length}/${LORE.length}.</p>`,
@@ -1875,10 +1877,10 @@ function skillWhy(h,k){if(h.lvl<k.lvl)return'Unlocks at level '+k.lvl;if(h.dead)
 function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){if(h.you)toast(k.name+': '+w);return false}
   (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'))*(1-.15*charm(h,'moon'));h.swing=.2;
   const near=r=>S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<r+m.r);
-  if(id==='cry'){for(const m of near(220)){hitBeast(h,m,Math.round(h.atk*.8));m.wind=null;m.rec=Math.max(m.rec||0,1.2);m.cd=Math.max(m.cd||0,1.2)}
-    for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('cry',h.you||nearPlayer(h))}
-  if(id==='whirl'){for(const m of near(95))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:95,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('whoosh',h.you||nearPlayer(h))}
-  if(id==='mend'){const a=Math.round(h.max*.4);h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
+  if(id==='cry'){const cr=perk(h,'thunder')?330:220;for(const m of near(cr)){hitBeast(h,m,Math.round(h.atk*.8*(perk(h,'thunder')?2:1)));m.wind=null;m.rec=Math.max(m.rec||0,1.2);m.cd=Math.max(m.cd||0,1.2)}
+    for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:perk(h,'thunder')?330:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('cry',h.you||nearPlayer(h))}
+  if(id==='whirl'){const wr=perk(h,'storm')?133:95;for(const m of near(wr))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:wr,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('whoosh',h.you||nearPlayer(h))}
+  if(id==='mend'){const a=Math.round(h.max*(perk(h,'deep')?.7:.4));h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
 function hitBeast(h,m,d){if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
@@ -1947,7 +1949,7 @@ function stepHuman(h,dt,mv){
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
   ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
   const x=h.x,y=h.y;
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider')):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1)*(1+.1*charm(h,'feather'));h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider'))*(1+.06*((h.horse&&h.horse.lv||1)-1)):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1)*(1+.1*charm(h,'feather'));h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;if(h.riding)horseGrow(h,Math.hypot(vx,vy)*C.H_SPEED*wade*ride*dt);h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   if(assigned&&dist(h,assigned)>Math.max(C.FORAGE_RANGE,dist(assigned,{x,y}))){h.x=x;h.y=y;h.goal=null;h.returnHome=true}
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered>=(S.nextStar||C.STAR_EVERY)){S.nextStar=S.gathered+C.STAR_EVERY+4*S.evc.star;if(S.events.filter(e=>e.k==='star').length<2)startStar()};
@@ -2498,7 +2500,7 @@ function record(){const R=save.rec;return`<p class="dim">As the giant: ${save.gi
 function openTitle(){S=null;document.body.classList.add('titling');ov.classList.add('title');openMenu({big:true,title:'Colossus',body:'<p class="dim">A giant two thousand feet tall walks between three towns. Its people climb it: some bolt cannons to its shoulders and turn it on their rivals, some drive wedges into its knees to bring it down.</p>',
   items:[{label:'Play for Ashville',sub:'A human of the town of two minds: quest, shop, then climb the giant',act:()=>start('human')},...(save.firstDay?[{label:'Play the first day again',sub:'The guided start, step by step',act:()=>start('human',null,true)}]:[]),{label:'Play for Brindle',sub:'A human of the town that tends the giant and arms it',act:()=>start('human',null,false,1)},{label:'Play for Corvel',sub:'A human of the town that hunts the giant. Hard: the giant turns on hunters, so lead your town or bring the giant down',act:()=>start('human',null,false,2)},
     {label:'Play as the giant',sub:'Survive until dusk and complete three of five tasks',act:()=>start('giant')},
-    {label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
+    {label:'Renown \u00b7 '+(save.renown||0),sub:'Perks you keep for every match',act:openRenown},{label:'How to play',act:()=>openHelp(openTitle)},{label:'Sound: '+(save.sound?'on':'off'),act:()=>{save.sound=!save.sound;persist();if(save.sound)unlockAudio();openTitle()}}],foot:record()})}
 function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gold, buy kits in town, then walk to one of the giant's planted feet and climb. You climb hold to hold: push a direction to reach for the best hold that way, or tap one. Every reach costs grip, hanging drains it, mossy holds drain it faster and loose stones crumble a moment after you grab them. Stand on a ledge or rest by your own anchor to refill it. Lunge for a hold beyond your reach across bare stone. At a hurt joint with no wedge in it, the anchor button Tends it instead: it heals a little and the giant remembers you kindly (the mirror of Strike). A rival climber within arm's reach (away from a joint or build spot) can be shoved with Attack: it costs them a lot of grip, you a little, and starts a feud. A falling climber lands on the next ledge below or is caught by an anchor of their own town.</p>
 <p><b>Your hero grows.</b> Every level you choose one of three talents (T). Levels 2, 3 and 5 unlock skills on 1, 2 and 3: War cry, Whirlwind and Mend. Charms change how you play: wear two, three at level 4, four at level 7; alphas always drop one, camp chests often, the merchant sells them. I (or Tab) shows your hero.</p>
 <p><b>Horses.</b> Buy one in town and ride with R: almost twice as fast, and blows struck riding hit harder. A hard hit throws you; a worn-out horse bolts home for a minute. No riding on the giant.</p>
@@ -2560,7 +2562,16 @@ function nextTime(){const o=S.over;if(!o)return'';
   if(S.g.dead)return'The giant is dead and '+t+' stands. Next time try the other way: tend it and earn its favour at dusk.';
   if(o.dusk&&S.favoredH!==y.id){const fp=S.humans.find(x=>x.id===S.favoredH);return'The giant honoured '+(fp?whoOf(fp):'someone else')+'. Brace it, pull wedges and Tend hurt joints to stand first in its regard, or join the hunt and bring it down.'}
   return'Play for another town, or as the giant.'}
-function openEnd(){if(!S||!S.over)return;const o=S.over;openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+chronicleHtml()+record(),items:[{label:'Play again',act:()=>start(S.role,null,false,S.you?S.you.town:0)},{label:'Title',act:openTitle}],back:openTitle})}
+// renown: what a human match earns toward lasting starting perks, bought on the title screen (a light roguelite layer)
+const RENOWN=[{id:'purse',n:'A full purse',t:'Start with 60 more gold',c:15},{id:'seasoned',n:'Seasoned',t:'Start at level 2 with a talent to choose',c:20},
+  {id:'mare',n:'An old mare',t:'Start with a horse',c:25},{id:'heirloom',n:'An heirloom',t:'Start wearing a random charm',c:30},{id:'pockets',n:'Wide pockets',t:'One more charm slot',c:40}];
+function applyRenown(h){const u=save.unlocks||{};if(u.purse)h.gold+=60;if(u.seasoned)gainXp(h,50);if(u.mare)h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};if(u.pockets)h.extraSlot=1;if(u.heirloom){const quiet=h.you;h.you=false;giveCharm(h);h.you=quiet}}
+function renownEarned(h,o){if(!h)return null;const camps=h.campsBroken||0,tale=h.saga?h.saga.i+(h.saga.done?1:0):0,ch=(h.charms||[]).length+(h.bag||[]).length,win=o&&!o.giantWon&&S.favoredH===h.id?10:0;
+  return{n:2*h.lvl+3*camps+4*tale+ch+win,parts:'level '+h.lvl+' (+'+2*h.lvl+'), camps '+camps+' (+'+3*camps+'), tale steps '+tale+' (+'+4*tale+'), charms '+ch+' (+'+ch+')'+(win?', honoured by the giant (+10)':'')}}
+function openRenown(){const pts=save.renown||0,u=save.unlocks||{};openMenu({title:'Renown \u00b7 '+pts,body:'<p class="dim">Every match as a human earns renown: levels, camps broken, steps of the elders\u2019 tale, charms found, and the giant\u2019s honour. Spend it on perks you keep for every match.</p>',
+  items:[...RENOWN.map(r=>({label:(u[r.id]?'\u2713 ':'')+r.n+(u[r.id]?'':' \u2013 '+r.c+' renown'),sub:r.t,why:u[r.id]?'Yours':pts<r.c?'Need '+(r.c-pts)+' more':null,act:()=>{save.renown=pts-r.c;save.unlocks={...u,[r.id]:1};persist();sfx('coin');openRenown()}})),{label:'Back',act:openTitle}],back:openTitle})}
+function openEnd(){if(!S||!S.over)return;const o=S.over;if(S.role==='human'&&S.you&&o.renown==null){const r=renownEarned(S.you,o);o.renown=r.n;o.renownParts=r.parts;save.renown=(save.renown||0)+r.n;persist()}
+  openMenu({title:o.win?'Victory':'Defeat',body:`<p>${o.text}</p>`+(o.renown!=null?`<p><b>Renown +${o.renown}</b> <span class="dim">(${o.renownParts}). Spend it on the title screen.</span></p>`:'')+chronicleHtml()+record(),items:[{label:'Play again',act:()=>start(S.role,null,false,S.you?S.you.town:0)},{label:'Title',act:openTitle}],back:openTitle})}
 function openBuild(){const h=S.you;if(!h)return;const it=(k,label,sub,placement)=>({label:label+' \u2013 '+C.COST[k]+' gold',sub,why:canBuild(h,k,placement),act:()=>{if(build(h,k))closeMenu();else openBuild()}});
   const lk=lakesNear(h.x,h.y,500),near=buildNear(h),placement=barracksPlacement(h);
   const upItem=near?[{label:'Upgrade this '+(near.k==='house'?'house':'watchtower')+(upCost(near.k,near)!=null?' \u2013 '+upCost(near.k,near)+' crystals':''),sub:'Level '+lv(near)+(near.k==='house'?' · '+HOUSE_RENT*lv(near)+' gold every '+RENT_INTERVAL+' s':': further and harder'),why:canUpgrade(h,near.k,near),act:()=>{upgrade(h,near.k,near);openBuild()}}]:[];
@@ -2591,6 +2602,7 @@ function start(role,seed,first,town=0){feed=[];cam.manualT=-99;document.body.cla
   if(!(role==='human'&&!town&&(first||!save.firstDay))){applyOmen(drawOmen(S.seed));applyMemory()} /* the guided first day runs without an omen or memory */
   cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
   if(S.memoryText)toast(S.memoryText);
+  if(role==='human'&&S.you&&!S.tut)applyRenown(S.you);
   if(S.omen&&S.omen.id!=='clear')toast('Omen: '+S.omen.name+'. '+S.omen.text.replace(/^./,c=>c.toUpperCase())+'.');
   toast(role==='giant'?'You are the giant, asleep in chains. Survive to dusk and complete three of five tasks.':'You are of '+TOWNS[S.you.town].name+'.')}
 

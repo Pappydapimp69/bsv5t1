@@ -320,3 +320,8 @@ tests/sleeper.js 22 checks; all suites pass.
   hard start and Next time explains the way out) — a candidate for tuning with real players.
 - First day: once the knee is reached, every remaining card offers **Finish the first day here** (the Now line takes
   over). Checked in the page; tutorial tests pass.
+- Performance: simulation step at t≈1000–1060 (giant seed 3): original 3.35 ms with 102 people, now 1.87 ms with 59
+  (≈0.03 ms per person in both) — about 6% of a 30 Hz frame; the new per-climber checks (Shove, zones) don't show.
+- Hand play (Brindle): reached the knee at 1:21; parked on the joint instead of the ledge and fell (my error); on the
+  re-climb hit a genuine dead end at 65 ft where the nearest hold was 3 cells right — the hint "No hold within reach that
+  way: lunge (K)…" appeared every 4 s and right+lunge crossed it.

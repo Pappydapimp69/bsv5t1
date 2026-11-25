@@ -89,7 +89,7 @@ async function main() {
       state.monsters = [];
       const right = state.chains.find(chain => chain.id === 'ankleR');
       const before = right.hp;
-      state.t = C.CHAIN_OPEN;
+      state.t = 900; state.chainsStarted = 1;
       botHuman(soldier, C.DT);
       const struckFromGround = soldier.mode === 'ground' && right.hp === before - soldier.atk && soldier.chainHits === 1;
       const rejectedHitsNotCounted = !strikeChain(soldier, right) && soldier.chainHits === 1;
@@ -110,7 +110,7 @@ async function main() {
       const keeper = state.humans.find(h => h.town === 1);
       keeper.role = 'keeper';
       keeper.horn = 1;
-      state.t = C.CHAIN_OPEN;
+      state.t = 900; state.chainsStarted = 1;
       for (const chain of state.chains) chain.hp = 0;
       mount(keeper, 0);
       const row = C.WAKE_ROW;

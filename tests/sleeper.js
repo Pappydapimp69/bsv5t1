@@ -25,12 +25,18 @@ const {chromium} = require('playwright');
       for (let i = 0; i < 40; i++) { S.g.cd.strain = 0; S.g.wind = null; S.g.aim = 'legs'; giantDo('strain'); resolveWind(); }
       out.strainFloor = S.chains.every(c => c.hp >= c.max * C.STRAIN_FLOOR - 1e-6) && S.chains.some(c => c.hp < c.max);
       out.strainBlocked = canGiant('strain') !== null;
-      // after the chains open, strain can break them, and once all are gone one more strain lets it rise
-      S.t = C.CHAIN_OPEN + 1;
+      // time alone never opens the chains (the owner's rule): an hour in, strain still only weakens them
+      S.t = 3600; S.g.cd.strain = 0; S.g.wind = null;
+      out.noTimeWake = !chainsOpen() && canGiant('strain') !== null && !S.g.awake;
+      // once people start on the chains, strain can break them, and once all are gone one more strain lets it rise
+      S.chainsStarted = 1; out.opensOnPeople = chainsOpen();
       for (let i = 0; i < 200 && !allWeak(); i++) { S.g.cd.strain = 0; S.g.wind = null; S.g.aim = null; giantDo('strain'); resolveWind(); }
       out.allBroken = allWeak();
       S.g.cd.strain = 0; S.g.wind = null; giantDo('strain'); resolveWind();
       out.rose = S.g.awake;
+      // a forged horn also opens them; the bot giant never rises on its own once they are broken
+      const H = __col.newGame('human', 6); H.t = 100; out.hornOpens = !chainsOpen() && (H.humans[3].horn = 1, chainsOpen());
+      for (const c of H.chains) c.hp = 0; H.humans[3].horn = 0; for (let i = 0; i < 40; i++) __col.step(30); out.noSelfRise = !H.g.awake;
 
       // the sleeper bruises but is never crippled
       const T = __col.newGame('human', 7);
@@ -86,7 +92,7 @@ const {chromium} = require('playwright');
       start('human', 3, false, 2);
       out.startCorvel = !menu && __col.S.you.town === 2 && !!__col.S.omen && !__col.S.tut;
       save.firstDay = 0; start('human', 4, true);
-      out.startFirstDay = !menu && !!__col.S.tut && !__col.S.omen && C.CHAIN_OPEN === 900;
+      out.startFirstDay = !menu && !!__col.S.tut && !__col.S.omen && !chainsOpen();
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

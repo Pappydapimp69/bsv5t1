@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.136 · bbab8b8 · 2026-11-25 06:14 UTC</div>
+  <div id="ver">v1.137 · d06834f · 2026-11-25 06:16 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -2700,6 +2700,14 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   // forests: two stacked cones a tree, all trees in two draws
   const tGeo=new THREE.ConeGeometry(1,1,7),t1=new THREE.InstancedMesh(tGeo,new THREE.MeshLambertMaterial({color:0x2f4a2a}),S.trees.length),t2=new THREE.InstancedMesh(tGeo,new THREE.MeshLambertMaterial({color:0x3d5e34}),S.trees.length);
   S.trees.forEach((t,i)=>{const g=groundH(t.x,t.y),h=t.r*3.6;put(t1,i,t.x,t.y,g+h*.62,t.r*.9,h*.75,t.r*.9,i);put(t2,i,t.x,t.y,g+h*.3,t.r*1.15,h*.6,t.r*1.15,i*2)});G3.t1=t1;G3.t2=t2;sc.add(t1,t2);
+  // ground cover (owner: the world should not feel empty): bushes, boulders and wildflowers from their own generator, three draws
+  {const R=mulberry32((S.seed^0xF10)>>>0),M=C.MAP,ok=(x,y)=>!inSolid(x,y,25)&&S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>t.r+60)&&!(S.lakes||[]).some(l=>Math.hypot(l.x-x,l.y-y)<(l.r||200));
+    const bush=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),900),rock=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0x8d8f94,flatShading:true}),420),flow=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),1400);
+    let nb=0,nr=0,nf=0;for(let k=0;k<9000&&(nb<900||nr<420||nf<1400);k++){const x=300+R()*(M-600),y=300+R()*(M-600),c=R();if(!ok(x,y))continue;const g=groundH(x,y);
+      if(c<.3&&nb<900){const r=10+R()*16;put(bush,nb,x,y,g+r*.55,r*1.2,r*.8,r,R()*6);bush.setColorAt(nb++,_c.set(['#4a6b3a','#56783f','#3f5f34','#6b7f3c'][Math.floor(R()*4)]))}
+      else if(c<.45&&nr<420){const r=8+R()*22;put(rock,nr++,x,y,g+r*.3,r*1.3,r*.8,r,R()*6)}
+      else if(nf<1400){const col=['#f2e14a','#e86a8a','#f4f0e8','#9a7ae0','#f29a4a'][Math.floor(R()*5)];for(let j=0;j<3&&nf<1400;j++){const fx=x+(R()-.5)*40,fy=y+(R()-.5)*40;put(flow,nf,fx,fy,groundH(fx,fy)+3,5,6,5,0);flow.setColorAt(nf++,_c.set(col))}}}
+    bush.count=nb;rock.count=nr;flow.count=nf;for(const m of[bush,rock,flow]){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}sc.add(bush,rock,flow)}
   // the old giants lying as mountains
   const rock=new THREE.IcosahedronGeometry(1,1);G3.marks=[];
   // one mesh a mountain, so a mountain the camera is inside can turn see-through on its own

@@ -156,6 +156,9 @@ const {chromium} = require('playwright');
       al3.hp = 1; hitBeast(rv, al3, 5); out.slayerBounty = rv.quest.done;
       const run = () => { const D2 = __col.newGame('human', 29); D2.autoplay = true; while (D2.t < 240) __col.step(60); return D2.monsters.length + ':' + D2.monsters.reduce((a, m) => a + Math.round(m.x) + Math.round(m.y), 0) + ':' + D2.pois.length; };
       out.deterministic = run() === run();
+      // a talent reroll: one per match, another at level 5
+      const Ro = __col.newGame('human', 30), ro = Ro.you; gainXp(ro, 50); openTalents(); const rr = menu.items.find(i => /^Reroll/.test(i.label)); rr.act(); const again = menu.items.find(i => /^Reroll/.test(i.label));
+      out.reroll = ro.rerolls === 0 && !!again.why; closeMenu();
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

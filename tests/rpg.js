@@ -165,6 +165,9 @@ const {chromium} = require('playwright');
       tp.tx0 = tp.x - 10; tp.ty0 = tp.y; stepHorse(tp, C.DT); out.trample = w2.hp < 100;
       __col.step(2); const far = Tp.pois.find(p => p.k === 'shrine' && Math.hypot(p.x - tp.x, p.y - tp.y) > 2500); out.undiscovered = !!far && !far.found;
       tp.x = far.x + 100; tp.y = far.y; Tp.t = 100; stepPois(.6); out.discovered = !!far.found;
+      // the Warlord's phases: its pack at half health, rage at a quarter
+      const Wl = __col.newGame('human', 32), wh = Wl.you; Wl.monsters = []; spawnWarlord(wh); const wlb = Wl.monsters.find(m => m.warlord); const n0 = Wl.monsters.length;
+      hitBeast(wh, wlb, 270); out.warlordPack = Wl.monsters.length === n0 + 4; const wa0 = wlb.atk; hitBeast(wh, wlb, 140); out.warlordRage = wlb.atk > wa0 && wlb.swift;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

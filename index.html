@@ -3584,6 +3584,7 @@ function paintPanel(){const g=S.g,h=S.you,cs=S.chains,st=c=>c.hp<=0?0:chainWeak(
 function nextAim(h){const g=S.g,J=S.joints;h.aimPoi=null;if(h.dead||h.job)return'';const kin=k=>h.kits[k]>0,climb=h.mode==='climb';
   if(packCount(h)>=packCap(h))return'your pack is full: bank it at home';
   if(g.dead)return'the giant is dead: hold your town until dusk';
+  {const home=S.towns.find(t=>t.i===h.town&&t.alive&&S.monsters.some(m=>m.raid&&m.raid.town===t.id&&Math.hypot(m.x-t.x,m.y-t.y)<t.r+80));if(home&&home.hp<home.max*.85&&!climb)return'beasts are at '+home.name+'\u2019s walls ('+Math.round(home.hp/home.max*100)+'%): go home and fight them'+(Math.hypot(home.x-h.x,home.y-h.y)>1500?' ('+Math.round(Math.hypot(home.x-h.x,home.y-h.y)/10)+' paces)':'')}
   // the horn race: whoever sounds a horn at the head first wakes the giant and earns its thanks for their town
   if(!g.awake&&allWeak()){const rivals=S.humans.filter(o=>o!==h&&o.horn&&!o.dead&&o.town!==h.town&&factionAlive(o.town)).sort((a,b)=>(b.cl?b.cl.y:0)-(a.cl?a.cl.y:0)),lead=rivals[0],
       lh=lead?(lead.mode==='climb'?Math.round(lead.cl.y*FT)+' ft':'on the ground'):null,race=lead?' \u00b7 '+whoOf(lead)+' carries a horn ('+lh+')':'';

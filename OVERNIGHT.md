@@ -427,6 +427,46 @@ Shipped (each published to play/ with its version number on the menu screen):
 | v1.142 | Treasure maps (dig at the glint) and town festivals at 70+ prosperity |
 | v1.143 | Wandering champion duels (a third world event) |
 | v1.144 | First-time hints for the human side |
+| v1.146 | Heroes wear town-coloured hoods; smaller armour pads |
+| v1.147 | Fixes from the independent review (10 verified defects, each pinned by a test) |
+| v1.148 | Rival news; end screen ranks the heroes |
+| v1.149 | Seasoned rivals attack guarded camps; slash arcs on your strikes |
+| v1.150 | What's new page on the title screen |
+| v1.151 | Passing rain showers |
+| v1.152 | Clickable skill bar |
+| v1.153 | Gamepad: D-pad skills, left stick rides |
+| v1.154 | Wave raiders hit walls a third as hard; warnings at 60% and 30% walls |
+
+## Independent review (v1.147)
+
+A read-only reviewer probed the run's code with throwaway scripts and verified ten defects my own tests missed:
+
+- The first-day hold could keep the chains closed all match, because my no-timer change removed the minute-20 cap.
+- Swapping health charms healed you: five cycles took a hero from 20 to 140 health.
+- Camp chests could be farmed by standing beside the camp (+529 gold).
+- The tale stalled if you had read the stones before it started.
+- A Warlord killed by someone else stranded the tale.
+- Civic buildings had NaN health and could not be destroyed.
+- A Hero-Slayer's rename broke its bounty.
+- The merchant parked on the first-day house spot.
+- `Math.random` in world events broke seed replay.
+- Farms were an uncapped source of gold.
+
+All ten are fixed, with regression checks in tests/rpg.js (76 checks now).
+
+## Balance findings from whole-match sweeps
+
+- **Gold piled up late.** Every house paying the player (your rule), plus prosperity and markets, left an autoplay
+  player at 5,039 gold by dusk in seed 32. Houses you did not build now pay half, and late sinks were added: Giantbone
+  and Skyforged gear, training that buys talents at a doubling price, and horse barding. The same seed now ends at 1,733.
+- **A town fell to a wave in minute 6.** In seed 22, wave 4 (a troll and five wolves, about 74 wall damage a second)
+  razed an undefended Ashville in about a minute. Wave raiders now hit walls a third as hard, with warnings at 60% and
+  30%. Six human seeds and the giant sweeps now reach dusk.
+- **The walk.** An autoplay hero's first 15 minutes (seed 701) split into walking 43% (33% of all time on horseback),
+  climbing 49%, fighting 5% and idle 4%. The earlier pacing review had walking above 90%. The measures differ and this
+  is one seed, so it is not a clean comparison.
+- **Speed.** The sim runs at the same speed as v1.148. Draw calls went from 30 to 35: ground cover added 3, and new
+  figures and places add a few. Frame rate under software rendering is unchanged.
 
 Tests: new tests/rpg.js (55 checks) covers all of the above; the older suites pass unchanged except where the owner's
 rules changed behaviour (outposts now need settlers; raising a town sends a trade caravan).

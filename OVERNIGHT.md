@@ -262,18 +262,6 @@ large; earlier 6-seed set at the same tuning had one giant death).
   more gold for a brace kit… or pull rivals' wedges"), hunters at wedges. Found while watching a Brindle tender policy
   that built its ladder, had 40 gold and no way to earn regard.
 
-## What I would build next (draft, updated at the end)
-
-1. **Put a person in each role.** Every claim here rests on bots, key-press policies and my own hand play. The open GPTBS
-   questions (is twitch/strain play or busywork for a person; do players read the chronicle; does the Now line narrow
-   play) need first-time players, one match each role, with screen recording.
-2. **The walk.** Bots spend 86–90% of the early game walking; roads only shave ~25%. Try purpose on the way (caravans to
-   escort, beasts guarding crystal fields between town and giant) before touching map scale (GPTBS 0101#E97).
-3. **Climber-vs-climber on the body.** Rival hunters and keepers share the giant but cannot touch each other up there;
-   a shove (grip damage) would make the horn race and wedge-pulling contests real.
-4. **Online play.** The asymmetric premise wants one real giant and several real humans; everything is single-file and
-   deterministic per seed, which helps a lockstep or host-authoritative prototype.
-
 ### 16. Shoving rivals on the body (checkpoint 16)
 
 - Rivals shared the giant but could not touch each other there. Now Attack on a rival within 1.8 cells (when no joint,
@@ -338,3 +326,16 @@ tests/sleeper.js 22 checks; all suites pass.
   of other settlements, and you shop at and come back to life at your nearest settlement. The Now line now suggests a
   forward outpost near the giant when you can afford one (120 gold) and your nearest settlement is >3000 away.
   Headless check: outpost founded 1273 from the giant; after a death the hero reappeared 64 from it (~8 s walk vs ~45 s).
+
+## What I would build next
+
+1. **Put a person in each role.** Every claim here rests on bots, key-press policies and my own hand play. The open GPTBS
+   questions (is twitch/strain play or busywork for a person; do players read the chronicle and act on Next time; does
+   the Now line narrow play; does the remembered grudge read as story or handicap) need first-time players, one match per
+   role, with screen recording.
+2. **Tune with players, not bots.** Bot giants now reach dusk in nearly every sweep; bot hunters are a crowd, not a
+   plan. A human hunter party (or smarter bot focus on one knee) is the real test of the awake phase.
+3. **The walk.** Roads (1.25×) and the forward-outpost hint help; next would be purpose on the way (escorting caravans,
+   beasts guarding the crystal fields between town and giant) before touching map scale (GPTBS 0101#E97).
+4. **Online play.** The asymmetric premise wants one real giant and several real humans; the sim is single-file and
+   deterministic per seed, which suits a host-authoritative prototype.

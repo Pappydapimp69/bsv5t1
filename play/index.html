@@ -479,7 +479,7 @@ let S=null;
 // omens: each match started from the menu draws one rule twist, told at the start and in the chronicle, so days differ
 // in shape. Drawn from their own generator (the land is untouched) and undone at every new game.
 const OMENS=[{id:'clear',name:'A clear sky',text:'no omen: the day runs as it always does',w:2,c:{}},
-  {id:'restless',name:'A restless giant',text:'its chains weaken from minute 10, not 15',w:1,c:{CHAIN_OPEN:600,CHAIN_HOLD_MAX:900}},
+  {id:'restless',name:'A restless giant',text:'its chains are worn thin: two thirds as strong',w:1,c:{CHAIN_HP:600}},
   {id:'blood',name:'A blood moon',text:'wedges bleed joints half again as fast',w:1,c:{WEDGE_DPS:6}},
   {id:'long',name:'A long day',text:'dusk comes at minute 30, not 25',w:1,c:{DUSK:1800}},
   {id:'dark',name:'Dark dreams',text:'the sleeper dreams of those who hurt it sooner and more often',w:1,c:{DREAM_MIN:25,DREAM_CD:60}}];
@@ -744,10 +744,11 @@ function fwd(g){return{x:Math.cos(g.ang),y:Math.sin(g.ang)}}
 function braces(){return S.sites.filter(s=>s.build&&s.build.k==='brace').length}
 // the giant starts all but unable to move; every brace humans bolt onto it lets it walk faster and do more
 function chained(id){const ch=S.chains.find(c=>c.id===id);return ch&&ch.hp>0}
-// rival people leave the chains alone until about minute 15, and not before the player's own chain step on the first day,
-// so the waking is a late turn of the match the player can see coming (the person: it woke before they saw chains break)
-C.CHAIN_OPEN=900;C.CHAIN_HOLD_MAX=1200; // a player who leaves the first day unfinished does not hold the whole match back past minute 20
-function chainsOpen(){if(S.t<C.CHAIN_OPEN)return false;const st=tutStep();return !st||S.t>=C.CHAIN_HOLD_MAX||FIRST_DAY.findIndex(x=>x.id==='chain')<S.tut.i}
+// the giant never wakes by the clock (the owner's rule): rival people leave the chains alone until someone has forged a
+// wake horn or a person has started on the chains, and never before the player's own chain step on the first day, so the
+// waking is a turn of the match people cause and can see coming. Only a horn wakes it, or the giant player's own strain
+// once people have broken all four chains.
+function chainsOpen(){const st=tutStep();if(st&&FIRST_DAY.findIndex(x=>x.id==='chain')>=S.tut.i)return false;return !!S.chainsStarted||S.humans.some(h=>h.horn)}
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below 60% of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)
@@ -757,7 +758,7 @@ C.DREAM_CD=90;C.DREAM_WIND=1.5;C.DREAM_MIN=50;
 // the sleeper's nightmare: it dreams of the town that has hurt it most, and the beasts of the land march on that town
 function dreamTarget(){let b=-1;for(let i=0;i<3;i++)if(factionAlive(i)&&S.grudge[i]>=C.DREAM_MIN&&(b<0||S.grudge[i]>S.grudge[b]))b=i;if(b<0)return null;
   if(S.events.some(e=>e.k==='raid'&&e.i===b))return null;return nearestOwn(b,S.g.x,S.g.y)}
-C.STRAIN_CD=3.5;C.STRAIN_WIND=.7;C.STRAIN_DMG=55;C.STRAIN_FLOOR=.4;C.STRAIN_OPEN=1.6;C.SELF_RISE=60;
+C.STRAIN_CD=3.5;C.STRAIN_WIND=.7;C.STRAIN_DMG=55;C.STRAIN_FLOOR=.4;C.STRAIN_OPEN=1.6;
 const huntOpen=()=>!!S&&(S.g.awake||S.t>=C.HUNT_OPEN);
 const ZONES={legs:'legs',left:'left side',right:'right side',top:'chest and head'};
 // four parts of the body, one per direction: legs (down), left side (left), right side (right), chest, shoulders and head (up)
@@ -845,8 +846,8 @@ function resolveWind(){const g=S.g,w=g.wind;g.wind=null;S.windAt=S.t;
   if(w.k==='strain'){if(allWeak()){riseFree();return}const ch=S.chains.find(c=>c.id===w.chain);shake(5);S.strains=(S.strains||0)+1;
     for(const h of climbers())h.grip-=S.chains.some(c=>c.id===w.chain&&Math.abs(c.r-h.cl.y)<12&&Math.abs(c.c-h.cl.x)<6)?5:1.5;
     if(ch&&ch.hp>0){const open=chainsOpen(),floor=open?0:ch.max*C.STRAIN_FLOOR;ch.hp=Math.max(floor,ch.hp-C.STRAIN_DMG*(open?C.STRAIN_OPEN:1));(S.chainFlash||(S.chainFlash={}))[ch.id]=S.t;
-      if(chainWeak(ch)){if(!S.headless)chainClank(ch,true);chron('The giant tore its own '+ch.name+' loose.','chain','the giant itself');announce('The giant tears its '+ch.name+' loose!'+(allWeak()?' All four chains are gone: '+(S.role==='giant'?'strain once more to rise.':'it will rise on its own unless a horn wakes it first.'):''))}
-      else if(S.role==='giant'&&!S.autoplay&&!open&&ch.hp<=ch.max*C.STRAIN_FLOOR+.5)toast('The '+ch.name+' groans but holds. It will give only once the chains weaken (minute '+Math.round(C.CHAIN_OPEN/60)+').')}
+      if(chainWeak(ch)){if(!S.headless)chainClank(ch,true);chron('The giant tore its own '+ch.name+' loose.','chain','the giant itself');announce('The giant tears its '+ch.name+' loose!'+(allWeak()?' All four chains are gone: '+(S.role==='giant'?'strain once more to rise.':'a wake horn sounded at its head will wake it.'):''))}
+      else if(S.role==='giant'&&!S.autoplay&&!open&&ch.hp<=ch.max*C.STRAIN_FLOOR+.5)toast('The '+ch.name+' groans but holds. It will give only once people start breaking your chains or forge a wake horn.')}
     return}
   if(w.k==='stomp'){sfx('stomp');shake(14);for(const f of g.feet){S.fx.push({k:'ring',x:f.x,y:f.y,r:C.STOMP_R,t:0,life:.6,col:'#ffcf6a'});hurtArea(f.x,f.y,C.STOMP_R,C.STOMP_DMG,C.STOMP_TOWN,'stomp')}}
   else if(w.k==='smash'){sfx('smash');shake(18);S.fx.push({k:'ring',x:w.x,y:w.y,r:C.SMASH_R,t:0,life:.7,col:'#ff8f80'});hurtArea(w.x,w.y,C.SMASH_R,C.SMASH_DMG,C.SMASH_TOWN,'smash')}
@@ -964,7 +965,7 @@ function reachT(h){const cl=h.cl,R=C.REACH;let b={d:R+1e-6,j:null,s:null,ch:null
   return b}
 // beside a planted foot the ankle chain on that leg can be struck from the ground
 function footChain(h){const f=nearFoot(h);if(nightLock())return null;if(f<0)return null;return S.chains.find(c=>c.id===(f?'ankleR':'ankleL')&&c.hp>0)||null}
-function strikeChain(h,ch){if(h.cd>0||nightLock()||!h.you&&!chainsOpen()||chainWeak(ch))return false;h.cd=.5;h.swing=.2;ch.hurtT=S.t;ch.hp=Math.max(0,ch.hp-h.atk);h.chainHits=(h.chainHits||0)+1;if(!S.headless&&Math.random()<.3)chainClank(ch);sfx('hit',h.you);
+function strikeChain(h,ch){if(h.cd>0||nightLock()||!h.you&&!chainsOpen()||chainWeak(ch))return false;S.chainsStarted=1;h.cd=.5;h.swing=.2;ch.hurtT=S.t;ch.hp=Math.max(0,ch.hp-h.atk);h.chainHits=(h.chainHits||0)+1;if(!S.headless&&Math.random()<.3)chainClank(ch);sfx('hit',h.you);
   if(chainWeak(ch)){S.grudge[h.town]-=30;regard(h,30);gainXp(h,25);(S.chainFlash||(S.chainFlash={}))[ch.id]=S.t;if(!S.headless)chainClank(ch,true);chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' broke the '+ch.name+'.','chain',whoOf(h));announce('The '+ch.name+' breaks.'+(allWeak()?' All four chains are broken: a wake horn sounded at its head will wake it.':''))}return true}
 // the giant's regard for each person: fed like the grudges but credited to whoever acted; fades the same way
 function regard(h,a){if(!h||!S)return;S.reg=S.reg||{};S.reg[h.id]=(S.reg[h.id]||0)+a}
@@ -1641,6 +1642,9 @@ function tutStep(){return S&&S.tut&&!S.tut.done?FIRST_DAY[S.tut.i]:null}
 function stepTutorial(dt){const st=tutStep(),h=S.you;if(!st||!h||h.dead||S.t<OPENING.len+1)return;
   // a step already done on the way (the crystal banked while walking out to the giant) passes without its card
   if(!S.tut.shown&&st.id==='home'&&st.check(h)){S.tut.i++;S.tut.t=0;return}
+  // after "Got it" (remembered) the cards stop opening: each new goal is told in the feed and on the goal line instead (the owner's note)
+  if(!S.tut.shown&&save.noFly){if(st.setup)st.setup(h);S.tut.shown=true;S.tut.t=0;S.tut.cardDue=false;
+    if(st.id==='end'){S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}else{sfx('coin');toast('New goal: '+st.name)}return}
   if(!S.tut.shown){if(!S.tut.cardDue&&!menu){S.tut.cardDue=true}return}
   S.tut.t+=dt;if(TUT_HUNT.includes(st.id)&&S.t%2<dt)tutWolves(h);const done=st.check(h);
   if(done||S.tut.skipped||(S.tut.t>150&&!st.hold)){if(!done)toast('Moving on.');else{sfx('coin');toast('Done.')}S.tut.i++;S.tut.t=0;S.tut.shown=false;S.tut.skipped=false;
@@ -1649,7 +1653,7 @@ const TUT_HUNT=['strike','dodge','heavy','reward'];
 function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false;if(st.setup)st.setup(S.you);const last=st.id==='end';
   openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[...(()=>{const show={label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
       // once "Got it" is chosen it stays the default (remembered), so pressing on through the cards never flies the camera
-      got={label:'Got it',sub:'No camera flight; the goal line and map marker keep pointing the way',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(!save.noFly){save.noFly=1;persist()}}};
+      got={label:'Got it',sub:'No more cards or camera flights: new goals show on the goal line and map',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(!save.noFly){save.noFly=1;persist()}}};
       return last||st.info?[show]:save.noFly?[got,show]:[show,got]})(),
     ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}]),
@@ -2013,7 +2017,7 @@ function botShop(h){const town=townAt(h);if(h.hero){if(town)botHeroShop(h,town);
   if(!h.potions&&h.gold>=C.COST.potion){h.gold-=C.COST.potion;h.potions++}
 }
 function botSleeper(dt){const g=S.g;if(g.wind||nightLock())return;
-  if(allWeak()){S.weakSince=S.weakSince??S.t;const hornUp=S.humans.some(h=>h.horn&&h.mode==='climb'&&!h.dead);if(S.t-S.weakSince>=(hornUp?C.SELF_RISE*3:C.SELF_RISE)&&!S.waker){g.aim=null;giantDo('strain')}return}
+  if(allWeak())return; // it waits for a horn: the bot giant never rises on a timer
   // it twitches where it is being worked against, not at every touch, and strains now and then in its sleep
   // it holds still where those tending it outnumber those hurting it (a keeper pulling a wedge is not shaken off)
   const side=z=>{let f=0,e=0;for(const h of climbers())if(zoneAt(h.cl.y,h.cl.x)===z){if(hunter(h))e++;else if(h.role==='keeper'||(S.reg&&S.reg[h.id]||0)>0)f++}return f>e};
@@ -2258,7 +2262,7 @@ function helpHtml(){return`<p><b>Humans.</b> Take quests and hunt beasts for gol
 <p><b>Days and nights.</b> Each day ends at dusk in a short night. While it is chained, no one can touch the giant at night, and the dusk storm grows as its chains wear.</p>
 <p><b>The giant wakes slowly.</b> It begins asleep and chained at both ankles and both wrists. Every blow wears a chain, and worn through it breaks; once all four are broken, a wake horn, forged in town from twenty sky crystals and sounded at its head for ten seconds, wakes it, and the town that wakes it earns its favour; and only then can it move. Even awake it is all but unable to move. Braces bolted to its shoulders, forearms and crown let it walk faster and unlock its stomp, smash and swipe. Once it can walk it wanders, and goes after any town that has hurt it past bearing.</p>
 <p><b>Playing the giant.</b> You win by surviving until dusk with your Heart-stone whole and completing three of five tasks: be Freed (all four chains broken), be Braced (three braces), be Avenged (a town that angered you brought below half its walls), be Befriended (a town friendly to you), and be a Wanderer (six thousand paces walked). The HUD shows each. You cannot build: court the towns that brace you and leave the hunters to rue it. Awake, you always have the strength of one brace (a slow walk and Stomp); Smash needs two braces and Swipe three. If both knees are crippled you fall: press any action fast to Struggle up sooner. Walk with momentum, stomp the ground, smash towns, shake off climbers and swipe a hand across one side of your body. </p>
-<p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction, or tap or click your body panel, to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: until the chains weaken (minute 15, or 10 under a restless omen) it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. Once a town has hurt you, Nightmare sends the beasts of the land against it; its people must go home to fight them. </p>
+<p><b>The chained sleeper.</b> You start asleep and chained, but not helpless. Push a direction, or tap or click your body panel, to pick a part of your body (legs, left side, right side, chest and head) and Twitch it: everyone there loses grip unless they hold still in time, and wedges and ropes there can shake loose. Strain pulls at a chain: until people start breaking your chains or someone forges a wake horn it only weakens them, after that it can tear them loose, and once all four are gone one more strain lets you rise on your own. From the first minute hunters may wedge and strike you as you sleep: it bruises but cannot cripple you. Climbers drawn with a red edge on your body panel are hunting you. Once a town has hurt you, Nightmare sends the beasts of the land against it; its people must go home to fight them. </p>
 <p class="dim">Keys: WASD or arrows move, J K L H act, Q and E turn the camera, T and G tilt it, R and F zoom, C resets it, Esc pauses. Pad: left stick moves, right stick turns and tilts, triggers zoom, R3 resets, A B X Y act, Start pauses. Touch: tap where to walk or which hold to climb to, drag to turn and tilt, pinch to zoom.</p>`}
 function openHelp(back){openMenu({title:'How to play',body:helpHtml(),items:[{label:'Back',act:back}],back})}
 // every barracks you built, wherever you are: pick one to train and give orders
@@ -3189,10 +3193,10 @@ function outpostAim(h){const g=S.g,climb=h.mode==='climb';
 // the giant's first lessons, each told once (ever) at the moment it applies, in the flow of play rather than on cards
 function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=save.ghint||{},k=device==='pad'?{A:'A',B:'B',X:'X',Y:'Y'}:device==='touch'?{A:'the big button',B:'the left button',X:'the top-left button',Y:'the top button'}:{A:'J',B:'K',X:'L',Y:'H'};
   const say=(id,text)=>{if(seen[id]||S.hintAt>S.t-6)return;seen[id]=1;S.hintAt=S.t;persist();toast(text)};
-  if(!g.awake){say('strain','You are chained. Strain ('+k.B+') pulls at your chains; until minute '+Math.round(C.CHAIN_OPEN/60)+' it only weakens them.');
+  if(!g.awake){say('strain','You are chained. Strain ('+k.B+') pulls at your chains; until people start breaking them or forge a wake horn it only weakens them.');
     if(climbers().some(hunter))say('twitch','Someone is climbing you to hurt you (red edge on your body panel). '+(device==='touch'?'Tap that part of your body panel':'Pick that part with the arrows or a click on the panel')+', then Twitch ('+k.A+').');
     if(dreamTarget())say('dream','You hold a grudge against '+TOWNS[dreamTarget().i].name+'. Nightmare ('+k.X+') sends the beasts of the land against it.');
-    if(chainsOpen())say('open','The chains weaken now: Strain can tear them loose, and once all four are gone you can rise.')}
+    if(chainsOpen())say('open','People are after your chains now: Strain can tear them loose too, and once all four are gone you can rise.')}
   else if(g.fallen>0)say('struggle','You are down! Press any action fast to Struggle up sooner.');
   else say('awake','You are awake. Walk with the stick or WASD; Stomp ('+k.A+') crushes around your feet, Shake ('+k.X+') throws off climbers, Smash ('+k.B+') and Swipe ('+k.Y+') need towns to brace you.')}
 // the dusk honour goes to whoever stands first in the giant's regard: say so when that changes to or from you

@@ -314,3 +314,7 @@ tests/sleeper.js 22 checks; all suites pass.
 - End screen **Next time**: one suggestion read from how the match ended (your town fell to the giant → lead it by
   tending; someone else was honoured → how to stand first in its regard, or join the hunt; giant missed tasks → how to get
   the first two; Heart broken → shake, swipe, struggle). Checked on three finished matches.
+- Chained-match check through the real `start()` path (4 matches each, giant and Corvel human, autoplay): no errors; omens
+  varied (clear, dark, restless) and resets held; memories carried and were announced. Corvel is remembered as "hurt it
+  most" every time a bot plays it; with restless + memory, bot-led Corvel fell at 15:03. Left as is (Corvel is the marked
+  hard start and Next time explains the way out) — a candidate for tuning with real players.

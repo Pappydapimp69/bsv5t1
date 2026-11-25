@@ -1104,7 +1104,8 @@ function stepBuilds(dt){
     for(const f of foes.slice(0,sp==='volley'?3:1)){if(f.m){f.m.hp-=dmg;f.m.hitT=S.t;S.fx.push({k:'ring',x:f.m.x,y:f.m.y,r:30,t:0,life:.3,col:'#ffcf6a'})}else{hurtHuman(f.o,dmg*.6,'tower');S.fx.push({k:'ring',x:f.o.x,y:f.o.y,r:30,t:0,life:.3,col:'#ff8f80'})}}}
   if(Math.floor(S.t/RENT_INTERVAL)!==Math.floor((S.t-dt)/RENT_INTERVAL)){
     let collected=0;
-    for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;const owner=S.humans.find(h=>h.id===b.owner);if(!owner)continue;
+    // every house of the player's town pays the player, whoever built it (the owner's rule); other towns' houses pay their builders
+    for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;
       const gold=HOUSE_RENT*lv(b);owner.gold+=gold;if(owner===S.you)collected+=gold}
     if(collected)toast('House rent: +'+collected+' gold.');
   }

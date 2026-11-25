@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.139 · def4fb5 · 2026-11-25 06:19 UTC</div>
+  <div id="ver">v1.140 · 11ff128 · 2026-11-25 06:23 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -481,9 +481,9 @@ function tone(f,dur,type,vol,slide){if(!actx||!save.sound)return;const t=actx.cu
 function sfx(k,near){if(near===false||sndBudget>6)return;sndBudget++;
   if(se&&se!=='starting'){if(!save.sound)return;const u=seSrc.ui,b=seSrc.boom;
     try{({step:()=>b.sfx('explosion',{midi:21,duration:.9,velocity:.7}),stomp:()=>b.sfx('explosion',{midi:24,velocity:.95}),smash:()=>b.sfx('explosion',{midi:28,velocity:1}),
-      hit:()=>u.sfx('hit'),hoof:()=>b.sfx('crunch',{velocity:.12}),whoosh:()=>u.sfx('hit',{midi:62}),cry:()=>{b.sfx('explosion',{midi:33,duration:.5,velocity:.5});u.sfx('hit',{midi:38})},hurt:()=>{b.sfx('crunch',{velocity:.7});u.sfx('hit',{midi:43})},heavy:()=>{u.sfx('hit');b.sfx('explosion',{midi:40,duration:.35,velocity:.55})},kill:()=>{u.sfx('hit',{midi:50});b.sfx('crunch',{velocity:.45})},thud:()=>b.sfx('crunch',{velocity:.5}),coin:()=>u.sfx('coin'),cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))()}catch(e){}return}
+      hit:()=>u.sfx('hit'),hoof:()=>b.sfx('crunch',{velocity:.12}),whoosh:()=>u.sfx('hit',{midi:62}),cry:()=>{b.sfx('explosion',{midi:33,duration:.5,velocity:.5});u.sfx('hit',{midi:38})},hurt:()=>{b.sfx('crunch',{velocity:.7});u.sfx('hit',{midi:43})},heavy:()=>{u.sfx('hit');b.sfx('explosion',{midi:40,duration:.35,velocity:.55})},kill:()=>{u.sfx('hit',{midi:50});b.sfx('crunch',{velocity:.45})},thud:()=>b.sfx('crunch',{velocity:.5}),coin:()=>u.sfx('coin'),fanfare:()=>{u.sfx('coin');setTimeout(()=>u.sfx('coin',{midi:79}),130);setTimeout(()=>u.sfx('coin',{midi:84}),260)},cannon:()=>b.sfx('crunch'),warn:()=>u.sfx('blip'),build:()=>u.sfx('powerup'),fall:()=>u.sfx('jump',{midi:55}),grip:()=>u.sfx('blip',{freq:440})}[k]||(()=>{}))()}catch(e){}return}
   ({step:()=>tone(52,.4,'sine',.35,28),stomp:()=>tone(70,.7,'triangle',.5,25),smash:()=>tone(90,.6,'sawtooth',.25,30),hit:()=>tone(330,.08,'square',.08,160),hoof:()=>tone(130,.05,'triangle',.07,90),whoosh:()=>tone(700,.22,'sawtooth',.05,180),cry:()=>tone(180,.5,'sawtooth',.14,110),hurt:()=>tone(160,.18,'sawtooth',.16,70),heavy:()=>tone(200,.22,'square',.14,60),kill:()=>tone(260,.25,'triangle',.14,90),thud:()=>tone(110,.18,'triangle',.14,55),
-    coin:()=>tone(880,.12,'sine',.12,1320),cannon:()=>tone(140,.25,'square',.12,60),warn:()=>tone(440,.3,'triangle',.16,300),build:()=>tone(600,.15,'triangle',.15,900),
+    fanfare:()=>{tone(660,.12,'triangle',.12,660);setTimeout(()=>tone(880,.12,'triangle',.12,880),130);setTimeout(()=>tone(1320,.25,'triangle',.12,1320),260)},coin:()=>tone(880,.12,'sine',.12,1320),cannon:()=>tone(140,.25,'square',.12,60),warn:()=>tone(440,.3,'triangle',.16,300),build:()=>tone(600,.15,'triangle',.15,900),
     fall:()=>tone(500,.6,'sine',.12,120),grip:()=>tone(240,.12,'square',.06,200)}[k]||(()=>{}))()}
 
 // ================= state =================
@@ -1834,7 +1834,7 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
 function gainXp(h,x){h.xp+=Math.round(x*(1+.2*charm(h,'knot')));while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;
     if(h.hero){h.picks=(h.picks||0)+1;if(!h.you||S.autoplay)autoTalent(h)}
     while(h.bag&&h.bag.length&&(h.charms||[]).length<charmSlots(h)){const id=h.bag[0];equipCharm(h,id);if(h.you)toast('A new charm slot: you wear the '+CHARMS[id].n+'.')}
-    if(h.you){const sk=SKILLS.find(k=>k.lvl===h.lvl);toast('Level '+h.lvl+'! Press T to choose a talent.'+(sk?' New skill: '+sk.name+' ('+sk.key+').':''));sfx('coin');S.lvlFx=S.t;S.fx.push({k:'lvl',x:h.x,y:h.y,z:0,t:0,life:1.6});S.fx.push({k:'ring',x:h.x,y:h.y,r:160,t:0,life:.9,col:'#ffd27a'})}}}
+    if(h.you){const sk=SKILLS.find(k=>k.lvl===h.lvl);toast('Level '+h.lvl+'! Press T to choose a talent.'+(sk?' New skill: '+sk.name+' ('+sk.key+').':''));sfx('fanfare');S.lvlFx=S.t;S.fx.push({k:'lvl',x:h.x,y:h.y,z:0,t:0,life:1.6});S.fx.push({k:'ring',x:h.x,y:h.y,r:160,t:0,life:.9,col:'#ffd27a'})}}}
 // Talents and skills (owner's request: skills and RPG elements). Each level a hero picks one talent of three, Hades and
 // Vampire Survivors style (pick 1 of 3, effects you feel at once), and levels 2, 3 and 5 unlock an active skill on keys 1-3.
 const TALENTS=[

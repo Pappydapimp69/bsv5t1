@@ -423,6 +423,10 @@ Shipped (each published to play/ with its version number on the menu screen):
 | v1.138 | Shop order: basics first |
 | v1.139 | Today's goals: three per match, 5 renown each |
 | v1.140 | Level-up fanfare |
+| v1.141 | Crafting: pelts become hides at home; the Forge makes a fur cloak, satchel, boots, a bone fetish |
+| v1.142 | Treasure maps (dig at the glint) and town festivals at 70+ prosperity |
+| v1.143 | Wandering champion duels (a third world event) |
+| v1.144 | First-time hints for the human side |
 
 Tests: new tests/rpg.js (55 checks) covers all of the above; the older suites pass unchanged except where the owner's
 rules changed behaviour (outposts now need settlers; raising a town sends a trade caravan).

@@ -334,3 +334,7 @@ tests/sleeper.js 22 checks; all suites pass.
 - The horn race is visible: once the chains are gone, the Now line names the leading rival horn carrier and their height
   ("· Brindle's hero carries a horn (1025 ft)"), and without a horn suggests shoving them or conceding the thanks.
   Ashville seed 21: the line tracked Brindle's hero climbing to 1104 ft and falling back.
+- "The walk" partly answered with an existing but undiscoverable mechanic: heroes can found an **outpost** anywhere clear
+  of other settlements, and you shop at and come back to life at your nearest settlement. The Now line now suggests a
+  forward outpost near the giant when you can afford one (120 gold) and your nearest settlement is >3000 away.
+  Headless check: outpost founded 1273 from the giant; after a death the hero reappeared 64 from it (~8 s walk vs ~45 s).

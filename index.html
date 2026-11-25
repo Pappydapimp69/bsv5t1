@@ -3098,6 +3098,8 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(kin('brace')||kin('cannon')||kin('ladder')||kin('platform'))return'bolt your kit onto a free build spot on the giant';
   if(w.length&&!climb)return'rivals\u2019 wedges bleed the giant\u2019s '+JOINTS[w[0]].name.toLowerCase()+': pull them out and it will remember you';
   if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
+  // a forward base: an outpost near the giant shortens every walk (you shop and come back to life at your nearest settlement)
+  {const near=nearestOwn(h.town,g.x,g.y);if(!climb&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000))return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}
   {const way=townWay(h.town),tend=way==='tend'||(S.reg&&S.reg[h.id]||0)>C.LEAD_REG,hunt=way==='hunt'&&!tend;
     if(!climb&&huntOpen()&&tend&&h.gold>=C.COST.brace)return'buy a brace kit in town and bolt it on: the giant remembers who braces it';
     if(!climb&&huntOpen()&&tend)return(Object.values(S.joints).some(j=>j.hp<j.max-1&&!j.crip)?'climb and Tend a hurt joint (anchor button): the giant remembers kindness; or ':'')+'earn '+(C.COST.brace-h.gold)+' more gold for a brace kit';

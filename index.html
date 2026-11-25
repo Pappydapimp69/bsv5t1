@@ -119,6 +119,8 @@ body[data-dev=pad] .ab.off{opacity:.85}body[data-dev=pad] .ab.off .k{opacity:.45
 .mb:focus-visible{outline:2px solid var(--accent)}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 .5rem}
 @media (max-width:380px){.grid2{grid-template-columns:minmax(0,1fr)}}
+#ver{display:none;position:fixed;right:10px;bottom:8px;z-index:60;font:500 12px/1.2 system-ui,sans-serif;color:#fff;opacity:.7;text-shadow:0 1px 2px #000;pointer-events:none}
+body.titling #ver{display:block}
 </style></head><body>
 <div id="app">
   <div id="stage">
@@ -132,6 +134,7 @@ body[data-dev=pad] .ab.off{opacity:.85}body[data-dev=pad] .ab.off .k{opacity:.45
   <div id="side"><div id="goal"></div><div id="feed"></div></div>
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
+  <div id="ver">dev build</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>

@@ -99,6 +99,12 @@ const {chromium} = require('playwright');
       const ar = campBeasts(bc)[0]; Ar.monsters = [ar]; ar.cd = 0; ar.wind = null; ah.x = ar.x + 280; ah.y = ar.y; const ahp0 = ah.hp;
       beastFight(ar, ah, C.DT); out.archerAims = !!ar.wind && Math.hypot(ar.x - ah.x, ar.y - ah.y) > 250;
       ah.x += 120; ar.wind.t = ar.wind.dur; beastBusy(ar, C.DT); out.archerMisses = ah.hp === ahp0;
+      // world events: an ambushed traveller needs the wolves driven off first; a golden stag pays 60 gold
+      const E = __col.newGame('human', 17), eh = E.you; __col.step(2); E.wevT = 0; const rnd0 = Math.random; Math.random = () => .2; __col.step(1); Math.random = rnd0;
+      const amb = E.pois.find(p => p.ambush); out.ambush = !!amb && E.monsters.filter(m => m.guard === amb.id).length === 3;
+      eh.x = amb.x + 40; eh.y = amb.y; out.ambushBlocked = !!poiAct(eh).why; E.monsters = E.monsters.filter(m => m.guard !== amb.id); out.ambushHelp = humanAct(eh, 'X') && amb.follow === eh.id;
+      E.wevT = 0; Math.random = () => .7; __col.step(1); Math.random = rnd0; const stag = E.critters.find(c => c.golden); out.stag = !!stag;
+      eh.x = stag.x + 30; eh.y = stag.y; eh.cd = 0; const sg = eh.gold; humanAct(eh, 'A'); out.stagPays = eh.gold >= sg + 60;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

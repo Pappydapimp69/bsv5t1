@@ -343,3 +343,13 @@ tests/sleeper.js 22 checks; all suites pass.
    beasts guarding the crystal fields between town and giant) before touching map scale (GPTBS 0101#E97).
 4. **Online play.** The asymmetric premise wants one real giant and several real humans; the sim is single-file and
    deterministic per seed, which suits a host-authoritative prototype.
+
+### 18. Third independent review (checkpoint 18)
+
+Five findings, none crashing, all fixed: the end screen blamed the giant for a town lost to raids (towns now remember
+what destroyed them); the forward-outpost hint ignored whether any site near the giant was open, outranked brace advice
+and recurred once the giant walked (now: only while the giant sleeps, only if an open site exists ~1400 from it, after
+the tend/hunt advice — which in practice makes it rare); the horn race named heroes of fallen towns; the first
+"the giant's eye settles on you" never fired; "Finish the first day here" left the tutorial job hiding the Now line.
+Final giant hand-check: clicked the panel to aim (head → chest and head, shin → legs), strained, the hunter hint came at
+1:35 when the first hunter climbed.

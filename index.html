@@ -865,7 +865,7 @@ function hurtArea(x,y,r,dmg,tdmg,why){
   for(const h of S.humans)if(h.mode==='ground'&&!h.dead&&Math.hypot(h.x-x,h.y-y)<r+10)hurtHuman(h,dmg,why);
   for(const m of S.monsters)if(Math.hypot(m.x-x,m.y-y)<r+m.r)m.hp-=dmg;
   for(const t of S.towns)if(t.alive&&Math.hypot(t.x-x,t.y-y)<r+t.r)hurtTown(t,tdmg,why)}
-function hurtTown(t,d,why){if(!t.alive)return;t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
+function hurtTown(t,d,why){if(!t.alive)return;t.hp-=d;t.hitT=S.t;if(S.grudge[t.i]>=C.ANGER&&(t.hp<=t.max/2))S.avenged=true;if(t.hp<=0){t.hp=0;t.alive=false;t.fellBy=why||null;displaceForagers(t);chron(t.name+' was destroyed'+(why==='stomp'||why==='smash'||why==='crush'?(S.grudge[t.i]>=C.ANGER?' by the giant, because its people had hurt it past bearing':' under the giant'):'')+'.');announce(t.name+' has been destroyed!');sfx('smash')}}
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
@@ -1593,7 +1593,7 @@ function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false
     ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
     ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}]),
     // once the giant has been climbed, the rest of the first day (jobs, building, soldiers) can be left for later
-    ...(!last&&S.tut.i>FIRST_DAY.findIndex(x=>x.id==='knee')?[{label:'Finish the first day here',sub:'The Now line keeps pointing at what matters',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}}]:[])],back:()=>{}})}
+    ...(!last&&S.tut.i>FIRST_DAY.findIndex(x=>x.id==='knee')?[{label:'Finish the first day here',sub:'The Now line keeps pointing at what matters',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist();if(S.you.quest&&S.you.quest.tut)S.you.quest=null;for(const m of S.monsters)if(m.tut)m.tut=0;announce('The first day is done. The rest is yours.')}}]:[])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
 function flyPress(){const f=S.fly;if(!f)return;if(f.phase==='out'){f.phase='back';f.t=f.dur*.7*(1-Math.min(1,f.t/f.dur));f.dur*=.7}else if(f.phase==='hold'){f.phase='back';f.t=0;f.dur*=.7}}
@@ -2221,7 +2221,8 @@ function nextTime(){const o=S.over;if(!o)return'';
     if(S.g.dead)return'Your Heart-stone broke. Shake and Swipe when hunters crowd you, and Struggle the moment you fall.';
     return miss.length?'For '+miss.slice(0,2).join(' and ')+': '+miss.slice(0,2).map(m=>tip[m]).join('; ')+'.':'Try another omen, or let a different town earn your favour.'}
   const y=S.you;if(!y)return'';const t=TOWNS[y.town].name;
-  if(!factionAlive(y.town))return S.grudge[y.town]>=C.ANGER?t+' fell because the giant turned on it. Lead '+t+' by Tending the giant and pulling wedges, or be ready to bring the giant down once it wakes.':t+' fell. Raise its walls with crystals and keep soldiers home.';
+  const byGiant=S.towns.some(x=>x.i===y.town&&/stomp|smash|crush/.test(x.fellBy||''));
+  if(!factionAlive(y.town))return byGiant&&S.grudge[y.town]>=C.ANGER?t+' fell because the giant turned on it. Lead '+t+' by Tending the giant and pulling wedges, or be ready to bring the giant down once it wakes.':(byGiant?t+' fell under the giant\u2019s feet. Keep it out of the giant\u2019s path, or earn its favour.':t+' fell to raids and rivals. Raise its walls with crystals and keep soldiers home.');
   if(S.g.dead)return'The giant is dead and '+t+' stands. Next time try the other way: tend it and earn its favour at dusk.';
   if(o.dusk&&S.favoredH!==y.id){const fp=S.humans.find(x=>x.id===S.favoredH);return'The giant honoured '+(fp?whoOf(fp):'someone else')+'. Brace it, pull wedges and Tend hurt joints to stand first in its regard, or join the hunt and bring it down.'}
   return'Play for another town, or as the giant.'}
@@ -3087,7 +3088,7 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(packCount(h)>=packCap(h))return'your pack is full: bank it at home';
   if(g.dead)return'the giant is dead: hold your town until dusk';
   // the horn race: whoever sounds a horn at the head first wakes the giant and earns its thanks for their town
-  if(!g.awake&&allWeak()){const rivals=S.humans.filter(o=>o!==h&&o.horn&&!o.dead&&o.town!==h.town).sort((a,b)=>(b.cl?b.cl.y:0)-(a.cl?a.cl.y:0)),lead=rivals[0],
+  if(!g.awake&&allWeak()){const rivals=S.humans.filter(o=>o!==h&&o.horn&&!o.dead&&o.town!==h.town&&factionAlive(o.town)).sort((a,b)=>(b.cl?b.cl.y:0)-(a.cl?a.cl.y:0)),lead=rivals[0],
       lh=lead?(lead.mode==='climb'?Math.round(lead.cl.y*FT)+' ft':'on the ground'):null,race=lead?' \u00b7 '+whoOf(lead)+' carries a horn ('+lh+')':'';
     if(h.horn)return'sound your wake horn at the giant\u2019s head (1860 ft): it will owe '+TOWNS[h.town].name+race;
     if(lead&&lead.mode==='climb')return'horn race: '+whoOf(lead)+' is climbing to wake it ('+lh+'); shove them on the way, or let '+TOWNS[lead.town].name+' have the thanks'}
@@ -3099,12 +3100,13 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(w.length&&!climb)return'rivals\u2019 wedges bleed the giant\u2019s '+JOINTS[w[0]].name.toLowerCase()+': pull them out and it will remember you';
   if(g.fallen>0)return'the giant is down: its Heart-stone takes more damage now';
   // a forward base: an outpost near the giant shortens every walk (you shop and come back to life at your nearest settlement)
-  {const near=nearestOwn(h.town,g.x,g.y);if(!climb&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000))return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}
   {const way=townWay(h.town),tend=way==='tend'||(S.reg&&S.reg[h.id]||0)>C.LEAD_REG,hunt=way==='hunt'&&!tend;
     if(!climb&&huntOpen()&&tend&&h.gold>=C.COST.brace)return'buy a brace kit in town and bolt it on: the giant remembers who braces it';
     if(!climb&&huntOpen()&&tend)return(Object.values(S.joints).some(j=>j.hp<j.max-1&&!j.crip)?'climb and Tend a hurt joint (anchor button): the giant remembers kindness; or ':'')+'earn '+(C.COST.brace-h.gold)+' more gold for a brace kit';
     if(!climb&&huntOpen()&&hunt&&h.gold>=C.COST.wedge)return'buy a wedge in town and drive it into a knee';
-    if(!climb&&h.gold>=C.COST.wedge&&huntOpen())return'buy a wedge or a brace kit in town, then climb the giant'}
+    if(!climb&&h.gold>=C.COST.wedge&&huntOpen()&&h.gold<C.COST.outpost)return'buy a wedge or a brace kit in town, then climb the giant'}
+  {const near=nearestOwn(h.town,g.x,g.y),site=()=>{for(let k=0;k<12;k++){const a=k/12*6.283,x=g.x+Math.cos(a)*1400,y=g.y+Math.sin(a)*1400;if(outpostSiteOpen(x,y)&&!inSolid(x,y,60)&&!S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))return true}return false};
+    if(!climb&&!g.awake&&h.hero&&h.gold>=C.COST.outpost&&S.outposts[h.town]<3&&(!near||dist(near,g)>3000)&&site())return'found an outpost near the giant (Build, '+C.COST.outpost+' gold): you shop and come back to life there, though the giant may trample it once it walks'}
   if(!climb)return'earn gold: take a job on the Board, hunt beasts or gather sky crystals';
   return''}
 // the giant's first lessons, each told once (ever) at the moment it applies, in the flow of play rather than on cards
@@ -3118,7 +3120,7 @@ function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=sa
   else say('awake','You are awake. Walk with the stick or WASD; Stomp ('+k.A+') crushes around your feet, Shake ('+k.X+') throws off climbers, Smash ('+k.B+') and Swipe ('+k.Y+') need towns to brace you.')}
 // the dusk honour goes to whoever stands first in the giant's regard: say so when that changes to or from you
 function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f||!(S.reg[f.id]>20))return;const me=f===S.you;
-  if(S.eyeOn===undefined){S.eyeOn=me;return}
+  if(S.eyeOn===undefined)S.eyeOn=false;
   if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)>20){S.eyeSaid=S.t;S.eyeOn=me;toast(me?'The giant\u2019s eye settles on you: you stand first in its regard. Keep it there until dusk.':'The giant\u2019s eye turns from you to '+whoOf(f)+'.')}
   else if(me!==S.eyeOn&&S.t-(S.eyeSaid||-99)<=20){}else S.eyeOn=me}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}

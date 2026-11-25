@@ -114,6 +114,12 @@ const {chromium} = require('playwright');
       // skill talents need the skill unlocked; a horse levels with riding
       const Sk = __col.newGame('human', 20), sk = Sk.you; out.skillTalentGated = !talentChoices(sk).some(t => t.lvl) || sk.lvl >= 2;
       sk.horse = {hp: 80, max: 80}; horseGrow(sk, 6001); out.horseLevels = sk.horse.lv === 2 && sk.horse.max === 100;
+      // affixes and the spear: elites roll a trait; an armoured one takes half until below half health; the spear hits at range
+      const Af = __col.newGame('human', 21), af = Af.you; __col.step(2); const el = Af.monsters.filter(m => m.elite);
+      out.affixes = el.length > 0 && el.every(m => AFFIX[m.affix]);
+      const arm = {id: 999, kind: 'wolf', x: af.x + 300, y: af.y, hx: 0, hy: 0, hp: 200, max: 200, atk: 1, gold: 0, xp: 0, r: 13, cd: 9, affix: 'armoured'}; Af.monsters = [arm];
+      hitBeast(af, arm, 20); out.armoured = arm.hp === 190;
+      af.lvl = 4; out.spear = useSkill(af, 'spear') && arm.hp < 190 && arm.rec >= .9;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

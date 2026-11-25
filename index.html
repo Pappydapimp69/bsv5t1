@@ -1966,6 +1966,7 @@ function step(dt){if(S.over)return;S.t+=dt;sndBudget=Math.max(0,sndBudget-dt*20)
   for(const a of combatPresses(takePresses(),wm)){if(S.role==='giant'){if(!S.autoplay)giantDo((S.g.fallen>0?{A:'struggle',B:'struggle',X:'struggle',Y:'struggle'}:S.g.awake?{A:'stomp',B:'smash',X:'shake',Y:'swipe'}:{A:'twitch',B:'strain',X:'dream',Y:'swipe'})[a])}
     else if(S.you&&!S.autoplay)humanAct(S.you,a,S.you.mode==='climb'?climbInput(S.you,mv):null)}
   if(S.you&&S.you.mode==='climb'&&S.you.cl)S.you.best=Math.max(S.you.best||0,S.you.cl.y);
+  if(S.role==='giant'&&!S.autoplay&&!S.headless)giantHints();
   stepCombat(dt);stepDays(dt);stepTutorial(dt);stepGiant(dt);stepMonsters(dt);stepShots(dt);stepBuilds(dt);stepArmy(dt);stepCrumble(dt);stepEvents(dt);
   for(let i=S.fx.length-1;i>=0;i--){S.fx[i].t+=dt;if(S.fx[i].t>S.fx[i].life)S.fx.splice(i,1)}
   checkEnd()}
@@ -3053,6 +3054,15 @@ function nextAim(h){const g=S.g,J=S.joints;if(h.dead||h.job)return'';const kin=k
   if(!climb&&h.gold>=C.COST.wedge&&huntOpen())return'buy a wedge or a brace kit in town, then climb the giant';
   if(!climb)return'earn gold: take a job on the Board, hunt beasts or gather sky crystals';
   return''}
+// the giant's first lessons, each told once (ever) at the moment it applies, in the flow of play rather than on cards
+function giantHints(){if(S.t<OPENING.len+2)return;const g=S.g,seen=save.ghint=save.ghint||{},k=device==='pad'?{A:'A',B:'B',X:'X',Y:'Y'}:device==='touch'?{A:'the big button',B:'the left button',X:'the top-left button',Y:'the top button'}:{A:'J',B:'K',X:'L',Y:'H'};
+  const say=(id,text)=>{if(seen[id]||S.hintAt>S.t-6)return;seen[id]=1;S.hintAt=S.t;persist();toast(text)};
+  if(!g.awake){say('strain','You are chained. Strain ('+k.B+') pulls at your chains; until minute '+Math.round(C.CHAIN_OPEN/60)+' it only weakens them.');
+    if(climbers().some(hunter))say('twitch','Someone is climbing you to hurt you (red edge on your body panel). '+(device==='touch'?'Tap that part of your body panel':'Pick that part with the arrows or a click on the panel')+', then Twitch ('+k.A+').');
+    if(dreamTarget())say('dream','A town has hurt you. Nightmare ('+k.X+') sends the beasts of the land against it.');
+    if(chainsOpen())say('open','The chains weaken now: Strain can tear them loose, and once all four are gone you can rise.')}
+  else if(g.fallen>0)say('struggle','You are down! Press any action fast to Struggle up sooner.');
+  else say('awake','You are awake. Walk with the stick or WASD; Stomp ('+k.A+') crushes around your feet, Shake ('+k.X+') throws off climbers, Smash ('+k.B+') and Swipe ('+k.Y+') need towns to brace you.')}
 function paintHud(){if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
   paintPanel();

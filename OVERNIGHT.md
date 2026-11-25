@@ -253,3 +253,6 @@ large; earlier 6-seed set at the same tuning had one giant death).
 - Same seeds 81–82, giant autoplay, memory (Brindle honoured, Corvel hurt) vs none: first Nightmare 9:02/10:39 vs
   15:19/15:25; nightmares 5/3 vs 1/1; tasks unchanged (5/5). In the page: "The giant remembers: it lay down beside
   Brindle at the last dusk; Corvel's people hurt it most, and it is wary of them." and Nightmare on Corvel available at once.
+- Just-in-time lessons for a first-time giant (each once ever, saved; at most one per 6 s; key names follow the device):
+  Strain at the start, aim + Twitch when a hunter first climbs, Nightmare when a town first hurts it, chains weakening,
+  Struggle on the first fall, and the awake kit on waking. Checked in the page: strain at 0:24, Nightmare at 0:32.

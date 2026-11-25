@@ -950,6 +950,8 @@ function nearMonster(h,r,allowed){let best=null,bd=r;for(const m of S.monsters){
 const dayLen=()=>C.DUSK+C.NIGHT,phase=()=>S.t%dayLen(),isNight=()=>phase()>=C.DUSK,nightLock=()=>isNight()&&!S.g.awake;
 function stepDays(dt){const n=isNight();if(n&&!S.night){S.night=true;S.duskAt=S.t;if(S.g.awake)S.verdictDue=true;else{for(const h of S.humans)if(h.mode==='climb'){const f=S.g.feet[h.leg?1:0];leaveClimb(h);h.x=f.x+60;h.y=f.y+60}announce('Dusk. Until morning no one can touch the chained giant.')}}
   if(!n&&S.night){S.night=false;S.day=(S.day||1)+1;announce('Day '+S.day+' begins.')}}
+// passing showers: in some 5-minute stretches, a minute of light rain rolls over (presentation only, from the clock)
+function shower(){if(!S||S.role!=='human')return 0;const c=Math.floor(S.t/300),u=S.t%300;if(((c*7+(S.seed||0))%3)!==0||u<150||u>230)return 0;const k=(u-150)/80;return .32*Math.sin(Math.PI*k)}
 function duskStorm(){if(!S.night)return 0;const tot=S.chains.reduce((a,c)=>a+c.max,0),left=S.chains.reduce((a,c)=>a+Math.max(0,c.hp),0),w=.15+.85*(1-left/tot),u=S.t-S.duskAt;return w*Math.min(1,u/12)*Math.min(1,(C.NIGHT-u)/10)}
 const GRAB_TIME=.24;
 function footHold(h,leg,face){const middle=leg?21.5:10.5;
@@ -2975,7 +2977,7 @@ function atmosFrame(dt){const A=ATM;
   // the storm breaks the moment it wakes, holds about a minute and eases out over two
   if(g.awake&&!A.wasAwake){A.wakeAt=S.t;atmosBolt(true,now);cue('wake');for(let i=0;i<3;i++)atmosFlockNear(g.x,g.y,900+i*500)}
   A.wasAwake=g.awake;
-  if(A.wakeAt>=0){const u=S.t-A.wakeAt,k=u<0?0:u<4?u/4:u<75?1:u<195?1-(u-75)/120:0;A.storm=k*k*(3-2*k)}else A.storm=0;A.storm=Math.max(A.storm,duskStorm());
+  if(A.wakeAt>=0){const u=S.t-A.wakeAt,k=u<0?0:u<4?u/4:u<75?1:u<195?1-(u-75)/120:0;A.storm=k*k*(3-2*k)}else A.storm=0;A.storm=Math.max(A.storm,duskStorm(),shower());
   if(A.storm>.35&&now>A.nextBolt){if(A.nextBolt)atmosBolt(false,now);A.nextBolt=now+5+Math.random()*9/A.storm}
   A.flash=Math.max(0,A.flash-dt*2.6);
   // turning points: the horn sounded, the fall, a town under siege (the waking is above)

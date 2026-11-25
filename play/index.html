@@ -142,7 +142,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.120 · 7366ab0 · 2026-11-25 05:13 UTC</div>
+  <div id="ver">v1.121 · f2ead13 · 2026-11-25 05:15 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -887,7 +887,9 @@ function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(
 function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));if(buffOf(h,'ward'))d*=.7;h.hp-=d;h.hurtAt=S.t;if(perk(h,'wind')&&h.hp>0&&h.hp<h.max*.25&&S.t-(h.windT??-99)>60){h.windT=S.t;h.hp+=40;if(h.you){toast('Second wind! +40 health.');S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}}if(why!=='fall')horseHurt(h,d);h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
   if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
-function killHuman(h,why){leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=null;h.gold=Math.floor(h.gold*.75);
+function killHuman(h,why){if(h.you&&why==='beast'&&h.lastBeast&&h.lastBeast.elite&&S.monsters.includes(h.lastBeast)&&!/Slayer/.test(h.lastBeast.elite)){const m=h.lastBeast;m.elite+=' the Hero-Slayer';m.max=Math.round(m.max*1.5);m.hp=m.max;m.atk+=4;m.gold+=40;m.xp+=40;
+    announce(m.elite.replace(' the Hero-Slayer','')+' killed you and grows stronger: now '+m.elite+'. Avenge yourself for a richer bounty.');chron('An alpha killed you and took a name for it: '+m.elite+'.')}
+leaveClimb(h);h.hp=0;h.dead=6;h.tx=h.ty=null;h.goal=null;h.gold=Math.floor(h.gold*.75);
   if(h.you)toast(why==='fall'?'You fell to your death. Back to town soon.':'You were killed. Back to town soon.')}
 function stepGiant(dt){const g=S.g;if(g.dead)return;
   for(const k in g.cd)g.cd[k]=Math.max(0,g.cd[k]-dt);
@@ -1732,10 +1734,10 @@ function poiAct(h){const p=poiNear(h);if(!p)return null;
   if(p.k==='traveller')return p.follow===h.id?null:{l:'Help traveller',sub:'Walk them to a town'};
   if(p.k==='merchant')return{l:'Trade',sub:'Rare goods'};return null}
 function usePoi(h,p){const D=SHRINES[p.sub];
-  if(p.k==='shrine'){if(S.t<p.ready)return false;p.ready=S.t+150;h.buff={k:p.sub,until:S.t+120};gainXp(h,15);if(h.you){toast(D.n+': '+D.t+'.');sfx('coin')}S.fx.push({k:'ring',x:p.x,y:p.y,r:140,t:0,life:.8,col:D.col});return true}
+  if(p.k==='shrine'){if(S.t<p.ready)return false;p.ready=S.t+150;h.buff={k:p.sub,until:S.t+120};gainXp(h,15);questTick(h,'pray');if(h.you){toast(D.n+': '+D.t+'.');sfx('coin')}S.fx.push({k:'ring',x:p.x,y:p.y,r:140,t:0,life:.8,col:D.col});return true}
   if(p.k==='spring'){p.used=p.used||{};if(!p.used[h.id]){p.used[h.id]=1;h.max+=10;h.hp=h.max;if(h.you)toast('The hot spring soothes you: +10 most health, fully healed.')}else{if(S.t<p.ready)return false;h.hp=Math.min(h.max,h.hp+h.max*.5);if(h.you)toast('The spring heals you.')}p.ready=S.t+90;sfx('coin',h.you);S.fx.push({k:'ring',x:p.x,y:p.y,r:90,t:0,life:.8,col:'#9fe8ff'});return true}
   if(p.k==='stones'){h.lore=h.lore||{};const first=!h.lore[p.lore];h.lore[p.lore]=1;if(h.you)openMenu({title:'Standing stones',body:'<p>'+LORE[p.lore]+'</p><p class="dim">'+Object.keys(h.lore).length+' of '+LORE.length+' stones read.</p>',items:[{label:'Go on',act:closeMenu}],back:closeMenu});
-    if(first){gainXp(h,25);if(Object.keys(h.lore).length===LORE.length){h.picks=(h.picks||0)+1;if(h.you)toast('Every stone read: a free talent (T)!');else autoTalent(h)}}return true}
+    if(first){gainXp(h,25);questTick(h,'lore');if(Object.keys(h.lore).length===LORE.length){h.picks=(h.picks||0)+1;if(h.you)toast('Every stone read: a free talent (T)!');else autoTalent(h)}}return true}
   if(p.k==='herb'){if(S.t<p.ready)return false;p.ready=S.t+150;h.herbs=(h.herbs||0)+1;h.hp=Math.min(h.max,h.hp+10);if(h.herbs>=3){h.herbs-=3;h.potions++;if(h.you)toast('Three herbs: you brew a potion.')}else if(h.you)toast('Healing herbs ('+h.herbs+'/3 for a potion).');sfx('coin',h.you);return true}
   if(p.k==='camp'){if(campBeasts(p).length||S.t<p.ready)return false;p.ready=S.t+300;p.alive=false;const g=80+Math.floor(rnd()*60),c=packAdd(h,'crystals',3);h.gold+=g;gainXp(h,40);questTick(h,'camp');
     if(h.you){toast(p.name+'\u2019s camp: +'+g+' gold'+(c?', '+c+' crystals':'')+'. The pack will return.');sfx('coin');shake(4)}return true}
@@ -1811,10 +1813,13 @@ function hitBeast(h,m,d){if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
 function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;h.gold+=Math.round(m.gold*.5*(1+.5*perk(h,'plunder')));if(perk(h,'blood'))h.hp=Math.min(h.max,h.hp+8*perk(h,'blood'));
-  {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll')}
+  {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll');if(m.warlord)questTick(h,'warlord');if(m.elite){questTick(h,'bounty',m.elite);if(h.you){announce('You slew '+m.elite+'!');shake(10)}}}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.
-const QUEST_KINDS=['slay','gather','deliver','build','search','troll'];
+const QUEST_KINDS=['slay','gather','deliver','build','search','troll','camp','bounty','escort','pray'];
+// quests that send you out to the places in the world: clear a camp, hunt a named alpha (bounty), walk a lost traveller home,
+// pray at two shrines; each carries a map target so the goal beacon and the map ring point the way
+function liveAlphas(){return S.monsters.filter(m=>m.elite)}
 function newQuest(h,kind){const lv=h.lvl,side=S&&S.you===h&&huntOpen()&&tends(h),k=kind||((lv>=3||side)&&rnd()<(side?.4:.3)?(rnd()<(side?.3:.5)?'climb':'tend'):QUEST_KINDS[Math.floor(rnd()*QUEST_KINDS.length)]);
   if(k==='slay')return{k,need:2+lv,n:0,gold:30+lv*12,xp:30+lv*10,text:'Slay '+(2+lv)+' beasts in the wilds'};
   if(k==='gather')return{k,need:2+Math.ceil(lv/2),n:0,gold:25+lv*12,xp:25+lv*10,text:'Fetch '+(2+Math.ceil(lv/2))+' sky crystals'};
@@ -1822,12 +1827,39 @@ function newQuest(h,kind){const lv=h.lvl,side=S&&S.you===h&&huntOpen()&&tends(h)
     return{k,to:to.id,need:1,n:0,gold:30+lv*10+Math.round(dist(home||to,to)/150),xp:25+lv*10,text:'Carry a parcel to '+to.name}}
   if(k==='build'){const w=rnd()<.6?'house':'tower';return{k,what:w,need:1,n:0,gold:C.COST[w]+20+lv*8,xp:30+lv*8,text:'Build a '+(w==='house'?'house':'watchtower')+' near home'}}
   if(k==='search')return{k,need:1,n:0,gold:40+lv*12,xp:40+lv*10,text:'Search the ruins of an old giant'};
+  if(k==='camp'&&(S.pois||[]).some(p=>p.k==='camp'))return{k,need:1,n:0,gold:50+lv*14,xp:45+lv*10,text:'Clear a beast camp and open its chest'};
+  if(k==='bounty'&&liveAlphas().length){const a=liveAlphas()[Math.floor(rnd()*liveAlphas().length)];return{k,elite:a.elite,need:1,n:0,gold:90+lv*20,xp:70+lv*12,text:'Bounty: slay '+a.elite+', the alpha'}}
+  if(k==='escort')return{k,need:1,n:0,gold:35+lv*10,xp:30+lv*8,text:'Walk a lost traveller to one of your towns'};
+  if(k==='pray'&&(S.pois||[]).some(p=>p.k==='shrine'))return{k,need:2,n:0,gold:30+lv*10,xp:30+lv*8,text:'Pray at two shrines'};
+  if(['camp','bounty','escort','pray'].includes(k))return newQuest(h,'slay');
   if(k==='troll')return{k,need:1,n:0,gold:45+lv*14,xp:45+lv*12,text:'Kill a troll at the old giants'};
   if(k==='tend')return{k,need:6,n:0,gold:50+lv*12,xp:40+lv*10,text:'Tend the giant\u2019s wounds (Tend a hurt joint, or pull a wedge)'};
   const ft=Math.min(1500,300+lv*200);return{k:'climb',need:ft/FT,n:0,gold:35+lv*14,xp:35+lv*12,text:'Climb the giant to '+ft+' ft'}}
+// the saga: a short chain from the elders, offered after your third job, ending at a warlord on the rim
+const SAGA=[{k:'lore',need:2,text:'The elders\u2019 tale: read two standing stones',gold:40,xp:40},
+  {k:'camp',need:1,text:'The elders\u2019 tale: break a beast camp',gold:60,xp:50},
+  {k:'bounty',need:1,text:'The elders\u2019 tale: slay any alpha',gold:80,xp:60},
+  {k:'warlord',need:1,text:'The elders\u2019 tale: slay the Rim Warlord',gold:300,xp:200,start:h=>spawnWarlord(h)}];
+function sagaTick(h,k,v){const g=h.saga;if(!g||g.done)return;const st=SAGA[g.i];if(!st||st.k!==k)return;g.n=(g.n||0)+1;if(g.n<st.need)return;
+  h.gold+=st.gold;gainXp(h,st.xp);g.i++;g.n=0;if(h.you){announce('Tale step done: +'+st.gold+' gold.'+(SAGA[g.i]?' Next: '+SAGA[g.i].text.replace(/^The elders\u2019 tale: /,'')+'.':''));sfx('coin')}
+  if(!SAGA[g.i]){g.done=true;h.picks=(h.picks||0)+1;h.atk+=5;if(h.you)announce('The tale is told. The towns sing of you: +5 damage and a talent (T).')}else if(SAGA[g.i].start)SAGA[g.i].start(h)}
+function spawnWarlord(h){const M=C.MAP,R=mulberry32((S.seed^0xBADA55)>>>0);let x=M/2,y=M/2;for(let k=0;k<80;k++){x=800+R()*(M-1600);y=800+R()*(M-1600);if(!inSolid(x,y,100)&&S.towns.every(t=>Math.hypot(t.x-x,t.y-y)>2200)&&Math.hypot(S.g.x-x,S.g.y-y)>1500)break}
+  S.monsters.push({id:S.nextId++,kind:'troll',x,y,hx:x,hy:y,hp:520,max:520,atk:22,gold:120,xp:150,r:30,cd:0,elite:'The Rim Warlord',warlord:1});
+  for(let k=0;k<3;k++)S.monsters.push({id:S.nextId++,kind:'wolf',x:x+rr(-120,120),y:y+rr(-120,120),hx:x,hy:y,hp:45,max:45,atk:8,gold:10,xp:14,r:13,cd:0});
+  if(h.you)announce('The Rim Warlord has come down from the rim. Find it (marked on your map).')}
+function goalTarget(){const st=tutStep();if(st&&S.tut.shown&&S.you)return st.target(S.you);return questTarget(S.you)}
+function questTarget(h){if(!h)return null;const near=xs=>xs.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]||null;
+  const g=h.saga&&!h.saga.done&&SAGA[h.saga.i],q=h.quest&&!h.quest.done?h.quest:null,k=q?q.k:g?g.k:null;
+  if(k==='warlord'){const w=S.monsters.find(m=>m.warlord);return w?{x:w.x,y:w.y}:null}
+  if(k==='bounty'){const a=S.monsters.find(m=>m.elite&&(!q||q.k!=='bounty'||m.elite===q.elite));return a?{x:a.x,y:a.y}:null}
+  if(k==='camp')return near((S.pois||[]).filter(p=>p.k==='camp'&&campBeasts(p).length));
+  if(k==='pray')return near((S.pois||[]).filter(p=>p.k==='shrine'&&S.t>=p.ready));
+  if(k==='lore')return near((S.pois||[]).filter(p=>p.k==='stones'&&!(h.lore||{})[p.lore]));
+  if(k==='escort'){const f=(S.pois||[]).find(p=>p.k==='traveller'&&p.follow===h.id);if(f){const t=nearestOwn(h.town,h.x,h.y);return t?{x:t.x,y:t.y}:null}return near((S.pois||[]).filter(p=>p.k==='traveller'))}
+  return null}
 function freshQuest(h,shown){for(let k=0;k<20;k++){const q=newQuest(h);if(!shown.some(o=>o.k===q.k))return q}return newQuest(h)}
 function board(t){const h=S.you||S.humans[0];if(!t.board||S.t-t.boardT>60){t.boardT=S.t;t.board=[];for(let i=0;i<3;i++)t.board.push(freshQuest(h,t.board.concat(h.quest?[h.quest]:[])))}return t.board}
-function questTick(h,k,v){const q=h.quest;if(!q||q.done)return;
+function questTick(h,k,v){sagaTick(h,k,v);const q=h.quest;if(!q||q.done)return;if(q.k==='bounty'&&k==='bounty'&&v!==q.elite)return;
   if(q.k==='climb'&&k==='height'){if(v>=q.need){q.n=q.need}else return}else if(q.k==='deliver'&&k==='arrive'){if(v!==q.to)return;q.n=1}else if(q.k===k)q.n+=(k==='tend'&&v)?v:1;else return;
   if(q.n>=q.need){q.done=true;sayTo(h,'Quest done! Return to town for '+q.gold+' gold.')}}
 function stepHuman(h,dt,mv){
@@ -1944,7 +1976,7 @@ function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.C
   const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
   if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
   if(!hit.includes(tg)){cstat('missed');if(tg.you&&!S.headless)S.fx.push({k:'txt',x:tg.x,y:tg.y,z:95,text:'Missed',t:0,life:.8,col:'#d8f0ff'})}
-  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);h.dodgedN=(h.dodgedN||0)+1;continue}cstat('hits');hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
+  for(const h of hit){if(untouchable(h)){cstat('dodged');dodgedFx(h);h.dodgedN=(h.dodgedN||0)+1;continue}cstat('hits');h.lastBeast=m;hurtHuman(h,Math.round(m.atk*CB.HIT),'beast')}}
 // a dodge: a quick sidestep, untouchable for its first part, then a short cooldown; no stamina
 function threatOf(h){let b=null,bd=1e9;for(const m of S.monsters){const d=Math.hypot(m.x-h.x,m.y-h.y)-(m.wind&&m.wind.id===h.id?1e4:0);if(d<bd&&d<300){bd=d;b=m}}if(!b)b=rivalNear(h,200);return b}
 function humanDodge(h,dir){if(h.dead||h.mode!=='ground'||h.job)return false;if(h.dodge||(h.dodgeCd||0)>0)return false;
@@ -2450,7 +2482,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
   const q=h.quest;let items=[],body='';
   if(wallsDown(t)&&(tb==='Board'||tb==='Shop')){body=`<p class="dim">${t.name}'s walls are under half (${Math.ceil(t.hp)}/${t.max}). The ${tb.toLowerCase()} is closed until they are repaired.</p>`;items=[{label:'Closed',sub:'Repair the walls in the Hall',why:'Walls under half',act:()=>{}}]}
   else if(tb==='Board'){body=`<p class="dim">Jobs posted in ${t.name}. The board changes in ${Math.max(1,Math.ceil(60-(S.t-(t.boardT||0))))} s.</p>`;
-    items=q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+')',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;h.claimed=(h.claimed||0)+1;sfx('coin')}openTown(t)}},...(q.done||q.tut?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
+    items=q?[{label:q.done?'Claim quest reward':'Current quest: '+q.text,sub:q.done?q.gold+' gold':'('+Math.min(q.n,q.need)+'/'+q.need+')',act:()=>{if(q.done){h.gold+=q.gold;gainXp(h,q.xp);h.quest=null;h.claimed=(h.claimed||0)+1;sfx('coin');if(h.claimed>=2&&!h.saga){h.saga={i:0,n:0};announce('The elders of '+t.name+' have a tale for you. Follow it on your goal line.')}}openTown(t)}},...(q.done||q.tut?[]:[{label:'Drop this quest',sub:'The board will have others',act:()=>{h.quest=null;openTown(t)}}])]
       :(tutJob()&&t.i===h.town?[{k:'slay',need:3,n:0,gold:42,xp:40,text:'Slay 3 beasts outside Ashville',tut:1}]:board(t)).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{if(o.tut){h.quest=o;openTown(t);return}h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
   else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
     const gearItem=k=>{const it=nextGear(h,k);if(!it)return{label:GEAR[k][GEAR[k].length-1].n,why:'The best there is',act:()=>{}};return{label:it.n+' \u2013 '+it.g+' gold',sub:{blade:'Hits '+it.v+' harder',armour:'Takes '+it.v+' off every blow',pack:'Carry '+it.v+' more',gloves:'25 more grip'}[k],why:lv(t)<it.t?'Raise '+t.name+' to level '+it.t+' to sell this':h.gold<it.g?'Need '+(it.g-h.gold)+' more gold':null,act:()=>{buyGear(h,k);sfx('coin');openTown(t)}}};
@@ -2652,7 +2684,7 @@ function g3Update(){const g=S.g,t=S.t;
       for(const[f,sd,ph]of[[11,1,1],[11,-1,-1],[-11,1,-1],[-11,-1,1]])L(bx+ca*f+px*sd*4,by+sa*f+py*sd*4,bz-4,11,3.5,a,sw*ph,0,lc);
       L(bx-ca*15,by-sa*15,bz+3,13,3,a,-2.3,Math.sin(t*7+m.id)*.5,lc)}
     else if(m.kind==='troll'&&ti<80){const W=stride(m,m.x,m.y,13),sw=Math.sin(W.ph)*.6*W.sp,club=m.wind?.4+2.7*cw:m.rec>0?1.25:.25+sw*.6,bz=z+Math.abs(Math.sin(W.ph))*2.5*W.sp,lc=fl?'#ffffff':'#6b4630';
-      put(G3.trollB,ti,m.x,m.y,bz+40,18,42,15,ry);put(G3.trollH,ti,m.x,m.y,bz+68,11,10,11,0);G3.trollB.setColorAt(ti,_c.set(fl?'#ffffff':'#7a5236'));G3.trollH.setColorAt(ti,_c.set(fl?'#ffffff':'#8f6a48'));ti++;
+      const es=m.warlord?1.7:1;put(G3.trollB,ti,m.x,m.y,bz+40*es,18*es,42*es,15*es,ry);put(G3.trollH,ti,m.x,m.y,bz+68*es,11*es,10*es,11*es,0);G3.trollB.setColorAt(ti,_c.set(fl?'#ffffff':m.warlord?'#5a2a2a':'#7a5236'));G3.trollH.setColorAt(ti,_c.set(fl?'#ffffff':'#8f6a48'));ti++;
       L(m.x+px*7,m.y+py*7,bz+22,22,8,a,sw,0,lc);L(m.x-px*7,m.y-py*7,bz+22,22,8,a,-sw,0,lc);L(m.x+px*18,m.y+py*18,bz+58,30,7,a,-sw*.8,0,lc);L(m.x-px*18,m.y-py*18,bz+58,30,7,a,club,0,lc);
       if(oi<120){const hd=tip(m.x-px*18,m.y-py*18,bz+58,30,a,club);limb(G3.tool,oi++,hd.x,hd.y,hd.z,28,7,a,club-.3,0,'#5a3b22')}}
     if(bi<200)put(G3.blobs,bi++,m.x,m.y,z+1,m.kind==='troll'?24:18,1,m.kind==='troll'?24:18,0)}
@@ -2704,7 +2736,7 @@ function g3Update(){const g=S.g,t=S.t;
       G3.box.count=bx2;G3.box.instanceMatrix.needsUpdate=true;if(G3.box.instanceColor)G3.box.instanceColor.needsUpdate=true}}
   // while a wake horn sounds, a beam of light stands over the giant's head, seen from anywhere on the land
   {const on=!!S.waker&&!S.g.awake;G3.hornBeam.visible=on;if(on){const a=bodyWorld(16,198);G3.hornBeam.position.set(a.x,a.z+2500,a.y);G3.hornBeam.scale.set(1,5000,1);G3.hornBeam.material.opacity=.35+.25*Math.sin(t*5)}}
-  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;G3.beacon.visible=!!tg&&tg.z==null;if(G3.beacon.visible){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
+  {const tg=goalTarget();G3.beacon.visible=!!tg&&tg.z==null;if(G3.beacon.visible){const z=groundH(tg.x,tg.y);G3.beacon.position.set(tg.x,z+900,tg.y);G3.beacon.scale.set(1,1800,1);G3.beacon.material.opacity=.5+.2*Math.sin(t*3)}}
   // light and haze follow the opening's sky
   const ok=openingK();G3.hemi.color.set('#e4e8ff').lerp(_c.set('#c87048'),ok*.7);G3.sun.intensity=.9-.45*ok;S.fogC=S.fogC||new THREE.Color();G3.scene.fog.color.set('#cdbfa2').lerp(_c.set('#6a3a30'),ok*.8)}
 // ================= the world breathes with the giant =================
@@ -2914,7 +2946,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(S.you&&!S.you.dead&&S.you.mode==='ground'){const at=attackTarget(S.you);if(at)ringOnGround(at.x,at.y,(at.r||14)+10,'rgba(255,120,90,.95)',3)}
   drawCombat3D();
   if(climbing3D())climbOverlay3D();
-  {const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const q=p3(tg.x,tg.y,tg.z!=null?tg.z:140);if(q){if(tg.z!=null){const r=12+3*Math.sin(S.t*4);ctx.strokeStyle='#ffd27a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,r,0,7);ctx.stroke()}lbl('Goal',q.x,q.y-(tg.z!=null?24:0),13,'#ffd27a')}}}
+  {const tg=goalTarget();if(tg){const q=p3(tg.x,tg.y,tg.z!=null?tg.z:140);if(q){if(tg.z!=null){const r=12+3*Math.sin(S.t*4);ctx.strokeStyle='#ffd27a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(q.x,q.y,r,0,7);ctx.stroke()}lbl('Goal',q.x,q.y-(tg.z!=null?24:0),13,'#ffd27a')}}}
   drawMinimap();G3.calls=G3.renderer.info.render.calls}
 function climbViewPoint(c,r){return bodyWorld(c,r,climbing3D()?.face)}
 function cellScreen(c,r){const a=climbViewPoint(c,r);return p3(a.x,a.y,a.z)}
@@ -3209,7 +3241,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   drawMinimap()}
 function labelRivalHeroes(project){for(const h of S.humans){if(!h.hero||h.you||h.dead||h.mode!=='ground')continue;
   const p=project(h.x,h.y,130);if(p&&p.d<2500)lbl(h.name,p.x,p.y,11,TOWNS[h.town].col)}}
-function drawMinimap(){if(FILM)return;drawMinimap0();const st=tutStep(),tg=st&&S.tut.shown&&S.you?st.target(S.you):null;if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap(){if(FILM)return;drawMinimap0();const tg=goalTarget();if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
 function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UIX.top,k=s/C.MAP;ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 
@@ -3378,7 +3410,7 @@ function paintHud(){paintSkills();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerH
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+(h.horse&&h.mode==='ground'?chip('Horse',h.riding?'riding':h.horse.away>S.t?'back in '+Math.ceil(h.horse.away-S.t)+' s':'R to ride',h.horse.hp/h.horse.max):'')+
       chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals+((n=>n?' +'+n+' town':'')(storeNear(h)?poolOf(storeNear(h)):0)))+(h.horn?chip('Horn','ready'):'');
-    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)))}
+    const st=tutStep(),q=h.quest;b=st&&S.tut.shown?'<span class="k">Goal</span> '+st.name+(st.note&&st.note(h)?' '+st.note(h):''):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)));if(!st&&h.saga&&!h.saga.done&&SAGA[h.saga.i]){const g=SAGA[h.saga.i];b=(b?b+'<br>':'')+'<span class="k">Tale</span> '+g.text.replace(/^The elders\u2019 tale: /,'')+(g.need>1?' '+(h.saga.n||0)+'/'+g.need:'')}}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');
 

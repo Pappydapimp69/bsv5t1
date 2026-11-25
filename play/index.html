@@ -143,7 +143,7 @@ body.titling #ver{display:block}
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
   <div id="skillbar"></div>
-  <div id="ver">v1.134 · b26bc74 · 2026-11-25 06:07 UTC</div>
+  <div id="ver">v1.135 · f28fbbc · 2026-11-25 06:11 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -538,8 +538,8 @@ function mkHuman(ti,you,role,t=S.towns[ti],hero=you){
     name:you?'You':role==='folk'?t.name+' forager':TOWNS[ti].name+(hero?' hero':' '+role)}}
 function maxGrip(h){return C.GRIP+h.gloves*25+(h.lvl-1)*5+40*perk(h,'grip')}
 // gear comes in tiers; a town sells a tier only once it has been raised to that level
-const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2},{n:'Starmetal blade',v:11,g:160,t:3}],
-  armour:[{n:'Hide armour',v:3,g:40,t:1},{n:'Mail',v:6,g:90,t:2},{n:'Plate',v:10,g:160,t:3}],
+const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2},{n:'Starmetal blade',v:11,g:160,t:3},{n:'Giantbone blade',v:16,g:340,t:3},{n:'Skyforged blade',v:22,g:650,t:3}],
+  armour:[{n:'Hide armour',v:3,g:40,t:1},{n:'Mail',v:6,g:90,t:2},{n:'Plate',v:10,g:160,t:3},{n:'Giantbone plate',v:14,g:340,t:3},{n:'Skyforged plate',v:18,g:650,t:3}],
   pack:[{n:'Larger pack',v:2,g:60,t:2},{n:'Great pack',v:2,g:120,t:3}],
   gloves:[{n:'Climbing gloves',v:1,g:50,t:1},{n:'Clawed gloves',v:1,g:110,t:2}]};
 const packCap=h=>C.PACK+2*(h.gear?h.gear.pack:0);
@@ -1093,6 +1093,7 @@ function rideWhy(h){if(!h.horse)return'Buy a horse in town ('+C.HORSE_COST+' gol
 function setRide(h,on){if(on&&rideWhy(h))return false;if(!!h.riding===!!on)return true;h.riding=!!on;if(h.you){sfx(on?'coin':'thud');toast(on?'You mount your horse. R to get down.':'You get down from your horse.')}return true}
 function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if(w){if(h.you)toast(w);return false}return setRide(h,true)}
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
+  if(h.horse.hp<=0&&h.horse.barded){h.horse.hp=1;h.riding=false;if(h.you)toast('Your barded horse stumbles but stays: let it rest.');return}
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
   if(!perk(h,'rider')&&!charm(h,'bell')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
 function horseGrow(h,d){const H=h.horse;if(!H||(H.lv||1)>=3)return;H.ride=(H.ride||0)+d;if(H.ride>=6000*(H.lv||1)){H.ride=0;H.lv=(H.lv||1)+1;H.max+=20;H.hp=H.max;if(h.you){toast('Your horse grows stronger: level '+H.lv+' (faster, tougher).');sfx('coin')}}}
@@ -1150,7 +1151,7 @@ function stepBuilds(dt){
     let collected=0;
     // every house of the player's town pays the player, whoever built it (the owner's rule); other towns' houses pay their builders
     for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;
-      const st=S.towns[b.settlementId],gold=Math.round(HOUSE_RENT*lv(b)*prospK(st)*(1+.25*civicIn(st,'market')));owner.gold+=gold;if(owner===S.you)collected+=gold}
+      const st=S.towns[b.settlementId],gold=Math.round(HOUSE_RENT*(owner===S.you&&b.owner!==S.you.id?.5:1)*lv(b)*prospK(st)*(1+.25*civicIn(st,'market')));owner.gold+=gold;if(owner===S.you)collected+=gold}
     for(const b of S.builds){if(b.k!=='farm'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;owner.gold+=3;if(owner===S.you)collected+=3}
     if(collected)toast((S.builds.some(b=>b.k==='farm'&&b.town===S.you?.town)?'Rent and harvest':'House rent')+': +'+collected+' gold.');
   }
@@ -2595,7 +2596,10 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
       :(tutJob()&&t.i===h.town?[{k:'slay',need:3,n:0,gold:42,xp:40,text:'Slay 3 beasts outside Ashville',tut:1}]:board(t)).map((o,i)=>({label:o.text,sub:o.gold+' gold',act:()=>{if(o.tut){h.quest=o;openTown(t);return}h.quest=o;t.board.splice(i,1);t.board.splice(i,0,freshQuest(h,t.board.concat([o])));openTown(t)}}))}
   else if(tb==='Shop'){body=`<p class="dim">${h.gold} gold. Kits: ${h.kits.anchor} anchors, ${h.kits.wedge} wedges, ${h.kits.cannon} cannons, ${h.kits.brace} braces.</p>`;
     const gearItem=k=>{const it=nextGear(h,k);if(!it)return{label:GEAR[k][GEAR[k].length-1].n,why:'The best there is',act:()=>{}};return{label:it.n+' \u2013 '+it.g+' gold',sub:{blade:'Hits '+it.v+' harder',armour:'Takes '+it.v+' off every blow',pack:'Carry '+it.v+' more',gloves:'25 more grip'}[k],why:lv(t)<it.t?'Raise '+t.name+' to level '+it.t+' to sell this':h.gold<it.g?'Need '+(it.g-h.gold)+' more gold':null,act:()=>{buyGear(h,k);sfx('coin');openTown(t)}}};
-    items=[h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',civicIn(t,'stable')&&t.i===h.town?45:C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
+    const tr=h.trained||0,trc=200*(tr+1);
+    items=[{label:'Train with the master-at-arms \u2013 '+trc+' gold',sub:'A talent to choose (price doubles each time)',why:h.gold<trc?'Need '+(trc-h.gold)+' more gold':lv(t)<2?'Raise '+t.name+' to level 2':null,act:()=>{h.gold-=trc;h.trained=tr+1;h.picks=(h.picks||0)+1;sfx('coin');toast('Trained: a talent to choose (T).');openTown(t)}},
+      ...(h.horse&&!h.horse.barded?[{label:'Horse barding \u2013 150 gold',sub:'+60 horse health; it never bolts',why:h.gold<150?'Need '+(150-h.gold)+' more gold':null,act:()=>{h.gold-=150;h.horse.barded=1;h.horse.max+=60;h.horse.hp=h.horse.max;sfx('coin');openTown(t)}}]:[]),
+      h.horse?{label:'Your horse',sub:Math.ceil(h.horse.hp)+'/'+h.horse.max+' health \u00b7 R to ride',why:'Already yours',act:()=>{}}:buy('Horse',civicIn(t,'stable')&&t.i===h.town?45:C.HORSE_COST,()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. Press R to ride.')},'Ride with R: almost twice as fast, charging blows'),gearItem('blade'),gearItem('armour'),gearItem('pack'),gearItem('gloves'),lv(t)>=2?buy('Greater potion',35,()=>h.bigPotions++,'Restores 140 health'):{label:'Greater potion',why:'Raise '+t.name+' to level 2 to sell this',act:()=>{}},
       buy('Anchor kit (3)',C.COST.anchor,()=>h.kits.anchor+=3,'Catches your people when they fall'),buy('Ladder kit',C.COST.ladder,()=>h.kits.ladder++,'Firm holds below a spot on the giant'),buy('Platform kit',C.COST.platform,()=>h.kits.platform++,'A resting place on the giant'),buy('Potion',C.COST.potion,()=>h.potions++,'Restores 60 health'),
       ...(huntOpen()?[buy('Wedge',C.COST.wedge,()=>h.kits.wedge++,S.g.awake?'Bleeds a joint':'Bruises the sleeper (half, never crippling)'),buy('Cannon kit',C.COST.cannon,()=>h.kits.cannon++,'Fires on rival towns'),buy('Brace kit',C.COST.brace,()=>h.kits.brace++,'Lets the giant walk')]:[{label:'Giant’s kits',why:'On sale in '+Math.max(1,Math.ceil(C.HUNT_OPEN-S.t))+' s',act:()=>{}}])]}
   else if(tb==='Forge'){body=`<p class="dim">${h.crystals} sky crystals in your store.</p>`;
@@ -2770,9 +2774,9 @@ function g3Update(){const g=S.g,t=S.t;
     G3.cloak.setColorAt(hi,_c.set(col));G3.badge.setColorAt(hi,_c.set(badge));hi++;
     L(x+sx*4*s,y+sy*4*s,zb+17*s,17*s,4.5*s,face,legA,0,'#3b3329');L(x-sx*4*s,y-sy*4*s,zb+17*s,17*s,4.5*s,face,legB,0,'#3b3329');
     L(x+sx*9*s,y+sy*9*s,zb+42*s,17*s,4*s,face,armL,0,col);L(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,4*s,face,armR,0,col);
-    if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);const bl=h.gear?h.gear.blade:0;limb(G3.tool,oi++,hd.x,hd.y,hd.z,(22+5*bl)*s,(2.5+.5*bl)*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':['#d6d9de','#c9a46a','#e8ecf2','#9fe8ff'][bl]||'#d6d9de')}
+    if(tool&&oi<C.FIG_MAX){const hd=tip(x-sx*9*s,y-sy*9*s,zb+42*s,17*s,face,armR);const bl=h.gear?h.gear.blade:0;limb(G3.tool,oi++,hd.x,hd.y,hd.z,(22+5*bl)*s,(2.5+.5*bl)*s,face,armR+(h.job?0:-.5),0,h.job?'#8a6a45':['#d6d9de','#c9a46a','#e8ecf2','#9fe8ff','#f2ead8','#ffd24a'][bl]||'#d6d9de')}
     // armour shows as pauldrons, a worn crown as a gold band
-    if(h.gear&&h.gear.armour){const ac=['','#8a8f98','#b9bec6','#9fb8d8'][h.gear.armour]||'#8a8f98';L(x+sx*9*s,y+sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac);L(x-sx*9*s,y-sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac)}
+    if(h.gear&&h.gear.armour){const ac=['','#8a8f98','#b9bec6','#9fb8d8','#e8dcc4','#ffd24a'][h.gear.armour]||'#8a8f98';L(x+sx*9*s,y+sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac);L(x-sx*9*s,y-sy*9*s,zb+47*s,7*s,8*s,face,0,0,ac)}
     if(h.charms&&h.charms.includes('crown'))L(x,y,zb+60*s,4*s,9*s,face,0,0,'#ffd24a')};
   // people nearest the camera first, so the figure pool never drops those you can see (it used to hold 30, in list order)
   const folkView=S.humans.filter(h=>!h.dead&&(h.mode!=='ground'||Math.hypot(h.x-S.cam.x,h.y-S.cam.y)<9000)).sort((a,b)=>(b.you-a.you)||Math.hypot(a.x-S.cam.x,a.y-S.cam.y)-Math.hypot(b.x-S.cam.x,b.y-S.cam.y));
@@ -3069,7 +3073,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;{const y=S.you,mk=y&&t.alive&&!t.outpost?(y.quest&&y.quest.done?'!':!y.quest&&!tutStep()?'?':''):'';if(mk){ctx.font=`900 ${30*UI}px system-ui`;ctx.textAlign='center';ctx.lineWidth=5;ctx.strokeStyle='rgba(0,0,0,.8)';const by=p.y-44*UI-Math.abs(Math.sin(S.t*3))*6*UI;ctx.strokeText(mk,p.x,by);ctx.fillStyle=mk==='!'?'#ffd24a':'#cfe8c8';ctx.fillText(mk,p.x,by)}}lbl(t.name+(t.alive?' \u00b7 Lv '+lv(t)+(p.d<6000?' \u00b7 prosperity '+(t.prosp??prosperity(t)):''):' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
   for(const q of S.pois||[]){const tx=poiLabel(q,S.you);if(!tx)continue;const p=p3(q.x,q.y,q.k==='herb'?30:110);if(p&&p.d<(q.k==='herb'?1600:4200))lbl(tx,p.x,p.y,11,q.k==='camp'&&campBeasts(q).length?'#ff9a8a':q.k==='shrine'?SHRINES[q.sub].col:q.k==='merchant'?'#d8b4ff':'#cfe8c8')}
-  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+(m.kind==='archer'?' (bandit chief)':m.warlord?'':' (alpha)')+(m.affix?' \u00b7 '+AFFIX[m.affix].n+': '+AFFIX[m.affix].t:''),p.x,p.y,12,'#ff8f80')}
+  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+(m.kind==='archer'?' (bandit chief)':m.warlord?'':' (alpha)')+(m.affix?' \u00b7 '+AFFIX[m.affix].n:''),p.x,p.y,12,'#ff8f80')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<4200)lbl(cacheLabel(c),p.x,p.y,11,S.t>=c.ready?'#ffcf6a':'#a9afbb')}
   mapLabels();
   upgradeReady();barracksFlags();

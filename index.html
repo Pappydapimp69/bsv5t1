@@ -1591,7 +1591,9 @@ function openTutorialCard(){const st=tutStep();if(!st)return;S.tut.cardDue=false
   openMenu({holdUntil:performance.now()+700,title:last?'The rest is yours':'The first day \u00b7 '+(S.tut.i+1)+' of '+FIRST_DAY.length,body:`<p>${st.text}</p>`,items:[{label:last?'Begin':st.info?'Go on':'Show me',sub:last||st.info?'':'The camera flies to it; press again to come back',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0;if(last){S.tut.done=true;save.firstDay=1;persist();return}const tg=st.target(S.you);if(tg&&Math.hypot(tg.x-S.you.x,tg.y-S.you.y)>300)startFly(tg)}},
     ...(last||st.info?[]:[{label:'Got it',sub:'No camera flight; the goal line and map marker keep pointing the way',act:()=>{closeMenu();S.tut.shown=true;S.tut.t=0}}]),
     ...(st.optional?[{label:'Skip this order',act:()=>{closeMenu();S.tut.shown=true;S.tut.skipped=true}}]:[]),
-    ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}])],back:()=>{}})}
+    ...(last||S.tut.i>0?[]:[{label:'Skip the first day',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist()}}]),
+    // once the giant has been climbed, the rest of the first day (jobs, building, soldiers) can be left for later
+    ...(!last&&S.tut.i>FIRST_DAY.findIndex(x=>x.id==='knee')?[{label:'Finish the first day here',sub:'The Now line keeps pointing at what matters',act:()=>{closeMenu();S.tut.done=true;save.firstDay=1;persist();announce('The first day is done. The rest is yours.')}}]:[])],back:()=>{}})}
 // the camera's flight to a goal and back: sized from the distance, a floor and a cap, the return quicker
 function startFly(tg){const d=Math.hypot(tg.x-S.you.x,tg.y-S.you.y),dur=Math.min(2.4,1.2+d/2000);S.fly={phase:'out',t:0,dur,to:{x:tg.x,y:tg.y}};latchHeld()}
 function flyPress(){const f=S.fly;if(!f)return;if(f.phase==='out'){f.phase='back';f.t=f.dur*.7*(1-Math.min(1,f.t/f.dur));f.dur*=.7}else if(f.phase==='hold'){f.phase='back';f.t=0;f.dur*=.7}}

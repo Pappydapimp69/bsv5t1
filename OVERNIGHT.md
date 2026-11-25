@@ -318,3 +318,5 @@ tests/sleeper.js 22 checks; all suites pass.
   varied (clear, dark, restless) and resets held; memories carried and were announced. Corvel is remembered as "hurt it
   most" every time a bot plays it; with restless + memory, bot-led Corvel fell at 15:03. Left as is (Corvel is the marked
   hard start and Next time explains the way out) — a candidate for tuning with real players.
+- First day: once the knee is reached, every remaining card offers **Finish the first day here** (the Now line takes
+  over). Checked in the page; tutorial tests pass.

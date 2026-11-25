@@ -159,6 +159,12 @@ const {chromium} = require('playwright');
       // a talent reroll: one per match, another at level 5
       const Ro = __col.newGame('human', 30), ro = Ro.you; gainXp(ro, 50); openTalents(); const rr = menu.items.find(i => /^Reroll/.test(i.label)); rr.act(); const again = menu.items.find(i => /^Reroll/.test(i.label));
       out.reroll = ro.rerolls === 0 && !!again.why; closeMenu();
+      // riding through a beast tramples it; places are discovered by coming near
+      const Tp = __col.newGame('human', 31), tp = Tp.you; Tp.monsters = []; tp.horse = {hp: 80, max: 80}; tp.riding = true;
+      const w2 = {id: 997, kind: 'wolf', x: tp.x + 10, y: tp.y, hx: 0, hy: 0, hp: 100, max: 100, atk: 1, gold: 0, xp: 0, r: 13, cd: 9}; Tp.monsters.push(w2);
+      tp.tx0 = tp.x - 10; tp.ty0 = tp.y; stepHorse(tp, C.DT); out.trample = w2.hp < 100;
+      __col.step(2); const far = Tp.pois.find(p => p.k === 'shrine' && Math.hypot(p.x - tp.x, p.y - tp.y) > 2500); out.undiscovered = !!far && !far.found;
+      tp.x = far.x + 100; tp.y = far.y; Tp.t = 100; stepPois(.6); out.discovered = !!far.found;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

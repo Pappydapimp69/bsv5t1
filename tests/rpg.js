@@ -38,6 +38,18 @@ const {chromium} = require('playwright');
       // bot heroes pick talents on their own
       const B = __col.newGame('human', 6); B.autoplay = true; while (B.t < 480) __col.step(60);
       out.botTalents = B.humans.filter(o => o.hero && o.lvl > 1).every(o => Object.keys(o.perks || {}).length === o.lvl - 1);
+      // places: laid out at the first step, each usable from its X button with its own reward
+      const P = __col.newGame('human', 8), me = P.you; __col.step(2);
+      const kinds = k => P.pois.filter(p => p.k === k);
+      out.poisLaid = kinds('shrine').length >= 4 && kinds('camp').length >= 3 && kinds('spring').length >= 2 && kinds('stones').length >= 3 && kinds('herb').length >= 10;
+      const at = p => { me.x = p.x + 40; me.y = p.y; me.cd = 0; };
+      const sh = kinds('shrine').find(p => p.sub === 'might'); at(sh); out.shrine = humanAct(me, 'X') && buffOf(me, 'might');
+      const sp = kinds('spring')[0]; at(sp); const m0 = me.max; humanAct(me, 'X'); out.spring = me.max === m0 + 10;
+      const camp = kinds('camp')[0]; at(camp); out.campGuarded = campBeasts(camp).length === 4 && !humanAct(me, 'X');
+      P.monsters = P.monsters.filter(m => m.camp !== camp.id); const g0 = me.gold; out.campChest = humanAct(me, 'X') && me.gold >= g0 + 80;
+      me.lore = {}; for (const st of kinds('stones')) { at(st); humanAct(me, 'X'); closeMenu(); }
+      out.lore = Object.keys(me.lore).length === kinds('stones').length;
+      me.potions = 0; me.herbs = 0; for (const hb of kinds('herb').slice(0, 3)) { at(hb); humanAct(me, 'X'); } out.herbs = me.potions === 1;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

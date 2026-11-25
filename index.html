@@ -1046,7 +1046,10 @@ function canBuild(h,k,placement=k==='barracks'?barracksPlacement(h):null){if(!h.
   if(S.builds.some(b=>Math.hypot(b.x-h.x,b.y-h.y)<45)||S.humans.some(o=>o.job&&o.job.kind==='ground'&&Math.hypot(o.job.x-h.x,o.job.y-h.y)<45))return'Too close to another building';
   if(k==='outpost')return !outpostSiteOpen(h.x,h.y)?'Too near a settlement':S.outposts[h.town]>=3?'Your people have already founded three outposts':null;
   if(k==='barracks')return null;
+  if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t&&(t.houses||0)>=houseCap(t))return t.name+' (level '+lv(t)+') has room for '+houseCap(t)+' houses: raise it for more'}
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
+// owner's rule: a settlement holds three houses at level 1 and two more per level, and its foragers build only after a hero built the first
+const houseCap=t=>3+2*(lv(t)-1);
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
 function ringR(t){return t.r+C.HOME_REACH+120*(lv(t)-1)+30*(Math.min(8,Math.floor((S.t-(t.born||0))/120))+Math.max(0,(S.day||1)-1))}
@@ -1084,7 +1087,7 @@ function finishBuild0(h,k){
   const b={k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0};S.builds.push(b);
   questTick(h,'build');
   let housed=false;
-  if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t);
+  if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){if(h.hero)t.heroHouse=true;b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t);
     if(housed&&!h.you&&S.you?.town===t.i)toast(t.name+' gained a forager from a new house.')}}
   gainXp(h,10);sayTo(h,k==='house'?(housed?'House built. Your settlement gains a forager.':'House built. Your build area reaches further.'):'Watchtower built: it shoots beasts that come near.');return true}
 function stepBuilds(dt){
@@ -1272,7 +1275,11 @@ function botOrders(b){const rs=readySoldiers(b);if(!rs.length)return;const home=
     else toast(TOWNS[b.town].name+'\u2019s soldiers go back to their old habit.')}}
   if(S.t<(S.revT[b.town]||0))return;for(let j=0;j<3;j++)if(j!==b.town&&factionAlive(j)&&S.feud[b.town][j]>ARMY.REVENGE&&S.towns[j].hp>S.towns[j].max*.6){S.revT[b.town]=S.t+ARMY.REVENGE_CD;giveOrder(b,'attack',j);
     if(S.you&&S.role==='human'&&j===S.you.town)announce(TOWNS[b.town].name+' soldiers march on '+TOWNS[j].name+'!');return}
+  // rivals act before the giant wakes: now and then a bot barracks raids the nearest rival town even without a feud
+  if(S.t>C.RIVAL_FROM&&rnd()<C.RIVAL_P){const j=[0,1,2].filter(x=>x!==b.town&&factionAlive(x)).sort((p,q)=>dist(orderTown(p,b)||b,b)-dist(orderTown(q,b)||b,b))[0];
+    if(j!=null){S.revT[b.town]=S.t+ARMY.REVENGE_CD;giveOrder(b,'attack',j);if(S.you&&S.role==='human'&&j===S.you.town)announce(TOWNS[b.town].name+' soldiers march on '+TOWNS[j].name+'!');return}}
   giveOrder(b,b.way)}
+C.RIVAL_FROM=240;C.RIVAL_P=.08;
 function stepArmy(dt){
   for(const b of S.builds){if(b.hp!=null&&b.hp>0&&b.hp<b.max&&S.t-(b.hitT||-99)>10)b.hp=Math.min(b.max,b.hp+ARMY.BUILD_MEND*dt);
     if(b.k!=='barracks')continue;
@@ -1375,7 +1382,7 @@ function spendPool(t,c){for(const u of linked(t)){const d=Math.min(c,u.crystals|
 function storeNear(h){if(!h||h.mode==='climb')return null;let best=null;for(const t of aliveTowns())if(t.i===h.town&&withinLimits(t,h.x,h.y)&&(!best||dist(t,h)<dist(best,h)))best=t;return best}
 function folkRaiseTown(h,t){const c=upCost('town',t);if(c==null||poolOf(t)<c)return false;spendPool(t,c);const promote=t.outpost;t.lvl=lv(t)+1;t.max+=600;t.hp+=600;t.r+=20;if(promote)t.outpost=false;else startCaravan(t);
   if(S.you&&S.role==='human'&&S.you.town===t.i)toast(t.name+'\u2019s foragers raised it to level '+t.lvl+' with the town\u2019s crystals'+(promote?': it is now a town.':'.'));return true}
-function folkBuildHouse(h,t){if((t.houses||0)>=C.FOLK_HOUSES||h.gold<C.COST.house+15)return false;
+function folkBuildHouse(h,t){if(!t.heroHouse||(t.houses||0)>=houseCap(t)||h.gold<C.COST.house+15)return false;
   for(let k=0;k<12;k++){const a=rr(0,6.28),d=t.r+rr(50,170),x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d;
     if(!withinLimits(t,x,y)||inSolid(x,y,30)||S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<50)||S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))continue;
     h.gold-=C.COST.house;const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,'house');h.x=hx;h.y=hy;

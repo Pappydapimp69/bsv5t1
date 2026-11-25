@@ -423,6 +423,7 @@ async function main() {
       const capacityIncreasesOnCompletion = foragersIn(town).length === 2 && foragerCapacity(town) === 2;
       upgrade(player, 'house', state.builds[0]);
       const upgradingKeepsSameForagerCount = foragersIn(town).length === 2;
+      town.lvl = 2; // owner's rule: three houses at level 1 and two more per level
       for (const offset of [310, 370, 430]) { startHouse(town, offset); stepJob(player, 6); }
       const cappedAtFour = town.houses === 4 && foragersIn(town).length === 4;
       startHouse(outpost, 250);

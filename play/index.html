@@ -134,7 +134,7 @@ body.titling #ver{display:block}
   <div id="side"><div id="goal"></div><div id="feed"></div></div>
   <div id="stats"><div id="hud1">Colossus</div><button id="stats-menu" type="button" aria-label="Pause and inventory" title="Pause and inventory">Ⅱ</button></div>
   <div id="pad"></div>
-  <div id="ver">v1.116 · 45448cb · 2026-11-25 04:50 UTC</div>
+  <div id="ver">v1.117 · f452435 · 2026-11-25 05:03 UTC</div>
   <div class="ov" id="ov"><div class="card" id="card"></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -1048,7 +1048,7 @@ function canBuild(h,k,placement=k==='barracks'?barracksPlacement(h):null){if(!h.
   const onLake=S.prints.some(p=>Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*1.2);
   if(h.gold<C.COST[k])return'Need '+(C.COST[k]-h.gold)+' more gold';if(onLake)return'Not in the lake';
   if(S.builds.some(b=>Math.hypot(b.x-h.x,b.y-h.y)<45)||S.humans.some(o=>o.job&&o.job.kind==='ground'&&Math.hypot(o.job.x-h.x,o.job.y-h.y)<45))return'Too close to another building';
-  if(k==='outpost')return !outpostSiteOpen(h.x,h.y)?'Too near a settlement':S.outposts[h.town]>=3?'Your people have already founded three outposts':null;
+  if(k==='outpost')return !outpostSiteOpen(h.x,h.y)?'Too near a settlement':S.outposts[h.town]+pendingSettlers(h.town)>=3?'Your people have already founded three outposts':S.events.some(e=>e.k==='caravan'&&e.site&&Math.hypot(e.site.x-h.x,e.site.y-h.y)<C.OUTPOST_GAP)?'Settlers are already on their way near here':!firstTown(h.town)?'No town to send settlers from':null;
   if(k==='barracks')return null;
   if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t&&(t.houses||0)>=houseCap(t))return t.name+' (level '+lv(t)+') has room for '+houseCap(t)+' houses: raise it for more'}
   return inTerritory(h.town,h.x,h.y)?null:'Outside your build area: build nearer your homes'}
@@ -1087,7 +1087,7 @@ function villageSite(from){if(S.outposts[from.i]>=3)return null;
   return null}
 function finishBuild0(h,k){
   if(k==='outpost'){if(S.outposts[h.town]>=3||!outpostSiteOpen(h.x,h.y)){h.gold+=C.COST.outpost;sayTo(h,'Outpost site is no longer available. Your gold was refunded.');return false}
-    const v=foundVillage(h.town,h.x,h.y);announce(TOWNS[h.town].name+' founded '+v.name+(lakesNear(h.x,h.y,500)?' beside a footprint lake.':'.'));gainXp(h,30);return true}
+    const from=firstTown(h.town);if(!from){h.gold+=C.COST.outpost;return false}startCaravan(from,{x:h.x,y:h.y},h);gainXp(h,10);return true}
   const b={k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0};S.builds.push(b);
   questTick(h,'build');
   let housed=false;
@@ -1122,7 +1122,7 @@ function canUpgrade(h,kind,o,crystals=h.crystals+(h.you&&storeNear(h)?poolOf(sto
 function upgrade(h,kind,o,bank=h){const near=bank===h&&h.you?storeNear(h):null,have=bank.crystals+(near?poolOf(near):0);const why=canUpgrade(h,kind,o,have);if(why){sayTo(h,why);return false}const promote=kind==='town'&&o.outpost;
   {const c=upCost(kind,o),own=Math.min(c,bank.crystals);bank.crystals-=own;if(c>own&&near)spendPool(near,c-own)}o.lvl=lv(o)+1;sfx('build',h.you);gainXp(h,10*o.lvl);
   if(kind==='ladder'){const st=S.sites.find(q=>q.build===o);if(st)ladderDown(st,30+25*(o.lvl-1))}
-  if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20;if(promote)o.outpost=false;else startCaravan(o)}
+  if(kind==='town'){o.max+=600;o.hp+=600;o.r+=20;if(promote)o.outpost=false;else if(!o.outpost)startCaravan(o)}
   if(kind==='house'){const t=S.towns[o.settlementId];if(t?.alive){t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP}}
   sayTo(h,{town:promote?o.name+' is now a town.':o.name+' is raised to level '+o.lvl+': stronger walls, a wider build area, and its shop sells level '+o.lvl+' gear.',house:'House raised to level '+o.lvl+'. It now earns '+HOUSE_RENT*o.lvl+' gold every '+RENT_INTERVAL+' s.',tower:'Watchtower raised to level '+o.lvl+(o.spec?': '+o.spec:': it hits harder')+'.',cannon:'Cannon raised to level '+o.lvl+': faster and heavier shot.',brace:'Brace raised to level '+o.lvl+': the giant walks faster.',ladder:'Ladder lengthened: it reaches further down.'}[kind]);return true}
 // the nearest of your own things to upgrade: a house or tower beside you, or the town you stand in
@@ -1503,11 +1503,15 @@ function startStar(){let x,y;for(let k=0;k<30;k++){x=rr(800,C.MAP-800);y=rr(800,
   for(let k=0;k<2;k++)S.monsters.push({id:S.nextId++,kind:'wolf',x:x+rr(-250,250),y:y+rr(-250,250),hx:x,hy:y,hp:40,max:40,atk:7,gold:12,xp:16,r:13,cd:0});
   eventSay('A star falls from the open sky! Ten sky crystals lie in its crater.')}
 // a caravan: set off when a town is raised; it carries trade to a neighbour and pays the town's people if it arrives
-function startCaravan(from){const site=villageSite(from),to=site?{x:site.x,y:site.y,site:true}:aliveTowns().filter(t=>t.i!==from.i).sort((a,b)=>dist(a,from)-dist(b,from))[0];if(!to)return;
-  const ev={k:'caravan',i:from.i,from:from.id,to:to.site?null:to.id,site,x:from.x,y:from.y,hp:C.CARAVAN_HP,max:C.CARAVAN_HP,t:S.t};S.events.push(ev);S.evc.caravan++;
+// owner's rule: only heroes found outposts. A hero stakes a site and a caravan of settlers walks there from the faction's
+// first town; the outpost is founded when it arrives. Raising a town sends a trade caravan to a neighbour instead.
+function firstTown(ti){const own=aliveTowns().filter(t=>t.i===ti);return own.find(t=>!t.outpost)||own[0]||null}
+const pendingSettlers=ti=>S.events.filter(e=>e.k==='caravan'&&e.site&&e.i===ti).length;
+function startCaravan(from,site=null,by=null){const to=site?{x:site.x,y:site.y,site:true}:aliveTowns().filter(t=>t.i!==from.i).sort((a,b)=>dist(a,from)-dist(b,from))[0];if(!to)return;
+  const ev={k:'caravan',i:from.i,from:from.id,to:to.site?null:to.id,site,by:by&&by.id,x:from.x,y:from.y,hp:C.CARAVAN_HP,max:C.CARAVAN_HP,t:S.t};S.events.push(ev);S.evc.caravan++;
   for(let k=0;k<3;k++){const f=.35+.15*k,x=from.x+(to.x-from.x)*f+rr(-300,300),y=from.y+(to.y-from.y)*f+rr(-300,300),troll=k===0&&canSpawnTroll(x,y);
     S.monsters.push({id:S.nextId++,kind:troll?'troll':'wolf',x,y,hx:x,hy:y,hp:troll?100:36,max:troll?100:36,atk:troll?13:7,gold:troll?24:10,xp:troll?30:14,r:troll?22:13,cd:0,ambush:ev})}
-  eventSay(site?TOWNS[from.i].name+' sends settlers out to found a village. Beasts lie in wait on the road.':TOWNS[from.i].name+' sends a caravan to '+to.name+'. Beasts lie in wait on the road.')}
+  eventSay(site?(by&&by.you?'Settlers set out from '+from.name+' for your staked site. Guard them on the road!':TOWNS[from.i].name+' sends settlers out to found an outpost. Beasts lie in wait on the road.'):TOWNS[from.i].name+' sends a caravan to '+to.name+'. Beasts lie in wait on the road.')}
 function escortCaravan(h){return S.events.find(e=>e.k==='caravan'&&e.escort===h)}
 function caravanThreat(e,allowed){let threat=null,best=Infinity;for(const m of S.monsters){if(allowed&&!allowed(m))continue;
   const d=dist(m,e);if(d<best&&(d<m.r+40||m.ambush===e&&d<500)){threat=m;best=d}}return threat}
@@ -1535,8 +1539,8 @@ function stepEvents(dt){stepWaves();
     if(e.k==='caravan'){const to=e.site?{x:e.site.x,y:e.site.y,r:60}:S.towns.find(t=>t.id===e.to);if(!to||e.site==null&&!to.alive){S.events.splice(k,1);continue}const d=Math.hypot(to.x-e.x,to.y-e.y);
       if(!e.escort||!canEscort(e.escort,e))e.escort=caravanEscort(e);
       if(e.site&&d<to.r){S.events.splice(k,1);if(S.outposts[e.i]>=3||!factionAlive(e.i)||!outpostSiteOpen(to.x,to.y)){eventSay('The settlers from '+TOWNS[e.i].name+' find no room and turn home.');continue}
-        const v=foundVillage(e.i,e.site.x,e.site.y);
-        eventSay('Settlers from '+TOWNS[e.i].name+' found '+v.name+'. A new villager lives there.');continue}
+        const v=foundVillage(e.i,e.site.x,e.site.y),by=S.humans.find(o=>o.id===e.by);if(by){gainXp(by,30);if(by.you)sfx('coin')}
+        (by&&by.you?announce:eventSay)('Settlers from '+TOWNS[e.i].name+' found '+v.name+'. A new villager lives there.');continue}
       if(d<to.r){S.events.splice(k,1);for(const h of S.humans)if(h.town===e.i)h.gold+=40;eventSay('The caravan from '+TOWNS[e.i].name+' reaches '+to.name+'. Every one of its people earns 40 gold.');continue}
       const near=S.monsters.find(m=>Math.hypot(m.x-e.x,m.y-e.y)<m.r+40);if(near){if(near.cd<=0){near.cd=1;e.hp-=near.atk}}else{const st=steerSolid(e,to.x,to.y,30);e.x+=st.x*55*WS*dt;e.y+=st.y*55*WS*dt;solidPush(e,30)}
       if(e.hp<=0){S.events.splice(k,1);eventSay('The caravan from '+TOWNS[e.i].name+' is lost on the road.')}}}}
@@ -2533,7 +2537,7 @@ function g3Update(){const g=S.g,t=S.t;
     else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
   for(const c of S.caches){const z=groundH(c.x,c.y),ok=t>=c.ready;B(c.x,c.y,z+14,44,26,30,ok?'#d9b45a':'#6b6250');B(c.x,c.y,z+30,46,8,32,'#3a2d1c')}
-  for(const e of S.events){if(e.k==='caravan'){const z=groundH(e.x,e.y);B(e.x,e.y,z+24,60,26,30,'#8a6a44');B(e.x,e.y,z+44,56,16,28,'#e6dcc4');B(e.x,e.y,z+60,8,8,8,TOWNS[e.i].col)}}
+  for(const e of S.events){if(e.k==='caravan'&&e.site){const z=groundH(e.site.x,e.site.y);B(e.site.x,e.site.y,z+60,5,120,5,'#6b5a44');B(e.site.x+14,e.site.y,z+108,26,18,3,TOWNS[e.i].col)}if(e.k==='caravan'){const z=groundH(e.x,e.y);B(e.x,e.y,z+24,60,26,30,'#8a6a44');B(e.x,e.y,z+44,56,16,28,'#e6dcc4');B(e.x,e.y,z+60,8,8,8,TOWNS[e.i].col)}}
   for(const s of S.sites)if(s.build){const face=climbing3D()?.face??s.build.face,a=bodyWorld(s.c,s.r,face),z=groundH(a.x,a.y)+a.z;if(s.build.k==='ladder'){const b2=bodyWorld(s.c,Math.max(0,s.r-30-25*(lv(s.build)-1)),face);B(a.x,a.y,(z+groundH(b2.x,b2.y)+b2.z)/2,6,Math.max(20,z-groundH(b2.x,b2.y)-b2.z),6,'#7a5a36');continue}if(s.build.k==='platform'){B(a.x,a.y,z,90,10,60,'#8a6a44',g.ang);continue}if(s.build.k==='brace'){B(a.x,a.y,z,110,14,14,'#3a3a3a',g.ang);B(a.x,a.y,z,14,110,14,'#3a3a3a',g.ang)}else{B(a.x,a.y,z,56,28,40,'#1b1b1b',g.ang);B(a.x,a.y,z+18,12,40,12,'#1b1b1b');B(a.x,a.y,z+40,10,10,10,TOWNS[s.build.town].col)}}
   for(const sh of S.shots){if(ba>=60)break;const z=1300*(1-sh.t)+Math.sin(sh.t*Math.PI)*350;put(G3.ball,ba++,sh.x,sh.y,groundH(sh.x,sh.y)+z,12,12,12,0)}
   for(const[m,n]of[[G3.box,bx],[G3.roof,rf],[G3.disc,dc],[G3.ball,ba]]){m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
@@ -3066,7 +3070,7 @@ function drawMinimap0(){const s=Math.min(110*UI,Math.min(W,H)*.26),x0=8*UI,y0=UI
   ctx.fillStyle='#9a9d80';for(const m of S.marks){ctx.beginPath();ctx.arc(x0+m.x*k,y0+m.y*k,3,0,7);ctx.fill()}
   for(const c of S.caches){ctx.fillStyle=S.t>=c.ready?'#d9b45a':'#6b6250';ctx.fillRect(x0+c.x*k-2,y0+c.y*k-2,4,4)}
   miniPlaces(x0,y0,k);
-  for(const e of S.events){ctx.fillStyle=e.k==='star'?'#9fe8ff':e.k==='raid'?'#ff5a4a':TOWNS[e.i].col;ctx.beginPath();ctx.arc(x0+e.x*k,y0+e.y*k,e.k==='raid'?4:3.5,0,7);ctx.fill();if(e.k!=='caravan'){ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke()}}
+  for(const e of S.events){if(e.k==='caravan'&&e.site){ctx.strokeStyle=TOWNS[e.i].col;ctx.lineWidth=1.5;ctx.strokeRect(x0+e.site.x*k-3,y0+e.site.y*k-3,6,6)}ctx.fillStyle=e.k==='star'?'#9fe8ff':e.k==='raid'?'#ff5a4a':TOWNS[e.i].col;ctx.beginPath();ctx.arc(x0+e.x*k,y0+e.y*k,e.k==='raid'?4:3.5,0,7);ctx.fill();if(e.k!=='caravan'){ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.stroke()}}
   ctx.fillStyle='#e8dcc4';ctx.beginPath();ctx.arc(x0+S.g.x*k,y0+S.g.y*k,5,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.stroke();
   if(S.you&&!S.you.dead){ctx.fillStyle='#c0392b';ctx.beginPath();ctx.arc(x0+S.you.x*k,y0+S.you.y*k,3,0,7);ctx.fill()}
   // the camera's facing

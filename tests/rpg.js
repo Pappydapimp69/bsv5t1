@@ -87,6 +87,18 @@ const {chromium} = require('playwright');
       out.deer = D.critters.length >= 24;
       const deer = D.critters[0]; dh.x = deer.x + 200; dh.y = deer.y; const dx0 = deer.x; __col.step(30); out.deerFlee = Math.hypot(deer.x - dh.x, deer.y - dh.y) > 200;
       dh.x = deer.x + 30; dh.y = deer.y; dh.cd = 0; const dg = dh.gold; out.hunt = humanAct(dh, 'A') && deer.dead && dh.gold === dg + 6;
+      // charms: an alpha drops one and it is worn; slots fill and the rest go to the bag; the crown adds its stats
+      const Ch = __col.newGame('human', 15), ch = Ch.you; __col.step(2); const alpha2 = Ch.monsters.find(m => m.elite);
+      alpha2.hp = 1; hitBeast(ch, alpha2, 5); out.alphaCharm = (ch.charms || []).length === 1;
+      giveCharm(ch); giveCharm(ch); out.slotsThenBag = ch.charms.length === 2 && ch.bag.length === 1;
+      const a1 = ch.atk, m1 = ch.max; removeCharm(ch, ch.charms[0]); ch.bag = ch.bag.filter(k => k !== 'crown'); ch.bag.push('crown'); equipCharm(ch, 'crown');
+      out.crown = ch.atk === a1 + 8 && ch.max >= m1 + 60 - 40; removeCharm(ch, 'crown'); out.crownOff = ch.atk === a1;
+      // bandit archers: a bandit camp has archers and a chief; an archer aims from range and a step off the mark makes it miss
+      const Ar = __col.newGame('human', 16), ah = Ar.you; __col.step(2);
+      const bc = Ar.pois.find(p => p.k === 'camp' && p.bandits); out.banditCamp = !!bc && campBeasts(bc).filter(m => m.kind === 'archer').length === 4;
+      const ar = campBeasts(bc)[0]; Ar.monsters = [ar]; ar.cd = 0; ar.wind = null; ah.x = ar.x + 280; ah.y = ar.y; const ahp0 = ah.hp;
+      beastFight(ar, ah, C.DT); out.archerAims = !!ar.wind && Math.hypot(ar.x - ah.x, ar.y - ah.y) > 250;
+      ah.x += 120; ar.wind.t = ar.wind.dur; beastBusy(ar, C.DT); out.archerMisses = ah.hp === ahp0;
       return out;
     });
     for (const [k, v] of Object.entries(r)) assert.ok(v, k);

@@ -888,8 +888,8 @@ function hurtTown(t,d,why){if(!t.alive)return;if(!S.headless&&S.t-(t.sndT||0)>.6
 function displaceForagers(t){for(const h of foragersIn(t).slice(foragerCapacity(t))){
   const vacancies=aliveTowns().filter(o=>o!==t&&o.i===t.i&&foragersIn(o).length<foragerCapacity(o));
   vacancies.sort((a,b)=>dist(a,h)-dist(b,h));assignForagerHome(h,vacancies[0])}}
-function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0));if(buffOf(h,'ward'))d*=.7;h.hp-=d;h.hurtAt=S.t;if(perk(h,'wind')&&h.hp>0&&h.hp<h.max*.25&&S.t-(h.windT??-99)>60){h.windT=S.t;h.hp+=40;if(h.you){toast('Second wind! +40 health.');S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}}if(why!=='fall')horseHurt(h,d);h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
-  if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
+function hurtHuman(h,d,why,by){if(h.dead)return;if(why==='beast')h.beastAt=S.t;if(!S.headless&&why!=='fall'&&!untouchable(h)){if(h.you)sfx('hurt');else if(S.t-(h.sndT||0)>.4&&nearPlayer(h)){h.sndT=S.t;sfx('hit',true)}}if(why!=='fall'&&untouchable(h)){dodgedFx(h);return}d=Math.max(d*.4,d-(h.def||0)-5*charm(h,'hide'));if(buffOf(h,'ward'))d*=.7;h.hp-=d;h.hurtAt=S.t;if(perk(h,'wind')&&h.hp>0&&h.hp<h.max*.25&&S.t-(h.windT??-99)>60){h.windT=S.t;h.hp+=40;if(h.you){toast('Second wind! +40 health.');S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}}if(why!=='fall')horseHurt(h,d);h.lastHurtBy=by||null;if(h.you&&h.mode==='ground')S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'-'+Math.round(d),t:0,life:.9,col:'#ff8f80'});
+  if(h.you){shake(6);if(h.hp>0&&why)toast({crush:'Crushed under a foot!',stomp:'Caught in a stomp!',smash:'Hit by the smash!',cannon:'Cannon fire!',beast:h.lastBeast&&h.lastBeast.kind==='archer'?'An arrow hits you!':h.lastBeast&&h.lastBeast.kind==='boar'?'A boar gores you!':'A beast bites you!',fall:'You hit hard.'}[why]||'Hurt!')}
   if(h.hp<=0)killHuman(h,why)}
 function killHuman(h,why){if(h.you&&why==='beast'&&h.lastBeast&&h.lastBeast.elite&&S.monsters.includes(h.lastBeast)&&!/Slayer/.test(h.lastBeast.elite)){const m=h.lastBeast;m.elite+=' the Hero-Slayer';m.max=Math.round(m.max*1.5);m.hp=m.max;m.atk+=4;m.gold+=40;m.xp+=40;
     announce(m.elite.replace(' the Hero-Slayer','')+' killed you and grows stronger: now '+m.elite+'. Avenge yourself for a richer bounty.');chron('An alpha killed you and took a name for it: '+m.elite+'.')}
@@ -1050,8 +1050,8 @@ function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why
     if(slot==='Y'){const j=reachT(h).j;if(j){h.kits.wedge--;if(h.you)h.wedged=(h.wedged||0)+1;S.firstWedge=S.firstWedge||{};if(!S.firstWedge[h.town]){S.firstWedge[h.town]=1;chron(whoOf(h).replace(/^./,c=>c.toUpperCase())+' drove '+(Object.keys(S.firstWedge).length===1?'the first':TOWNS[h.town].name+'\u2019s first')+' wedge into the '+(S.g.awake?'':'sleeping ')+'giant\u2019s '+JOINTS[j].name.toLowerCase()+'.')}S.joints[j].wedges.push({town:h.town,who:h.id});if(!S.headless&&Math.random()<.5)giantCall('pain');sfx('build',h.you);gainXp(h,8);sayTo(h,'Wedge driven into the '+JOINTS[j].name.toLowerCase()+'. It bleeds.');return true}
       return drinkPotion(h)}
     return false}
-  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(!at&&h.hero&&critterNear(h)){huntCritter(h,critterNear(h));return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1;h.critNext=0;
-    const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
+  if(slot==='A'){if(h.cd>0)return false;h.cd=.5;h.swing=.2;const at=attackTarget(h),m=at&&at.town==null?at:null;if(at&&!m){strikeHuman(h,at);return true}if(!at&&h.hero&&critterNear(h)){huntCritter(h,critterNear(h));return true}if(m){const cb=S.t-(h.comboT??-9)<.9?(h.combo||0)+1:1;h.combo=cb>=3?0:cb;h.comboT=S.t;const fin=cb>=3,crit=!!h.critNext||rnd()<.1+.1*charm(h,'tooth');h.critNext=0;
+    const dm=Math.round(h.atk*(h.riding?C.RIDE_HIT:1)*(h.cryT>S.t?1.3:1)*(buffOf(h,'might')?1.25:1)*(fin?1.6:1)*(crit?1.8:1));if(perk(h,'cleave'))for(const o of S.monsters.slice())if(o!==m&&Math.hypot(o.x-h.x,o.y-h.y)<70+o.r)hitBeast(h,o,Math.round(dm*.6));m.hp-=dm;m.hitT=S.t;if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:crit?'#fff05a':'#ffe6a0'});if(charm(h,'blood'))h.hp=Math.min(h.max,h.hp+3);if(fin&&m.wind){m.wind=null;m.rec=.5}onBlow(h,m,dm,fin?.45:crit?.25:0);if(h.you){S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+dm+(crit?' CRIT':'')+(fin?' x3':h.riding?' charge':''),t:0,life:crit||fin?1.1:.8,col:crit?'#fff05a':fin?'#ffb347':'#ffe6a0',big:crit||fin});if(crit)shake(5)}sfx('hit',h.you||nearPlayer(m));if(m.hp<=0)killMonster(m,h);return true}{const ch=footChain(h);if(ch){h.cd=0;return strikeChain(h,ch)}}return false}
   if(slot==='B'){if(nearFoot(h)<0){const up=upgradeTarget(h);if(up)return up.act();return false}return mount(h,nearFoot(h))}
   if(slot==='X'){const t=townAt(h),c=h.hero&&cacheNear(h);if(!t&&h.hero&&poiAct(h))return usePoi(h,poiNear(h));if(!t&&c)return searchCache(h,c);if(h.you){if(t)openTown(t);else if(barracksNear(h))openBarracks(barracksNear(h));else openBuild();return true}return false}
   if(slot==='Y')return drinkPotion(h);
@@ -1094,7 +1094,7 @@ function setRide(h,on){if(on&&rideWhy(h))return false;if(!!h.riding===!!on)retur
 function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if(w){if(h.you)toast(w);return false}return setRide(h,true)}
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0){h.riding=false;h.horse.hp=h.horse.max*.5;h.horse.away=S.t+C.HORSE_AWAY;if(h.you)toast('Your horse is hurt and bolts for home! Back in '+C.HORSE_AWAY+' s.');return}
-  if(!perk(h,'rider')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
+  if(!perk(h,'rider')&&!charm(h,'bell')&&(d>=12||rnd()<C.THROW)){h.riding=false;h.dodgeCd=Math.max(h.dodgeCd||0,.6);if(h.you){toast('Thrown from your horse! R to remount.');shake(8)}}}
 function stepHorse(h,dt){if(!h.horse)return;if(S.t%1<dt&&S.builds.some(b=>b.k==='stable'&&b.town===h.town&&Math.hypot(b.x-h.x,b.y-h.y)<350)){h.horse.hp=h.horse.max;h.horse.away=0}if(h.mode!=='ground'||h.job||h.dead)h.riding=false;if(!h.riding)h.horse.hp=Math.min(h.horse.max,h.horse.hp+2*dt)}
 // a people's build area: a ring around each of its settlements and around every house it has built, so houses
 // push the area outward and towers can stand anywhere inside it
@@ -1740,14 +1740,17 @@ function layPois(){if(S.pois)return;const R=mulberry32((S.seed^0x51ED27)>>>0),M=
   S.pois=pois;S.poiT=0}
 function poiNear(h,r=120){let best=null,d=r;for(const p of S.pois||[]){if(p.gone)continue;const e=Math.hypot(p.x-h.x,p.y-h.y)-(p.k==='camp'?60:0);if(e<d){best=p;d=e}}return best}
 function campBeasts(p){return S.monsters.filter(m=>m.camp===p.id)}
-function spawnCamp(p){const R2=rr;p.alive=true;for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*90,y=p.y+Math.sin(a)*90;S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:p.x,hy:p.y,hp:40,max:40,atk:7,gold:10,xp:14,r:13,cd:0,camp:p.id})}
+const CHIEFS=['Black Hal','Mother Crow','Two-Bows Ned','Red Wenna'];
+function spawnCamp(p){p.alive=true;if(p.id%2===0){p.bandits=1;p.name=p.name&&!ALPHAS.includes(p.name)?p.name:CHIEFS[p.id%CHIEFS.length];
+    for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*110,y=p.y+Math.sin(a)*110;S.monsters.push({id:S.nextId++,kind:'archer',x,y,hx:x,hy:y,hp:40,max:40,atk:8,gold:16,xp:20,r:14,cd:1+k*.7,camp:p.id})}
+    S.monsters.push({id:S.nextId++,kind:'archer',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:130,max:130,atk:12,gold:45,xp:70,r:16,cd:0,camp:p.id,elite:p.name});return}for(let k=0;k<3;k++){const a=k*2.1,x=p.x+Math.cos(a)*90,y=p.y+Math.sin(a)*90;S.monsters.push({id:S.nextId++,kind:'wolf',x,y,hx:p.x,hy:p.y,hp:40,max:40,atk:7,gold:10,xp:14,r:13,cd:0,camp:p.id})}
   S.monsters.push({id:S.nextId++,kind:'wolf',x:p.x,y:p.y+40,hx:p.x,hy:p.y,hp:150,max:150,atk:12,gold:40,xp:70,r:19,cd:0,camp:p.id,elite:p.name})}
 function poiLabel(p,h){const left=s=>{s=Math.ceil(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
   if(p.k==='shrine'){const D=SHRINES[p.sub];return D.n+(S.t<p.ready?' (resting '+left(p.ready-S.t)+')':': '+D.t)}
   if(p.k==='spring')return'Hot spring'+(h&&!(p.used||{})[h.id]?': +10 most health':S.t<p.ready?' (warming '+left(p.ready-S.t)+')':': heals');
   if(p.k==='stones')return'Standing stones'+(h&&(h.lore||{})[p.lore]?' (read)':': lore');
   if(p.k==='herb')return S.t<p.ready?'':'Healing herbs';
-  if(p.k==='camp'){const n=campBeasts(p).length;return n?p.name+'\u2019s camp: '+n+' beasts guard a chest':S.t<p.ready?'Empty camp (back in '+left(p.ready-S.t)+')':'Camp chest: open it!'}
+  if(p.k==='camp'){const n=campBeasts(p).length;return n?p.name+'\u2019s camp: '+n+(p.bandits?' bandits':' beasts')+' guard a chest':S.t<p.ready?'Empty camp (back in '+left(p.ready-S.t)+')':'Camp chest: open it!'}
   if(p.k==='traveller')return p.follow?'Traveller (following you)':'Lost traveller: walk them home';
   if(p.k==='merchant')return'Wandering merchant';return''}
 function poiAct(h){const p=poiNear(h);if(!p)return null;
@@ -1764,7 +1767,7 @@ function usePoi(h,p){const D=SHRINES[p.sub];
   if(p.k==='stones'){h.lore=h.lore||{};const first=!h.lore[p.lore];h.lore[p.lore]=1;if(h.you)openMenu({title:'Standing stones',body:'<p>'+LORE[p.lore]+'</p><p class="dim">'+Object.keys(h.lore).length+' of '+LORE.length+' stones read.</p>',items:[{label:'Go on',act:closeMenu}],back:closeMenu});
     if(first){gainXp(h,25);questTick(h,'lore');if(Object.keys(h.lore).length===LORE.length){h.picks=(h.picks||0)+1;if(h.you)toast('Every stone read: a free talent (T)!');else autoTalent(h)}}return true}
   if(p.k==='herb'){if(S.t<p.ready)return false;p.ready=S.t+150;h.herbs=(h.herbs||0)+1;h.hp=Math.min(h.max,h.hp+10);if(h.herbs>=3){h.herbs-=3;h.potions++;if(h.you)toast('Three herbs: you brew a potion.')}else if(h.you)toast('Healing herbs ('+h.herbs+'/3 for a potion).');sfx('coin',h.you);return true}
-  if(p.k==='camp'){if(campBeasts(p).length||S.t<p.ready)return false;p.ready=S.t+300;p.alive=false;const g=80+Math.floor(rnd()*60),c=packAdd(h,'crystals',3);h.gold+=g;gainXp(h,40);questTick(h,'camp');
+  if(p.k==='camp'){if(campBeasts(p).length||S.t<p.ready)return false;p.ready=S.t+300;p.alive=false;const g=Math.round((80+Math.floor(rnd()*60))*(1+.25*charm(h,'coin'))),c=packAdd(h,'crystals',3);h.gold+=g;if(rnd()<.45)giveCharm(h);gainXp(h,40);questTick(h,'camp');
     if(h.you){toast(p.name+'\u2019s camp: +'+g+' gold'+(c?', '+c+' crystals':'')+'. The pack will return.');sfx('coin');shake(4)}return true}
   if(p.k==='traveller'){p.follow=h.id;if(h.you)toast('"Thank you! Take me to any of '+TOWNS[h.town].name+'\u2019s towns."');return true}
   if(p.k==='merchant'){if(h.you)openMerchant(h,p);return true}return false}
@@ -1773,7 +1776,7 @@ function openMerchant(h,p){const it=(label,cost,sub,fn,why)=>({label:label+' \u2
     it('Tome of insight',150,'One more talent pick',()=>{h.picks=(h.picks||0)+1;toast('A talent to choose (T).')}),
     it('Elixir of strength',120,'+3 damage for good',()=>{h.atk+=3}),
     it('Swift mare',55,'A horse at a discount',()=>{h.horse={hp:C.HORSE_HP,max:C.HORSE_HP};toast('A horse is yours. R to ride.')},h.horse?'You have a horse':null),
-    it('Greater potion',30,'Restores 140 health',()=>{h.bigPotions++}),{label:'Leave',act:closeMenu}],back:closeMenu})}
+    it('Greater potion',30,'Restores 140 health',()=>{h.bigPotions++}),it('A charm, sight unseen',100,'One of the charms you do not have',()=>{giveCharm(h)}),{label:'Leave',act:closeMenu}],back:closeMenu})}
 function stepPois(dt){layPois();
   for(const p of S.pois){if(p.k==='camp'&&!p.alive&&S.t>=p.ready&&!campBeasts(p).length&&Math.hypot((S.you||S.g).x-p.x,(S.you||S.g).y-p.y)>1500)spawnCamp(p)}
   // travellers: one or two lost at a time; a helped one follows its hero and is paid for at any town of theirs
@@ -1804,8 +1807,9 @@ function searchCache(h,c){if(!h.hero||h.dead||h.job||h.mode!=='ground'||!c||dist
   c.ready=S.t+C.CACHE_REFILL;if(rnd()<.5){const t=nearestOwn(h.town,c.x,c.y);if(t)startRaid(t,'Beasts stir in the robbed ruin and march on '+t.name+'!',c)}const gold=50+Math.floor(rnd()*70),cr=2+Math.floor(rnd()*4),kits=['anchor','wedge','brace','cannon'],k=kits[Math.floor(rnd()*4)];
   h.gold+=gold;packAdd(h,'crystals',cr);h.kits[k]+=k==='anchor'?3:1;gainXp(h,25);questTick(h,'search');sfx('coin',h.you);
   sayTo(h,'In the old giant\u2019s ribs: '+gold+' gold, '+cr+' sky crystals and a '+k+' kit.');return true}
-function gainXp(h,x){h.xp+=x;while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;
+function gainXp(h,x){h.xp+=Math.round(x*(1+.2*charm(h,'knot')));while(h.xp>=h.lvl*50){h.xp-=h.lvl*50;h.lvl++;h.max+=15;h.hp=h.max;h.atk+=3;
     if(h.hero){h.picks=(h.picks||0)+1;if(!h.you||S.autoplay)autoTalent(h)}
+    while(h.bag&&h.bag.length&&(h.charms||[]).length<charmSlots(h)){const id=h.bag[0];equipCharm(h,id);if(h.you)toast('A new charm slot: you wear the '+CHARMS[id].n+'.')}
     if(h.you){const sk=SKILLS.find(k=>k.lvl===h.lvl);toast('Level '+h.lvl+'! Press T to choose a talent.'+(sk?' New skill: '+sk.name+' ('+sk.key+').':''));sfx('coin');S.lvlFx=S.t;S.fx.push({k:'lvl',x:h.x,y:h.y,z:0,t:0,life:1.6});S.fx.push({k:'ring',x:h.x,y:h.y,r:160,t:0,life:.9,col:'#ffd27a'})}}}
 // Talents and skills (owner's request: skills and RPG elements). Each level a hero picks one talent of three, Hades and
 // Vampire Survivors style (pick 1 of 3, effects you feel at once), and levels 2, 3 and 5 unlock an active skill on keys 1-3.
@@ -1826,6 +1830,19 @@ const perk=(h,id)=>(h.perks&&h.perks[id])||0;
 function talentChoices(h){const pool=TALENTS.filter(t=>perk(h,t.id)<t.max&&(t.id!=='rider'||h.horse));const out=[];while(out.length<3&&pool.length)out.push(pool.splice(Math.floor(rnd()*pool.length),1)[0]);return out}
 function takeTalent(h,t){if(!(h.picks>0))return false;h.picks--;h.perks=h.perks||{};h.perks[t.id]=(h.perks[t.id]||0)+1;if(t.on)t.on(h);h.offer=null;if(h.you){toast('Talent: '+t.name+'. '+t.text+'.');sfx('coin')}return true}
 function autoTalent(h){const c=talentChoices(h);if(c.length)takeTalent(h,c[0])}
+// charms (Ghost of Tsushima's charm slots): loot that changes how you play, worn in 2 slots, 3 at level 4, 4 at level 7.
+// Alphas always drop one, camp chests often, the Rim Warlord drops its crown, the merchant sells them.
+const CHARMS={tooth:{n:'Wolf-tooth charm',t:'+10% chance to crit'},hide:{n:'Boar-hide charm',t:'Take 5 less from every blow'},heart:{n:'Troll-heart charm',t:'+40 most health',on:[0,40]},
+  feather:{n:'Hawk feather',t:'Move 10% faster'},ember:{n:'Ember stone',t:'Whirlwind hits 50% harder'},knot:{n:'Elder\u2019s knot',t:'+20% XP'},bell:{n:'Rider\u2019s bell',t:'Your horse never throws you'},
+  coin:{n:'Miser\u2019s coin',t:'+25% gold from beasts and chests'},moon:{n:'Moon shard',t:'Skills come back 15% sooner'},blood:{n:'Bloodstone',t:'Heal 3 on every strike that lands'},
+  crown:{n:'Warlord\u2019s crown',t:'+8 damage and +60 most health',on:[8,60],rare:1}};
+const charmSlots=h=>2+(h.lvl>=4?1:0)+(h.lvl>=7?1:0);
+const charm=(h,id)=>h.charms&&h.charms.includes(id)?1:0;
+function giveCharm(h,id){if(!id){const pool=Object.keys(CHARMS).filter(k=>!CHARMS[k].rare&&!(h.charms||[]).includes(k)&&!(h.bag||[]).includes(k));if(!pool.length){h.gold+=40;return null}id=pool[Math.floor(rnd()*pool.length)]}
+  h.bag=h.bag||[];h.charms=h.charms||[];if(h.charms.length<charmSlots(h))equipCharm(h,id);else h.bag.push(id);
+  if(h.you){announce('Charm found: '+CHARMS[id].n+' ('+CHARMS[id].t.toLowerCase()+').'+(h.charms.includes(id)?' Worn.':' In your bag: wear it from your hero sheet (I).'));sfx('coin')}return id}
+function equipCharm(h,id){h.charms=h.charms||[];h.bag=(h.bag||[]).filter(k=>k!==id);if(h.charms.length>=charmSlots(h)||h.charms.includes(id))return false;h.charms.push(id);const o=CHARMS[id].on;if(o){h.atk+=o[0];h.max+=o[1];h.hp+=o[1]}return true}
+function removeCharm(h,id){if(!charm(h,id))return false;h.charms=h.charms.filter(k=>k!==id);(h.bag=h.bag||[]).push(id);const o=CHARMS[id].on;if(o){h.atk-=o[0];h.max-=o[1];h.hp=Math.min(h.hp,h.max)}return true}
 // the character sheet (I): everything the hero has become, in one place
 function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).map(k=>h.gear[k]?GEAR[k][h.gear[k]-1].n:'No '+k).join(', ');
   const tal=TALENTS.filter(t=>perk(h,t.id)).map(t=>'<b>'+t.name+(perk(h,t.id)>1?' x'+perk(h,t.id):'')+'</b> '+t.text.toLowerCase()).join('<br>')||'None yet: level up and press T';
@@ -1834,9 +1851,10 @@ function openSheet(){const h=S&&S.you;if(!h)return;const gear=Object.keys(GEAR).
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i];
   openMenu({title:'Your hero \u00b7 level '+h.lvl,body:`<p><b>Health</b> ${Math.ceil(h.hp)}/${h.max} \u00b7 <b>Damage</b> ${h.atk} \u00b7 <b>Armour</b> ${h.def||0} \u00b7 <b>XP</b> ${h.xp}/${h.lvl*50}</p>
     <p class="dim"><b>Gear</b> ${gear}. <b>Horse</b> ${h.horse?Math.ceil(h.horse.hp)+'/'+h.horse.max+(h.riding?' (riding)':''):'none'}. <b>Blessing</b> ${bf}.</p>
+    <p class="dim"><b>Charms</b> (${(h.charms||[]).length}/${charmSlots(h)} worn)<br>${(h.charms||[]).map(k=>'<b>'+CHARMS[k].n+'</b> '+CHARMS[k].t.toLowerCase()).join('<br>')||'None: alphas, camp chests and the merchant have them'}</p>
     <p class="dim"><b>Talents</b><br>${tal}</p><p class="dim"><b>Skills</b><br>${sk}</p>
     <p class="dim"><b>Job</b> ${h.quest?h.quest.text+' '+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need:'none (the board in town)'}. <b>Tale</b> ${h.saga?h.saga.done?'told':g.text.replace(/^The elders\u2019 tale: /,''):'offered after two jobs'}. <b>Stones read</b> ${Object.keys(h.lore||{}).length}/${LORE.length}.</p>`,
-    items:[...(h.picks>0?[{label:'Choose a talent ('+h.picks+')',act:openTalents}]:[]),{label:'Close',act:closeMenu}],back:closeMenu})}
+    items:[...(h.picks>0?[{label:'Choose a talent ('+h.picks+')',act:openTalents}]:[]),...(h.charms||[]).map(k=>({label:'Take off '+CHARMS[k].n,sub:CHARMS[k].t,act:()=>{removeCharm(h,k);openSheet()}})),...(h.bag||[]).map(k=>({label:'Wear '+CHARMS[k].n,sub:CHARMS[k].t,why:(h.charms||[]).length>=charmSlots(h)?'All '+charmSlots(h)+' slots full: take one off':null,act:()=>{equipCharm(h,k);openSheet()}})),{label:'Close',act:closeMenu}],back:closeMenu})}
 function openTalents(){const h=S&&S.you;if(!h)return;if(!(h.picks>0)){toast('No talent to choose yet: level up first.');return}
   h.offer=h.offer&&h.offer.length?h.offer:talentChoices(h);const owned=TALENTS.filter(t=>perk(h,t.id)).map(t=>t.name+(perk(h,t.id)>1?' x'+perk(h,t.id):'')).join(', ');
   openMenu({title:'Choose a talent'+(h.picks>1?' ('+h.picks+' to choose)':''),body:'<p class="dim">Level '+h.lvl+'. '+(owned?'Yours: '+owned+'.':'Pick one; you get another every level.')+'</p>',
@@ -1847,19 +1865,19 @@ const SKILLS=[
   {id:'mend',key:'3',name:'Mend',lvl:5,cd:45,text:'Heal 40% of your health'}];
 function skillWhy(h,k){if(h.lvl<k.lvl)return'Unlocks at level '+k.lvl;if(h.dead)return'Dead';if(h.mode!=='ground')return'Not on the giant';const c=(h.skCd&&h.skCd[k.id]||0)-S.t;return c>0?'Ready in '+Math.ceil(c)+' s':null}
 function useSkill(h,id){const k=SKILLS.find(q=>q.id===id),w=skillWhy(h,k);if(w){if(h.you)toast(k.name+': '+w);return false}
-  (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'));h.swing=.2;
+  (h.skCd=h.skCd||{})[id]=S.t+k.cd*(1-.25*perk(h,'focus'))*(1-.15*charm(h,'moon'));h.swing=.2;
   const near=r=>S.monsters.filter(m=>Math.hypot(m.x-h.x,m.y-h.y)<r+m.r);
   if(id==='cry'){for(const m of near(220)){hitBeast(h,m,Math.round(h.atk*.8));m.wind=null;m.rec=Math.max(m.rec||0,1.2);m.cd=Math.max(m.cd||0,1.2)}
     for(const o of S.humans)if(o.town===h.town&&!o.dead&&Math.hypot(o.x-h.x,o.y-h.y)<400)o.cryT=S.t+8;S.fx.push({k:'ring',x:h.x,y:h.y,r:220,t:0,life:.6,col:'#ffcf6a'});shake(8);if(!S.headless)sfx('heavy',h.you)}
-  if(id==='whirl'){for(const m of near(95))hitBeast(h,m,Math.round(h.atk*1.5));S.fx.push({k:'ring',x:h.x,y:h.y,r:95,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('hit',h.you)}
+  if(id==='whirl'){for(const m of near(95))hitBeast(h,m,Math.round(h.atk*1.5*(1+.5*charm(h,'ember'))));S.fx.push({k:'ring',x:h.x,y:h.y,r:95,t:0,life:.35,col:'#d6d9de'});if(!S.headless)sfx('hit',h.you)}
   if(id==='mend'){const a=Math.round(h.max*.4);h.hp=Math.min(h.max,h.hp+a);if(h.you)S.fx.push({k:'txt',x:h.x,y:h.y,z:90,text:'+'+a,t:0,life:1,col:'#9be08a'});S.fx.push({k:'ring',x:h.x,y:h.y,r:60,t:0,life:.6,col:'#9be08a'})}
   return true}
 // one blow at a beast from a person: damage number, kill, and the cry's bonus
 function hitBeast(h,m,d){if(!S.headless&&(h.you||nearPlayer(m)))S.fx.push({k:'spark',x:m.x,y:m.y,z:m.kind==='troll'?60:30,t:0,life:.25,col:'#ffe6a0'});if(h.cryT>S.t)d=Math.round(d*1.3);if(buffOf(h,'might'))d=Math.round(d*1.25);m.hp-=d;m.hitT=S.t;if(h.you||nearPlayer(m))S.fx.push({k:'txt',x:m.x,y:m.y,z:m.kind==='troll'?80:40,text:'-'+d,t:0,life:.8,col:'#ffe6a0'});if(m.hp<=0)killMonster(m,h);return d}
 function removeMonster(i){const [m]=S.monsters.splice(i,1);
   if(m.wild&&m.kind==='wolf'&&S.monsters.length>=C.MONSTERS&&S.monsters.length<WOLF_REFILL_LIMIT)spawnMonster(true)}
-function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;{const gg=Math.round(m.gold*.5*(1+.5*perk(h,'plunder')));h.gold+=gg;if(h.you&&!S.headless)S.fx.push({k:'txt',x:m.x+20,y:m.y,z:70,text:'+'+gg+' gold',t:0,life:1.2,col:'#ffd27a'})}if(perk(h,'blood'))h.hp=Math.min(h.max,h.hp+8*perk(h,'blood'));
-  {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll');if(m.warlord)questTick(h,'warlord');if(m.elite){questTick(h,'bounty',m.elite);if(h.you){announce('You slew '+m.elite+'!');shake(10)}}}
+function killMonster(m,h){if(!S.headless&&(h&&h.you||nearPlayer(m))){(S.bodies=S.bodies||[]).push({x:m.x,y:m.y,r:m.r*1.6,t:S.t});if(S.bodies.length>40)S.bodies.shift()}if(h&&m.raid){(m.raid.killers=m.raid.killers||{})[h.id]=1}if(!S.headless&&(h&&h.you||nearPlayer(m)))sfx('kill',true);const i=S.monsters.indexOf(m);if(i>=0)removeMonster(i);if(!h)return;{const gg=Math.round(m.gold*.5*(1+.5*perk(h,'plunder'))*(1+.25*charm(h,'coin')));h.gold+=gg;if(h.you&&!S.headless)S.fx.push({k:'txt',x:m.x+20,y:m.y,z:70,text:'+'+gg+' gold',t:0,life:1.2,col:'#ffd27a'})}if(perk(h,'blood'))h.hp=Math.min(h.max,h.hp+8*perk(h,'blood'));
+  {const cr=m.kind==='troll'?2:rnd()<.4?1:0,pe=m.kind==='troll'?1:rnd()<.7?1:0;const a=packAdd(h,'crystals',cr),b=packAdd(h,'pelts',pe);if(h.you&&(a||b))toast('The '+m.kind+' drops '+[a?a+' sky crystal'+(a>1?'s':''):'',b?'a pelt':''].filter(Boolean).join(' and ')+' ('+packCount(h)+'/'+packCap(h)+' in pack).')}gainXp(h,m.xp);if(h.you)sfx('coin');questTick(h,'slay');if(m.kind==='troll')questTick(h,'troll');if(m.warlord){questTick(h,'warlord');giveCharm(h,'crown')}else if(m.elite)giveCharm(h);else if(m.kind==='troll'&&rnd()<.08)giveCharm(h);if(m.elite){questTick(h,'bounty',m.elite);if(h.you){announce('You slew '+m.elite+'!');shake(10)}}}
 // quests come from the town board, which cycles. Early on only fetch, kill and build work is posted; the giant is never
 // a quest you must take: later boards add climbing it and tending its wounds, never striking it.
 const QUEST_KINDS=['slay','gather','deliver','build','search','troll','camp','bounty','escort','pray'];
@@ -1920,7 +1938,7 @@ function stepHuman(h,dt,mv){
   if(h.tx!=null&&!vx&&!vy){const dx=h.tx-h.x,dy=h.ty-h.y,d=Math.hypot(dx,dy);if(d<10)h.tx=h.ty=null;else{const st=steerSolid(h,h.tx,h.ty,14);vx=st.x;vy=st.y}}else if(vx||vy)h.tx=h.ty=null;
   ({x:vx,y:vy}=combatMove(h,dt,vx,vy));
   const x=h.x,y=h.y;
-  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider')):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1);h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
+  if(vx||vy){const wade=S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*.8)?.5:landPace(h,vx,vy);const ride=(h.riding?C.RIDE*(1+.2*perk(h,'rider')):1)*(1+.12*perk(h,'swift'))*(buffOf(h,'swift')?1.2:1)*(1+.1*charm(h,'feather'));h.x+=vx*C.H_SPEED*wade*ride*dt;h.y+=vy*C.H_SPEED*wade*ride*dt;h.face=Math.atan2(vy,vx)}solidPush(h,12);
   h.x=clamp(h.x,20,C.MAP-20);h.y=clamp(h.y,20,C.MAP-20);
   if(assigned&&dist(h,assigned)>Math.max(C.FORAGE_RANGE,dist(assigned,{x,y}))){h.x=x;h.y=y;h.goal=null;h.returnHome=true}
   for(let i=S.crystals.length-1;i>=0;i--){const c=S.crystals[i];if(Math.hypot(c.x-h.x,c.y-h.y)<C.PICKUP_R&&(!c.tut||h.you)&&(!folk||inForageRange(assigned,c))){if(packCount(h)>=packCap(h)){if(h.you&&!h.fullSaid){h.fullSaid=1;toast('Your pack is full. Go home to empty it.')}continue}h.fullSaid=0;S.crystals.splice(i,1);if(!c.star&&!c.tut)spawnCrystal();packAdd(h,'crystals',1);S.gathered++;if(S.gathered>=(S.nextStar||C.STAR_EVERY)){S.nextStar=S.gathered+C.STAR_EVERY+4*S.evc.star;if(S.events.filter(e=>e.k==='star').length<2)startStar()};
@@ -1979,7 +1997,7 @@ function stepMonsters(dt){
     if(m.raid){const town=S.towns[m.raid.town];if(town?.alive&&S.t>=m.raid.go){let foe=null,fd=200**2;for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town===m.raid.i){const d2=distSq(h,m);if(d2<fd){fd=d2;foe=h}}
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;
       if(foe){beastFight(m,foe,dt);continue}if(d>town.r){m.x+=(tx-m.x)/d*sp*dt;m.y+=(ty-m.y)/d*sp*dt}else if(m.cd<=0){m.cd=1;hurtTown(town,m.atk*1.5)}continue}}
-    let tgt=null,bd=260**2;
+    let tgt=null,bd=(m.kind==='archer'?440:260)**2;
     for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h!==protectedPlayer){const d2=distSq(h,m);
       if(d2<bd&&!townAt(h)){bd=d2;tgt=h}}
     if(tgt)beastFight(m,tgt,dt);
@@ -1994,8 +2012,8 @@ function stepMonsters(dt){
 // one at a time, two for a pack of four or more) while the rest circle at a slot round them. Blows you land knock back by
 // their strength, harder from a held (charged) Attack; a beast knocked into stone or a footprint lake takes more.
 // All of it is sim state on the fixed tick and uses rnd() only; hit-stop, shake and rings are presentation.
-const CB={WIND:{wolf:.7,troll:.85,boar:.75},RING:{wolf:34,troll:46,boar:44},RECOVER:{wolf:.45,troll:.6,boar:1.1},CD:{wolf:.9,troll:1.2,boar:1.6},HIT:1.4,
-  CIRCLE:{wolf:80,troll:92,boar:150},DODGE_T:.3,DODGE_IFR:.22,DODGE_DIST:105,DODGE_CD:.5,CHARGE_MIN:.16,CHARGE_FULL:.6,TOK_GAP:.3};
+const CB={WIND:{wolf:.7,troll:.85,boar:.75,archer:1.1},RING:{wolf:34,troll:46,boar:44,archer:40},RECOVER:{wolf:.45,troll:.6,boar:1.1,archer:.4},CD:{wolf:.9,troll:1.2,boar:1.6,archer:2.2},HIT:1.4,
+  CIRCLE:{wolf:80,troll:92,boar:150,archer:260},DODGE_T:.3,DODGE_IFR:.22,DODGE_DIST:105,DODGE_CD:.5,CHARGE_MIN:.16,CHARGE_FULL:.6,TOK_GAP:.3};
 const untouchable=h=>!!(h&&h.dodge&&h.dodge.t<CB.DODGE_IFR);
 function cstat(k){const c=S.cstat||(S.cstat={winds:0,hits:0,dodged:0,missed:0,heavy:0,slams:0,lakes:0,dodges:0,two:0});c[k]++}
 function dodgedFx(h){if(S.headless||!(h.you||nearPlayer(h))||S.t-(h.dfxT||-9)<.5)return;h.dfxT=S.t;S.fx.push({k:'txt',x:h.x,y:h.y,z:95,text:'Dodged!',t:0,life:.9,col:'#9fe8ff'})}
@@ -2003,6 +2021,9 @@ const lakeAt=(x,y)=>S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<C.FOOT_R
 // a free attack token on this person: the shared gap after a strike has passed, and fewer than one (two for a big pack) wind-ups on them
 function tokenFree(m,tg){if(S.t<(tg.nextTok||0))return false;let n=0,pack=0;for(const o of S.monsters){if(o.wind&&o.wind.id===tg.id)n++;if(o.eng===tg.id&&S.t-o.engT<.3)pack++}return n<(pack>=4?2:1)}
 function beastFight(m,tg,dt){const dx=tg.x-m.x,dy=tg.y-m.y,d=Math.hypot(dx,dy)||1,sp=m.kind==='troll'?85:120,reach=m.r+(m.kind==='troll'?34:30);
+  // bandit archers keep their distance (200-340), draw a line to the spot they aim at, and loose after 1.1 s: step off the mark
+  if(m.kind==='archer'){m.eng=tg.id;m.engT=S.t;m.fa=Math.atan2(dy,dx);if(m.cd<=0&&d<=340){m.wind={t:0,dur:CB.WIND.archer,x:tg.x,y:tg.y,R:CB.RING.archer,id:tg.id};cstat('winds');if(tg.you&&!S.headless)sfx('warn',true);return}
+    const want=d<200?-1:d>320?1:0,sx=-dy/d*(m.id%2?1:-1);m.x+=(dx/d*want*.9+sx*.5)*90*dt;m.y+=(dy/d*want*.9+(dx/d)*(m.id%2?1:-1)*.5)*90*dt;return}
   m.eng=tg.id;m.engT=S.t;const free=m.cd<=0&&tokenFree(m,tg);
   // the turn is ours and the target is in reach: lock the spot where it stands and wind up
   if(free&&d<=reach){const two=S.monsters.some(o=>o!==m&&o.wind&&o.wind.id===tg.id);m.wind={t:0,dur:CB.WIND[m.kind]||.7,x:tg.x,y:tg.y,R:CB.RING[m.kind]||34,id:tg.id};tg.lunges=(tg.lunges||0)+1;cstat('winds');if(two)cstat('two');
@@ -2018,7 +2039,8 @@ function beastBusy(m,dt){if(m.kb)return true;
   if(m.wind){const W=m.wind;W.t+=dt;const tg=S.humans.find(h=>h.id===W.id);if(!tg||tg.dead||tg.mode!=='ground'){m.wind=null;m.cd=.4;return true}if(W.t>=W.dur)beastStrike(m,W,tg);return true}
   if(m.rec>0){m.rec-=dt;return true}return false}
 function beastStrike(m,W,tg){m.wind=null;m.rec=CB.RECOVER[m.kind]||.45;m.cd=CB.CD[m.kind]||1;tg.nextTok=S.t+CB.TOK_GAP;
-  if(m.kind==='boar'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy)||1;m.kb={x:dx/d,y:dy/d,left:d+70,by:null,dmg:0,k:0,charge:1};if(!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.3,col:'#ffb070'})}
+  if(m.kind==='archer'){if(!S.headless&&nearPlayer(m))S.fx.push({k:'arrow',x:m.x,y:m.y,x2:W.x,y2:W.y,t:0,life:.18})}
+  else if(m.kind==='boar'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy)||1;m.kb={x:dx/d,y:dy/d,left:d+70,by:null,dmg:0,k:0,charge:1};if(!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.3,col:'#ffb070'})}
   else if(m.kind!=='troll'){const dx=W.x-m.x,dy=W.y-m.y,d=Math.hypot(dx,dy);if(d>m.r+6){m.x+=dx/d*(d-m.r-6);m.y+=dy/d*(d-m.r-6);solidPush(m,m.r)}}
   const hit=m.kind==='troll'?S.humans.filter(h=>!h.dead&&h.mode==='ground'&&Math.hypot(h.x-W.x,h.y-W.y)<W.R+10):Math.hypot(tg.x-W.x,tg.y-W.y)<W.R+10?[tg]:[];
   if(m.kind==='troll'&&!S.headless&&nearPlayer(m))S.fx.push({k:'ring',x:W.x,y:W.y,r:W.R,t:0,life:.35,col:'#ffb070'});
@@ -2720,6 +2742,7 @@ function g3Update(){const g=S.g,t=S.t;
   for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y)+(h.riding?24:0);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=climberWorld(h);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,g.ang+(h.cl.face===1?Math.PI:0))}}
+  for(const m of S.monsters)if(m.kind==='archer'&&Math.hypot(m.x-S.cam.x,m.y-S.cam.y)<7000){const fl=m.hitT&&t-m.hitT<.15;if(m.wind)m.swing=.15;fig(m,m.x,m.y,groundH(m.x,m.y),fl?'#ffffff':m.elite?'#3a1414':'#5a2a2a',m.elite?'#ff5a4a':'#222222',!!m.elite,m.fa||0)}
   for(const p of S.pois||[])if((p.k==='traveller'||p.k==='merchant')&&Math.hypot(p.x-S.cam.x,p.y-S.cam.y)<7000)fig(p,p.x,p.y,groundH(p.x,p.y),p.k==='merchant'?'#7d4fa8':'#9a9384','#ffffff',false,p.fa||0);
   for(const m of[G3.cloak,G3.head,G3.badge]){m.count=hi;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   // beasts: wolves low and long, trolls tall; a struck beast flashes white
@@ -2989,6 +3012,8 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(g.wind&&(g.wind.k==='stomp'||g.wind.k==='smash')){const p=1-g.wind.t/g.wind.dur,pts=g.wind.k==='stomp'?g.feet:[g.wind],R=g.wind.k==='stomp'?C.STOMP_R:C.SMASH_R;for(const q of pts){ringOnGround(q.x,q.y,R*p,null,0,null,`rgba(255,80,60,${.15+p*.25})`);ringOnGround(q.x,q.y,R,'rgba(255,90,70,.95)',2.5,[8,6])}}
   if(S.bodies)for(const bd of S.bodies){const a=1-(S.t-bd.t)/25;if(a<=0)continue;ringOnGround(bd.x,bd.y,bd.r,null,0,null,`rgba(40,22,18,${.55*a})`)}
   if(S.you)for(const h of S.humans)if(h.sol&&!h.dead&&h.town===S.you.town&&h.ord&&h.ord.k==='giant'&&h.ord.ph==='hold'){ctx.globalAlpha=.55;ringOnGround(h.x,h.y,C.GUARD_R,TOWNS[h.town].col,2,[10,8]);ctx.globalAlpha=1}
+  for(const m of S.monsters)if(m.kind==='archer'&&m.wind){const a=p3(m.x,m.y,40),b=p3(m.wind.x,m.wind.y,20);if(a&&b){const k=m.wind.t/m.wind.dur;ctx.globalAlpha=.35+.5*k;ctx.strokeStyle='#ff5a4a';ctx.setLineDash([6,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1}}
+  for(const e of S.fx){if(e.k!=='arrow')continue;const a=p3(e.x,e.y,40),b=p3(e.x2,e.y2,20);if(a&&b){const k=e.t/e.life,mx=a.x+(b.x-a.x)*k,my=a.y+(b.y-a.y)*k;ctx.strokeStyle='#f2e6c8';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(mx,my);ctx.lineTo(mx-(b.x-a.x)*.12,my-(b.y-a.y)*.12);ctx.stroke()}}
   for(const e of S.fx){if(e.k!=='spark'&&e.k!=='lvl')continue;const p=e.t/e.life,q=p3(e.x,e.y,e.z||40);if(!q)continue;ctx.globalAlpha=1-p;
     if(e.k==='spark'){ctx.strokeStyle=e.col||'#ffe6a0';ctx.lineWidth=2.5*UI;ctx.beginPath();for(let i=0;i<9;i++){const a=i*0.698+e.x,r0=(6+p*34)*UI,r1=r0+(10-p*8)*UI;ctx.moveTo(q.x+Math.cos(a)*r0,q.y+Math.sin(a)*r0*.7);ctx.lineTo(q.x+Math.cos(a)*r1,q.y+Math.sin(a)*r1*.7)}ctx.stroke()}
     else{const top=p3(e.x,e.y,(e.z||40)+260);if(top){const g=ctx.createLinearGradient(0,q.y,0,top.y);g.addColorStop(0,'rgba(255,220,120,.75)');g.addColorStop(1,'rgba(255,220,120,0)');ctx.fillStyle=g;ctx.fillRect(q.x-22*UI*(1-p*.5),top.y,44*UI*(1-p*.5),q.y-top.y)}
@@ -2999,7 +3024,7 @@ function render3D(){if(G3.seed!==S.seed||!G3.scene)g3Build();sizeLayer(skyCv);G3
   if(!onBody)for(const t of S.towns){const p=p3(t.x,t.y,220);if(!p||p.d>19000)continue;lbl(t.name+(t.alive?' \u00b7 Lv '+lv(t)+(p.d<6000?' \u00b7 prosperity '+(t.prosp??prosperity(t)):''):' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   if(!onBody)labelRivalHeroes(p3);
   for(const q of S.pois||[]){const tx=poiLabel(q,S.you);if(!tx)continue;const p=p3(q.x,q.y,q.k==='herb'?30:110);if(p&&p.d<(q.k==='herb'?1600:4200))lbl(tx,p.x,p.y,11,q.k==='camp'&&campBeasts(q).length?'#ff9a8a':q.k==='shrine'?SHRINES[q.sub].col:q.k==='merchant'?'#d8b4ff':'#cfe8c8')}
-  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+' (alpha)',p.x,p.y,12,'#ff8f80')}
+  for(const m of S.monsters)if(m.elite){const p=p3(m.x,m.y,60);if(p&&p.d<3000)lbl(m.elite+(m.kind==='archer'?' (bandit chief)':m.warlord?'':' (alpha)'),p.x,p.y,12,'#ff8f80')}
   for(const c of S.caches)if(t3ok(c)){const p=p3(c.x,c.y,70);if(p&&p.d<4200)lbl(cacheLabel(c),p.x,p.y,11,S.t>=c.ready?'#ffcf6a':'#a9afbb')}
   mapLabels();
   upgradeReady();barracksFlags();

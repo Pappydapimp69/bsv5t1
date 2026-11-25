@@ -239,6 +239,7 @@ large; earlier 6-seed set at the same tuning had one giant death).
 
 ## GPTBS batches saved
 
+- Batch 3 (3 records) committed as BS@b21c695 (01:11Z). Total 57 records on BS branch `claude/compassionate-faraday-hkztpc`.
 - Batch 2 (14 records) finished, verified, acceptance passed, committed as BS@0fa472a (01:05Z).
 
 ## GPTBS batch 1 saved (23:52Z)
@@ -353,3 +354,9 @@ the tend/hunt advice — which in practice makes it rare); the horn race named h
 "the giant's eye settles on you" never fired; "Finish the first day here" left the tutorial job hiding the Now line.
 Final giant hand-check: clicked the panel to aim (head → chest and head, shin → legs), strained, the hunter hint came at
 1:35 when the first hunter climbed.
+
+## Final state (01:12Z)
+
+- All suites pass: sleeper 22, giant 42, heroes, barracks (incl. 8 tutorial checks), land fairness 40 seeds 0 unfair.
+- Final hand checks: giant (panel aiming, strain, hunter hint at 1:35) and Corvel human (menu start, Now line, end
+  screen chronicle + Next time).

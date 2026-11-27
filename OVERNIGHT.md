@@ -501,3 +501,22 @@ rules changed behaviour (outposts now need settlers; raising a town sends a trad
    and the first day itself is unchanged, as you asked.
 4. Clean up the code. These systems were added fast into one file. Before the next big push, split the human RPG
    layer (talents, places, quests, charms, civic) into clearly marked sections.
+
+## Code cleanup (v1.169, 2026-11-27)
+
+`index.html` (3,716 lines, 597 KB) is now a 58-line page shell plus `src/`: 27 classic script files cut at the
+existing section markers in their original order, `src/wire.js`, `src/style.css` and `src/vendor/se.js`. The human
+RPG systems are grouped in `src/rpg/`. `CODEMAP.md` maps the files.
+
+There is no build step and no modules. Classic scripts share one global scope, so the tests' direct calls and
+reassignments work unchanged.
+
+- **The only code moved out of order:** three top-level wrappers that extended functions defined later in the file
+  (the beast leash on `stepMonsters`, and the hit-stop and map/camera wrappers on the 3D update). The single file
+  could rely on hoisting; split files cannot. They now run from `wire.js`, after every definition, in their original
+  order. The new load test found both cases (`stepMonsters is not defined`, `g3Update is not defined`).
+- **Proof that gameplay did not change:** `tests/fingerprint.js` hashes the full sim state after 300 s of four
+  seeded runs (human seeds 7, 22 and 32; giant seed 41). The baseline was recorded on the single file, and all four
+  hashes match after the split. All suites pass. The real-input playtest and both renderers ran with no errors.
+- **Publishing:** the live page fetches `src/` with `?v=<sha>`, so a browser never mixes cached old scripts with a
+  new page.

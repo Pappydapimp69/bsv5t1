@@ -26,40 +26,83 @@ const {chromium} = require('playwright');
       out.housePaysWood = build(h, 'house') && home.wood === w0 - C.RES_COST.house.wood; stepJob(h, 10);
       home.wood = 10; h.x = home.x - 260; out.noWoodNoHouse = canBuild(h, 'house') === 'Need 30 more wood' && !build(h, 'house');
       home.wood = 500;
-      // settlers: a house makes room for six; they walk in while there is food, and nobody is trained or assigned
-      out.startPop = S.towns.every(t => t.pop === C.HALL_POP) && popCap(home) === C.HALL_POP + C.HOUSE_POP;
-      S.monsters = []; S.events = []; home.food = 300; run(S, 40);
-      out.settlersArrive = home.pop > C.HALL_POP && home.pop <= popCap(home);
+      // settlers: a level 1 house holds 5 (owner); they walk in to it; nobody is trained or assigned
+      const house = S.builds.find(b => b.k === 'house' && b.town === h.town); houseInit(house);
+      out.startPop = S.towns.every(t => t.pop === C.HALL_POP) && occCap(house) === 5 && popCap(home) === C.HALL_POP + 5;
+      S.monsters = []; S.events = []; run(S, 40);
+      out.settlersArrive = house.occ > 0 && house.occ <= 5;
       out.noTraining = typeof queueVillager === 'undefined' && !/Train a villager/.test((openTown(home, 'Hall'), menu.items.map(i => i.label).join('|'))); closeMenu();
-      // workplaces: placed by what they need, staffed from the settlers, and productive only while staffed
+      // a house keeps food and water, 30 a level, starting at 30; every 10 s both drop by its occupants (owner)
+      { const hb = {k: 'house', x: home.x + 900, y: home.y + 900, town: h.town, settlementId: home.id, cd: 0}; S.builds.push(hb); houseInit(hb); const start = hb.food === 30 && hb.water === 30 && houseMax(hb) === 30;
+        hb.occ = 5; stepHouses(); out.houseNeeds = start && hb.food === 25 && hb.water === 25; hb.lvl = 2; out.storeGrows = houseMax(hb) === 60;
+        // a house with water or food gone for long falls a level; with no food its settlers leave
+        hb.water = 0; hb.food = 0; for (let k = 0; k < C.LACK_GRACE / 10; k++) stepHouses(); out.devolves = lv(hb) === 1;
+        const occ0 = hb.occ; for (let k = 0; k < C.HUNGER_LEAVE / 10 + 1; k++) stepHouses(); out.hungerDrivesThemOut = hb.occ < occ0;
+        S.builds = S.builds.filter(b => b !== hb); S.walkers = S.walkers.filter(w => w.k !== 'leaver'); }
+      // placement: a woodcutter anywhere in town; a farm by water; a well not on high ground; a quarry by an outcrop
       const at = p => { h.x = p.x; h.y = p.y; h.job = null; };
-      at(S.quarries.find(q => q.town === h.town)); h.x += 150; out.woodcutterNeedsForest = canBuild(h, 'woodcutter') !== null || treesNear(h.x, h.y, C.FOREST_R) >= C.FOREST_N;
-      for (let a = 0; a < 6.28; a += .5) { at({x: home.x + Math.cos(a) * (home.r + 90), y: home.y + Math.sin(a) * (home.r + 90)}); if (canBuild(h, 'quarry') !== 'Too close to another building' && !outcropNear(h.x, h.y)) break; } out.qWhy = canBuild(h, 'quarry'); out.quarryNeedsOutcrop = out.qWhy === 'Build it beside a stone outcrop';
-      const wsite = botSite(home, 'woodcutter', () => .5); at(wsite); out.woodcutterBuilt = build(h, 'woodcutter'); stepJob(h, 30);
+      const spot = ok => { for (let r = home.r + 70; r < ringR(home) - 30; r += 40) for (let a = 0; a < 6.28; a += .3) { const p = {x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r}; at(p); if (ok(p)) return p; } return null; };
+      const free = p => !S.builds.some(b => Math.hypot(b.x - p.x, b.y - p.y) < 60) && !inSolid(p.x, p.y, 40);
+      out.woodcutterAnywhere = !!spot(p => free(p) && canBuild(h, 'woodcutter') === null);
+      const dry = spot(p => free(p) && !nearWater(p.x, p.y)); out.farmNeedsWater = !dry || canBuild(h, 'farm') === 'Build it beside a river or lake';
+      let high = null; for (let k = 0; k < 4000 && !high; k++) { const x = Math.random() * C.MAP, y = Math.random() * C.MAP; if (groundH(x, y) > C.MOUNTAIN_H + 20) high = {x, y}; }
+      at(high); out.wellNotOnMountain = /high ground/.test(placeWhy(h, 'well') || '') && (at({x: home.x + home.r * .5, y: home.y}), placeWhy(h, 'well') == null);
+      spot(p => free(p) && !outcropNear(p.x, p.y)); out.qWhy = canBuild(h, 'quarry'); out.quarryNeedsOutcrop = out.qWhy === 'Build it beside a stone outcrop';
+      // every bot site passes the player's placement rule (GPTBS fc6a998c), on three seeds
+      { const bad = []; const keep = __col.S; for (const seed of [1, 2, 3]) { const G = __col.newGame('human', seed); for (const t of G.towns) { const hero = G.humans.find(x => x.hero && x.town === t.i) || G.you;
+          for (const k of ['farm', 'well', 'quarry', 'woodcutter', 'granary', 'market']) { const p = botSite(t, k, () => .37); if (!p) { if (k !== 'quarry') bad.push(seed + ' ' + t.name + ' ' + k + ' no site'); continue; }
+            const hx = hero.x, hy = hero.y, g = hero.gold; hero.x = p.x; hero.y = p.y; hero.gold = 999; hero.job = null; const why = canBuild(hero, k); hero.x = hx; hero.y = hy; hero.gold = g; if (why) bad.push(seed + ' ' + t.name + ' ' + k + ': ' + why); } } }
+        out.botSiteFails = bad.join('; '); out.botSitesPass = !bad.length; S = __col.newGame('human', 3); h = S.you; home = S.towns[h.town]; S.monsters = []; S.events = []; }
+      // a farm grows 60 s, harvests 10 s, only with workers; the harvest is carried to the granary (owner)
+      const fp = botSite(home, 'farm', () => .5), farm = {k: 'farm', x: fp.x, y: fp.y, town: h.town, settlementId: home.id, cd: 0, staff: 6};
+      const gran = {k: 'granary', x: home.x + 60, y: home.y + 60, town: h.town, settlementId: home.id, cd: 0, staff: 5}; S.builds.push(farm, gran);
+      farm.staff = 0; stepFarms(30); const idle = !farm.grow; farm.staff = 6;
+      for (let k = 0; k < 59; k++) stepFarms(1); const growing = farm.harvT == null && farm.grow > 58; stepFarms(1); const harvesting = farm.harvT === 0;
+      for (let k = 0; k < 10; k++) stepFarms(1); const hw = S.walkers.find(w => w.k === 'harvest');
+      out.farmCycle = idle && growing && harvesting && !!hw && hw.load === C.FARM_YIELD && farm.grow === 0 && Math.hypot(hw.tx - gran.x, hw.ty - gran.y) < 1;
+      const f0 = home.food = 0; for (let k = 0; k < 2000 && S.walkers.includes(hw); k++) stepWalkers(.1); out.harvestReachesGranary = home.food === C.FARM_YIELD;
+      // the granary carts 80 food to a bazaar; the bazaar's trader takes up to 100 to the houses near it (owner)
+      const baz = {k: 'market', x: home.x - 80, y: home.y + 40, town: h.town, settlementId: home.id, cd: 0, staff: 4, store: 0}; S.builds.push(baz); home.food = 300;
+      dispatch(); const cart = S.walkers.find(w => w.k === 'grain'); const sent = !!cart && cart.load === C.CARRY_GRAIN && Math.round(home.food) === 300 - C.CARRY_GRAIN;
+      for (let k = 0; k < 2000 && S.walkers.includes(cart); k++) stepWalkers(.1); out.granaryToBazaar = sent && baz.store === C.CARRY_GRAIN;
+      const hn = {k: 'house', x: baz.x + 300, y: baz.y, town: h.town, settlementId: home.id, cd: 0}; S.builds.push(hn); houseInit(hn); hn.occ = 5; hn.food = 0; hn.water = 0; baz.store = 200; baz.next = 0;
+      dispatch(); const trader = S.walkers.find(w => w.k === 'food'); const tSent = !!trader && trader.load === C.CARRY_FOOD && baz.store === 100;
+      for (let k = 0; k < 3000 && S.walkers.includes(trader); k++) stepWalkers(.1); out.bazaarFeeds = tSent && hn.food === houseMax(hn);
+      const well = {k: 'well', x: hn.x - 150, y: hn.y + 60, town: h.town, settlementId: home.id, cd: 0, staff: 2}; S.builds.push(well); dispatch();
+      const wc0 = S.walkers.find(w => w.k === 'water'); const wSent = !!wc0 && wc0.load === C.CARRY_WATER;
+      for (let k = 0; k < 3000 && S.walkers.includes(wc0); k++) stepWalkers(.1); out.wellCarries = wSent && hn.water === houseMax(hn);
+      // a house levels up only with food and water in it (owner)
+      h.crystals = 50; hn.owner = h.id; hn.food = 0; const noFood = /food/.test(canUpgrade(h, 'house', hn) || ''); hn.food = 10; out.upgradeNeedsSupply = noFood && canUpgrade(h, 'house', hn) === null;
+      // nobody walks about without a purpose: every walker is a newcomer, a leaver or a carrier with a load
+      run(S, 60); out.noIdleWalkers = S.walkers.every(w => ['settler', 'leaver', 'water', 'food', 'grain', 'harvest'].includes(w.k));
+      // workers are where they work: a staffed building shows its workers beside it
+      out.workersAtWork = workerSpots(farm, 1).length === 4 && workerSpots({...gran, staff: 0}, 1).length === 0 && workerSpots(gran, 1).every(p => Math.hypot(p.x - gran.x, p.y - gran.y) < 70);
+      // woodcutters and quarries: staffed from the settlers and productive only while staffed
+      const wsite = spot(p => free(p) && canBuild(h, 'woodcutter') === null); out.woodcutterBuilt = build(h, 'woodcutter'); stepJob(h, 30);
       const q0 = S.quarries.find(q => q.town === h.town); at({x: q0.x + 120, y: q0.y}); out.quarryBuilt = build(h, 'quarry'); stepJob(h, 30);
       const wc = S.builds.find(b => b.k === 'woodcutter'), qy = S.builds.find(b => b.k === 'quarry');
-      allocate(home); out.staffedFromSettlers = wc.staff > 0 && qy.staff > 0 && home.employed <= home.pop && home.employed + home.idle === Math.floor(home.pop);
+      home.hall = 30; allocate(home); out.staffedFromSettlers = wc.staff > 0 && qy.staff > 0 && home.employed + home.idle === Math.floor(home.pop);
       const tick = () => { const w = home.wood, st = home.stone; S.t = Math.floor(S.t / RENT_INTERVAL + 1) * RENT_INTERVAL + .01; stepEconomy(.02); return [home.wood - w, home.stone - st]; };
       const [dw, ds] = tick(); out.workplacesProduce = dw >= C.PROD.woodcutter.wood * wc.staff / C.JOBS.woodcutter - .01 && ds > 0;
-      const pop = home.pop; home.pop = 0; allocate(home); const emptied = wc.staff === 0 && qy.staff === 0; const [dw0, ds0] = tick(); home.pop = pop; allocate(home);
+      home.hall = 0; for (const b of S.builds) if (b.k === 'house') b.occ = 0; allocate(home); const emptied = wc.staff === 0 && qy.staff === 0; const [dw0, ds0] = tick();
       out.emptyWorkplacesIdle = emptied && dw0 < 3 && ds0 < 2; // only the hall's small trickle (2 wood, 1 stone a 10 s)
       // labour order: raising a kind in the Hall gives it workers first
-      home.pop = 5; home.pri = 'quarry'; allocate(home); const qFirst = qy.staff === 5 && wc.staff === 0; home.pri = 'woodcutter'; allocate(home);
-      out.labourPriority = qFirst && wc.staff === 4 && qy.staff === 1; home.pri = null; home.pop = pop; allocate(home);
-      // a granary (staffed) holds more food
-      const cap0 = foodCap(home); S.builds.push({k: 'granary', x: home.x + 40, y: home.y + 80, town: h.town, settlementId: home.id, cd: 0, staff: 3});
-      out.granaryStores = foodCap(home) === cap0 + C.GRANARY_CAP;
+      const aside = [farm, gran, baz, well]; aside.forEach(b => { b.hp = 0; });
+      home.hall = 8; home.pri = 'quarry'; allocate(home); const qFirst = qy.staff === 8 && wc.staff === 0; home.pri = 'woodcutter'; allocate(home);
+      out.labourPriority = qFirst && wc.staff === 3 && qy.staff === 5; home.pri = null; home.hall = 30; allocate(home); aside.forEach(b => { delete b.hp; }); allocate(home);
+      // different workplaces employ different numbers (owner)
+      out.jobsDiffer = new Set(Object.values(C.JOBS)).size >= 6;
+      // a staffed granary holds more food
+      const cap0 = foodCap(home); gran.staff = 0; const capE = foodCap(home); gran.staff = 5; out.granaryStores = foodCap(home) === capE + C.GRANARY_CAP;
       // fire: a building no fire station reaches can catch fire; you beat it out, or a staffed fire station does
       const p0 = C.FIRE_P; C.FIRE_P = 1; wc.risk = C.FIRE_SAFE + 1; S.you.x = home.x; S.you.y = home.y; stepFires(); C.FIRE_P = p0;
       const caught = !!wc.fire; at({x: wc.x + 40, y: wc.y}); stepFires(); stepFires(); stepFires();
       out.youBeatItOut = caught && !wc.fire;
-      wc.fire = S.t; h.x = home.x; h.y = home.y; S.builds.push({k: 'firehouse', x: wc.x + 300, y: wc.y, town: h.town, settlementId: home.id, cd: 0, staff: 3}); stepFires(); stepFires(); stepFires();
+      wc.fire = S.t; h.x = home.x; h.y = home.y; S.builds.push({k: 'firehouse', x: wc.x + 300, y: wc.y, town: h.town, settlementId: home.id, cd: 0, staff: 4}); stepFires(); stepFires(); stepFires();
       out.fireStationPutsOut = !wc.fire && covered(wc) && (stepFires(), wc.risk === 0);
-      // roads: settlers walking to work wear the land into roads, which are faster to walk
-      run(S, 240); out.settlersWearRoads = (S.worn || 0) > 0 && S.land.road.some((v, i) => v && S.foot && S.foot[i] >= C.ROAD_STEPS);
-      // with no food the settlers leave
-      home.food = 0; for (const t of S.towns) if (t !== home) { t.food = 0; } const leave0 = home.pop; S.t = Math.floor(S.t / C.SETTLER_EVERY + 1) * C.SETTLER_EVERY + .01; stepEconomy(.02);
-      out.hungerDrivesThemOut = home.pop === leave0 - 1;
+      // roads: a way walked often enough by the settlers becomes a road, faster to walk on
+      { const w = {x: home.x + home.r + 400, y: home.y + 37, cell: -1}, c = landCell(w.x, w.y), worn0 = S.worn || 0; for (let k = 0; k < C.ROAD_STEPS; k++) { w.cell = -1; footfall(w); }
+        out.settlersWearRoads = !!S.land.road[c] && (S.worn || 0) === worn0 + 1 && onRoad(w.x, w.y); }
       // quests on the Board: offered, taken (at most three), each step pays when its state is true
       S = __col.newGame('human', 4); h = S.you; home = S.towns[h.town]; h.x = home.x; h.y = home.y; S.headless = false;
       openTown(home, 'Board');

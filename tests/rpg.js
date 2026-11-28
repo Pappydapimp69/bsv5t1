@@ -73,7 +73,7 @@ const {chromium} = require('playwright');
       // city: civic buildings go up inside a settlement, raise prosperity, and pay off (farm harvest, market rent, smithy prices)
       const Ci = __col.newGame('human', 12), c = Ci.you, home = Ci.towns[c.town]; Ci.monsters = []; c.gold = 2000; home.lvl = 2;
       const p0 = prosperity(home); const spot = (dx, dy) => { c.x = home.x + dx; c.y = home.y + dy; c.job = null; };
-      home.houses = 2; spot(120, 40); build(c, 'farm'); stepJob(c, 10); spot(-120, 40); build(c, 'market'); stepJob(c, 12); spot(40, -130); build(c, 'smithy'); stepJob(c, 12);
+      home.houses = 2; { const fp = botSite(home, 'farm', () => .5); c.x = fp.x; c.y = fp.y; c.job = null; } build(c, 'farm'); stepJob(c, 10); spot(-120, 40); build(c, 'market'); stepJob(c, 12); spot(40, -130); build(c, 'smithy'); stepJob(c, 12);
       out.civicBuilt = civicIn(home, 'farm') === 1 && civicIn(home, 'market') === 1 && civicIn(home, 'smithy') === 1;
       out.prosperityUp = prosperity(home) > p0 + 25;
       spot(-40, 140); out.oneMarket = build(c, 'market') === false;

@@ -8,9 +8,9 @@ const GOALS=[{id:'camp',t:'Break a camp',n:1,k:'camp'},{id:'alpha',t:'Slay a nam
   {id:'civic',t:'Build 2 town buildings',n:2,k:'civic'},{id:'charm',t:'Find a charm',n:1,k:'charm'}];
 function matchGoals(){if(!S.goals){const R=mulberry32((S.seed^0x60A1)>>>0),pool=GOALS.slice(),g=[];while(g.length<3)g.push(pool.splice(Math.floor(R()*pool.length),1)[0]);S.goals=g.map(x=>({...x,done:false}))}return S.goals}
 const goalProg=(h,g)=>Math.min(g.n,g.f?g.f(h):(h.stat&&h.stat[g.k])||0);
-function stepGoals(){const h=S.you;if(!h||S.role!=='human'||S.t%1>C.DT*1.5)return;for(const g of matchGoals())if(!g.done&&goalProg(h,g)>=g.n){g.done=true;if(!S.headless){announce('Goal done: '+g.t+' (+5 renown).');sfx('coin')}}}
+function stepGoals(){const h=S.you;if(!h||S.role!=='human'||tutActive()||S.t%1>C.DT*1.5)return;for(const g of matchGoals())if(!g.done&&goalProg(h,g)>=g.n){g.done=true;if(!S.headless){announce('Goal done: '+g.t+' (+5 renown).');sfx('coin')}}}
 // first-time hints for the human side, each told once ever, when the thing is right there (like the giant's lessons)
-function humanHints(){const h=S.you;if(!h||S.headless||S.role!=='human'||S.tut||h.dead||S.t%1>C.DT*1.5||S.t<OPENING.len+8)return;const seen=save.hhint=save.hhint||{},X=device==='pad'?'X':device==='touch'?'the top-left button':'L';
+function humanHints(){const h=S.you;if(!h||S.headless||S.role!=='human'||h.dead||S.t%1>C.DT*1.5||S.t<OPENING.len+8)return;const seen=save.hhint=save.hhint||{},X=device==='pad'?'X':device==='touch'?'the top-left button':'L';
   const say=(id,text)=>{if(seen[id]||S.hintAt>S.t-8)return;seen[id]=1;S.hintAt=S.t;persist();toast(text)};const near=(k,r)=>(S.pois||[]).some(p=>p.k===k&&Math.hypot(p.x-h.x,p.y-h.y)<r);
   say('map','Press M for the full map with every town, shrine, camp and spring.');
   if(near('shrine',350))say('shrine','A shrine: press '+X+' beside it to pray for a two-minute blessing.');

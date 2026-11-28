@@ -85,7 +85,7 @@ function tends(h){return townWay(h.town)==='tend'||(S.reg&&S.reg[h.id]||0)>0}
 function drinkPotion(h){if(h.bigPotions){h.bigPotions--;h.hp=Math.min(h.max,h.hp+140);sayTo(h,'You drink a greater potion.')}
   else{h.potions--;h.hp=Math.min(h.max,h.hp+60);sayTo(h,'You drink a potion.')}return true}
 function humanAct(h,slot,dir){const r=humanAct0(h,slot,dir);if(r&&h.sol&&h.ord&&(h.mode==='climb'||slot==='A'&&footChain(h)))h.workedAt=S.t;return r}
-function humanAct0(h,slot,dir){const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
+function humanAct0(h,slot,dir){if(h.you&&slot==='A'&&S.tut&&!S.tut.done&&h.mode==='ground'&&attackTarget(h))S.tut.fought=true;const c=humanCtx(h)[slot];if(c.why){sayTo(h,c.why);return false}
   if(h.mode==='climb'){const cl=h.cl;
     // waking is not a press: you must hold still at its head while it stirs, through its shudders
     if(slot==='A'&&!S.g.awake&&cl.y>=C.WAKE_ROW&&(h.horn||(rt=>!rt.j&&!rt.s)(reachT(h)))){if(!h.horn||!allWeak()||S.waker&&S.waker!==h&&S.waker.waking)return false;h.waking=true;S.waker=h;if(!S.headless){announce(h.you?'You sound the wake horn. Hold still while it stirs.':TOWNS[h.town].name+' is sounding a wake horn at the giant\u2019s head!');hornCall()}if(!S.headless)giantCall('breath');return true}

@@ -16,7 +16,8 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if(e.code==='KeyR'&&!e.repeat&&S.you&&!S.you.dead){toggleRide(S.you);e.preventDefault();return}
   if(e.code==='KeyT'&&!e.repeat&&S.you){openTalents();e.preventDefault();return}
   if((e.code==='KeyI'||e.code==='Tab')&&!e.repeat&&S.you){openSheet();e.preventDefault();return}
-  if(e.code==='KeyM'&&!e.repeat){BIGMAP=!BIGMAP;e.preventDefault();return}
+  if(e.code==='KeyM'&&!e.repeat){BIGMAP=!BIGMAP;if(BIGMAP&&tutActive())S.tut.mapOpened=true;e.preventDefault();return}
+  if(e.code==='KeyN'&&!e.repeat&&tutActive()){tutCycle();e.preventDefault();return}
   {const sk=SKILLS.find(k=>'Digit'+k.key===e.code);if(sk&&!e.repeat&&S.you){useSkill(S.you,sk.id);e.preventDefault();return}}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});

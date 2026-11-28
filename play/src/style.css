@@ -125,3 +125,10 @@ body.titling #skillbar{display:none}
 #ver{display:none;position:fixed;right:10px;bottom:8px;z-index:60;font:500 12px/1.2 system-ui,sans-serif;color:#fff;opacity:.7;text-shadow:0 1px 2px #000;pointer-events:none}
 body.titling #ver{display:block}
 
+/* the first day's journal */
+#goal .jg{font-weight:500;font-size:.8rem;pointer-events:auto;cursor:pointer;opacity:.92}
+#goal .jg.tr{font-weight:700;color:#ffe6a0}
+#goal .jg.old{opacity:.6}
+#goal .jg.dn{color:#9be08a;opacity:.85}
+#goal .jg.hint{font-style:italic;opacity:.7;cursor:default}
+#goal .jg b{color:var(--accent);font-size:.7rem;font-weight:700}

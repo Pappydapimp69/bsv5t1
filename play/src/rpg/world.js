@@ -74,7 +74,7 @@ function stepPois(dt){layPois();if(S.you&&S.t%.5<dt)for(const p of S.pois)if(!p.
     const t=aliveTowns().find(t=>t.i===h.town&&Math.hypot(t.x-p.x,t.y-p.y)<t.r+40);if(t){S.pois.splice(i,1);h.gold+=p.ambush?100:50;gainXp(h,30);questTick(h,'escort');if(h.you){toast('The traveller is safe in '+t.name+': +'+(p.ambush?100:50)+' gold.');sfx('coin')}}}
   // world events, every 2.5-3.5 minutes: a traveller ambushed by wolves (drive them off, then walk them home for double
   // pay), or a golden stag (hunt it for 60 gold and maybe a charm). Told to everyone; the map and the Now line show where.
-  S.wevT=(S.wevT??150)-dt;if(S.wevT<=0){S.wevT=150+rnd()*60;worldEvent()}
+  S.wevT=(S.wevT??150)-dt;if(tutChapter()<2&&S.t<480)S.wevT=Math.max(S.wevT,30);if(S.wevT<=0){S.wevT=150+rnd()*60;worldEvent()}
   if(S.critters)S.critters=S.critters.filter(c=>!c.golden||!c.dead&&S.t<c.until);
   if(S.t%5<dt)for(const h of S.humans)if(h.saga&&!h.saga.done&&SAGA[h.saga.i]&&SAGA[h.saga.i].k==='warlord'&&!S.monsters.some(m=>m.warlord))spawnWarlord(h);
   for(let i=S.monsters.length-1;i>=0;i--){const m=S.monsters[i];if(m.champion&&S.t>m.until&&!(m.eng&&S.t-(m.engT||-9)<5))S.monsters.splice(i,1)}

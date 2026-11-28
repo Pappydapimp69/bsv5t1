@@ -260,7 +260,9 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
 function labelRivalHeroes(project){for(const h of S.humans){if(!h.hero||h.you||h.dead||h.mode!=='ground')continue;
   const p=project(h.x,h.y,130);if(p&&p.d<2500)lbl(h.name,p.x,p.y,11,TOWNS[h.town].col)}}
 let BIGMAP=false;
-function drawMinimap(){if(FILM)return;drawMinimap0();if(BIGMAP&&S.role==='human')drawMinimap0(true);const tg=goalTarget();if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
+function drawMinimap(){if(FILM)return;drawMinimap0();if(BIGMAP&&S.role==='human')drawMinimap0(true);
+  // the first day: a small mark for every open goal with a known place (the tracked one gets the big ring below)
+  if(tutActive()&&S.you){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='rgba(255,210,122,.7)';ctx.lineWidth=1.5;for(const g of tutGoals()){const p=g.target&&g.target(S.you);if(!p)continue;ctx.beginPath();ctx.arc(8*UI+p.x*k,UIX.top+p.y*k,3,0,7);ctx.stroke()}}const tg=goalTarget();if(tg){const s2=Math.min(110*UI,Math.min(W,H)*.26),k=s2/C.MAP;ctx.strokeStyle='#ffd27a';ctx.lineWidth=2;ctx.beginPath();ctx.arc(8*UI+tg.x*k,UIX.top+tg.y*k,5+2*Math.sin(S.t*4),0,7);ctx.stroke()}}
 function drawMinimap0(big){const s=big?Math.min(W,H)*.84:Math.min(110*UI,Math.min(W,H)*.26),x0=big?(W-s)/2:8*UI,y0=big?(H-s)/2:UIX.top,k=s/C.MAP;if(big){ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(0,0,W,H)}ctx.fillStyle='rgba(10,14,10,.8)';ctx.fillRect(x0-2,y0-2,s+4,s+4);ctx.drawImage(miniGround(),x0,y0,s,s);miniRelief(x0,y0,s);
   for(const t of S.towns){ctx.fillStyle=t.alive?t.col:'#555';shapePath(ctx,x0+t.x*k,y0+t.y*k,t.outpost?3.5:5,t.shape);ctx.fill()}
 

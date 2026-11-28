@@ -4,7 +4,7 @@
 
 // ================= monsters and shots =================
 function stepMonsters(dt){
-  const protectedPlayer=S.tut&&!S.tut.done&&S.tut.i<FIRST_DAY.findIndex(s=>s.id==='strike')?S.you:null;
+  const protectedPlayer=tutProtect()?S.you:null;
   for(const m of S.monsters){m.cd=Math.max(0,m.cd-dt);if(beastBusy(m,dt))continue;
     if(m.raid){const town=S.towns[m.raid.town];if(town?.alive&&S.t>=m.raid.go){let foe=null,fd=200**2;for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town===m.raid.i){const d2=distSq(h,m);if(d2<fd){fd=d2;foe=h}}
       const tx=foe?foe.x:town.x,ty=foe?foe.y:town.y,d=Math.hypot(tx-m.x,ty-m.y),sp=m.kind==='troll'?75:105;

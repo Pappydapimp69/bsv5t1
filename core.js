@@ -978,6 +978,8 @@
   function load(str) {
     const run = JSON.parse(str);
     if (!run || run.v !== 1 || !run.rng || !run.deck) throw new Error('bad save');
+    // saves from before the redesign lack the stance counters
+    if (!run.stats.stances) run.stats.stances = { strike: 0, brace: 0 };
     return run;
   }
   function hash(run) {

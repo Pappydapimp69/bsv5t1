@@ -148,6 +148,16 @@ test('overload fizzles the line and the foe still acts', () => {
   assert.strictEqual(run.fight.noise, 0, 'overload should vent noise to 0');
 });
 
+test('a save from before the redesign loads and can bank', () => {
+  const run = XR.newRun('old-save');
+  XR.act(run, { t: 'go', node: XR.options(run)[0] });
+  delete run.stats.stances;
+  const loaded = XR.load(JSON.stringify(run));
+  XR.act(loaded, { t: 'draw' });
+  XR.act(loaded, { t: 'bank', stance: 'brace' });
+  assert.strictEqual(loaded.stats.stances.brace, 1);
+});
+
 test('noise carries into the next turn and cools by 1', () => {
   const run = XR.newRun('carry');
   XR.act(run, { t: 'go', node: XR.options(run)[0] });

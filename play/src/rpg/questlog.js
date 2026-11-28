@@ -13,21 +13,22 @@ const mySoldiers=h=>S.humans.filter(o=>o.sol&&o.town===h.town&&!o.dead).length;
 const builtOf=(h,k)=>S.builds.filter(b=>b.k===k&&b.town===h.town&&b.hp!==0).length;
 // each step: text, and p(h) -> [have, need]; a step already true when reached passes at once
 const QUESTS={
-  charter:{n:'A town of our own',sub:'Houses bring settlers; workplaces give them work: farms, timber, a new age',reward:80,
+  charter:{n:'A town of our own',sub:'Houses, then the food and water they need, then a house that grows',reward:80,
     steps:[{t:'Build a house (settlers move in)',p:h=>[builtOf(h,'house'),1]},
-      {t:'Build a farm',p:h=>[builtOf(h,'farm'),1]},
-      {t:'Build a woodcutter at a forest edge',p:h=>[builtOf(h,'woodcutter'),1]},
-      {t:'Have settlers in your town',p:h=>[Math.floor((myTown(h)||{}).pop||0),20]},
-      {t:'Stockpile wood',p:h=>[Math.floor(stockOf(myTown(h),'wood')),300]},
+      {t:'Build a well (water for the houses)',p:h=>[builtOf(h,'well'),1]},
+      {t:'Build a farm beside a river or lake',p:h=>[builtOf(h,'farm'),1]},
+      {t:'Build a granary (it takes in the harvest)',p:h=>[builtOf(h,'granary'),1]},
+      {t:'Build a bazaar (it feeds the houses)',p:h=>[builtOf(h,'market'),1]},
+      {t:'Raise a house to level 2 (it needs food and water)',p:h=>[S.builds.some(b=>b.k==='house'&&b.town===h.town&&b.hp!==0&&lv(b)>=2)?1:0,1]},
       {t:'Advance to the Village age (Hall)',p:h=>[lv(myTown(h)||{}),2]}]},
   walls:{n:'Hold the walls',sub:'Barracks, soldiers and towers before the raids grow',reward:90,
     steps:[{t:'Build a barracks',p:h=>[barracksOf(h.town).length,1]},
       {t:'Have soldiers under arms',p:h=>[mySoldiers(h),3]},
       {t:'Build watchtowers',p:h=>[builtOf(h,'tower'),2]}]},
-  trade:{n:'Stone and coin',sub:'A quarry, a fire station, a market and the Town age',reward:150,unlock:h=>lv(myTown(h)||{})>=2||(h.qDone||{}).charter,
-    steps:[{t:'Build a quarry beside a stone outcrop',p:h=>[builtOf(h,'quarry'),1]},
+  trade:{n:'Stone and coin',sub:'A woodcutter, a quarry, a fire station and the Town age',reward:150,unlock:h=>lv(myTown(h)||{})>=2||(h.qDone||{}).charter,
+    steps:[{t:'Build a woodcutter',p:h=>[builtOf(h,'woodcutter'),1]},
+      {t:'Build a quarry beside a stone outcrop',p:h=>[builtOf(h,'quarry'),1]},
       {t:'Build a fire station',p:h=>[builtOf(h,'firehouse'),1]},
-      {t:'Build a market',p:h=>[builtOf(h,'market'),1]},
       {t:'Have settlers in your town',p:h=>[Math.floor((myTown(h)||{}).pop||0),40]},
       {t:'Advance to the Town age (Hall)',p:h=>[lv(myTown(h)||{}),3]}]},
   frontier:{n:'The frontier',sub:'Found an outpost and join it to home by road',reward:120,unlock:h=>lv(myTown(h)||{})>=2,
@@ -71,7 +72,7 @@ function questCycle(h){const es=trackEntries(h);if(!es.length)return;const i=es.
 function trackedTarget(h){if(!h.track||h.track==='task')return null;const id=h.track.slice(2),q=questOpen(h).find(q=>q.id===id);if(!q)return null;
   if(QUESTS[id].saga)return questTarget({...h,quest:null});const t=myTown(h);const st=QUESTS[id].steps[q.i];if(!st||!t)return null;
   if(/quarry/.test(st.t)){const qq=(S.quarries||[]).filter(x=>x.town===h.town).sort((a,b)=>dist(a,t)-dist(b,t))[0];return qq?{x:qq.x,y:qq.y}:null}
-  if(/woodcutter/.test(st.t)){const p=botSite(t,'woodcutter',()=>.5);return p}
+  if(/river or lake/.test(st.t))return botSite(t,'farm',()=>.5)
   return Math.hypot(t.x-h.x,t.y-h.y)>t.r+200?{x:t.x,y:t.y}:null}
 // the quests as rows under the first-day journal: collapsed, only the tracked one; open, every quest and task
 function questRows(h,open){const es=trackEntries(h);if(!es.length)return'';const tr=es.find(e=>e.key===h.track)||es.find(e=>e.key!=='task')||es[0];

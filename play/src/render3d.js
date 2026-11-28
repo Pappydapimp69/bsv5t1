@@ -183,12 +183,15 @@ function g3Update(){const g=S.g,t=S.t;
   for(const h of folkView){const T=TOWNS[h.town],fl=S.t-(h.hurtAt??-9)<.12;if(h.mode==='ground'){const z=groundH(h.x,h.y)+(h.riding?24:0);fig(h,h.x,h.y,z,fl?'#ffffff':h.you?'#c0392b':T.col,h.sol?'#ffffff':T.col,h.you||!!h.sol,h.face||0);
       if(bi<200){put(G3.blobs,bi++,h.x,h.y,z+1,16,1,16,0)}}
     else if(h.cl){const a=climberWorld(h);fig(h,a.x,a.y,groundH(a.x,a.y)+a.z,h.you?'#c0392b':T.col,T.col,h.you,g.ang+(h.cl.face===1?Math.PI:0))}}
-  {const vs=G3.villagers||(G3.villagers=new Map());for(const tw of S.towns){if(!tw.alive||Math.hypot(tw.x-S.cam.x,tw.y-S.cam.y)>4500)continue;const n=Math.min(10,(tw.outpost?2:4)+Math.floor((tw.houses||0)/2)+(civicIn(tw,'market')?2:0));
-    for(let i=0;i<n;i++){const key=tw.id*100+i;let v=vs.get(key);if(!v){v={id:key,x:tw.x,y:tw.y,fa:0,nobadge:1};vs.set(key,v)}const a=i*2.399+t*.05*(i%2?1:-1),r=tw.r*(.25+.5*((i*.618)%1)),px=tw.x+Math.cos(a)*r,py=tw.y+Math.sin(a)*r;v.fa=Math.atan2(py-v.y,px-v.x)||v.fa;v.x=px;v.y=py;
-      fig(v,v.x,v.y,groundH(v.x,v.y),['#c9b896','#a8b4a0','#b8a0a0','#a0a8b8'][i%4],tw.col,false,v.fa)}}}
+  // the settlers at work: each staffed workplace near the camera shows its workers working at it (they do not wander);
+  // kept in G3.villagers, which the speech bubbles read
+  {const vs=G3.villagers||(G3.villagers=new Map()),c=S.cam,seen=new Set();for(const bd of S.builds.filter(b=>b.staff>0&&b.hp!==0&&!b.fire&&Math.hypot(b.x-c.x,b.y-c.y)<4000).sort((a,b)=>Math.hypot(a.x-c.x,a.y-c.y)-Math.hypot(b.x-c.x,b.y-c.y))){
+      workerSpots(bd,t).forEach((p,i)=>{const key=(bd.id||(bd.id=S.nextId++))*10+i;let v=vs.get(key);if(!v){v={id:key,x:p.x,y:p.y,fa:0,nobadge:1,job:{},town:bd.town};vs.set(key,v)}seen.add(key);v.x=p.x;v.y=p.y;v.fa=p.face;
+        fig(v,v.x,v.y,groundH(v.x,v.y),['#c9b896','#a8b4a0','#b8a0a0','#a0a8b8'][i%4],TOWNS[bd.town].col,false,v.fa)})}
+    for(const k of vs.keys())if(!seen.has(k))vs.delete(k)}
   // settlers on the move (immigrants, workers going to and from work), nearest the camera first so the pool keeps those in view
   {const c=S.cam,ws=(S.walkers||[]).filter(w=>Math.hypot(w.x-c.x,w.y-c.y)<4500).sort((a,b)=>Math.hypot(a.x-c.x,a.y-c.y)-Math.hypot(b.x-c.x,b.y-c.y));
-    for(const w of ws)fig(w,w.x,w.y,groundH(w.x,w.y),w.k==='settler'?'#e0d2a8':w.k==='leaver'?'#7a6e62':'#c9b896',TOWNS[w.town].col,false,w.fa||0)}
+    for(const w of ws)fig(w,w.x,w.y,groundH(w.x,w.y),WALKER_COL[w.k]||'#c9b896',TOWNS[w.town].col,false,w.fa||0)}
   for(const m of S.monsters)if(m.kind==='knight'&&Math.hypot(m.x-S.cam.x,m.y-S.cam.y)<7000){const fl=m.hitT&&t-m.hitT<.15;if(m.wind)m.swing=.15*(1-m.wind.t/m.wind.dur);m.gear={blade:4,armour:4};fig(m,m.x,m.y,groundH(m.x,m.y),fl?'#ffffff':'#4a5468','#ffd24a',true,m.fa||0)}
   for(const m of S.monsters)if(m.kind==='archer'&&Math.hypot(m.x-S.cam.x,m.y-S.cam.y)<7000){const fl=m.hitT&&t-m.hitT<.15;if(m.wind)m.swing=.15;fig(m,m.x,m.y,groundH(m.x,m.y),fl?'#ffffff':m.elite?'#3a1414':'#5a2a2a',m.elite?'#ff5a4a':'#222222',!!m.elite,m.fa||0)}
   for(const p of S.pois||[])if((p.k==='traveller'||p.k==='merchant')&&Math.hypot(p.x-S.cam.x,p.y-S.cam.y)<7000)fig(p,p.x,p.y,groundH(p.x,p.y),p.k==='merchant'?'#7d4fa8':'#9a9384','#ffffff',false,p.fa||0);
@@ -237,7 +240,7 @@ function g3Update(){const g=S.g,t=S.t;
   for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'&&Math.hypot(b.x-S.cam.x,b.y-S.cam.y)<3500){const hh=18+8*L;for(let k=0;k<2;k++){const ph=(t*.35+k*.5+b.x*.001)%1;B(b.x+8+ph*10,b.y-6,z+hh+34+ph*50,6+ph*10,6+ph*10,6+ph*10,ph<.5?'#d8d8d8':'#eeeeee')}}
     if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
     else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
-    else if(b.k==='farm'){for(let r=0;r<4;r++)B(b.x-36+r*24,b.y,z+5,16,10,90,r%2?'#c9b458':'#a8963e');B(b.x+60,b.y-30,z+14,26,28,22,'#9a7a4e');RF(b.x+60,b.y-30,z+34,20,16,'#7a4e38')}
+    else if(b.k==='farm')drawFarm(b,z,B,RF,Math.hypot(b.x-S.cam.x,b.y-S.cam.y)<3000)
     else if(b.k==='market'){for(const[dx,c]of[[-40,'#d07a4a'],[0,'#4a8ad0'],[40,'#d0c04a']]){B(b.x+dx,b.y,z+14,28,28,24,'#9a8a72');B(b.x+dx,b.y,z+32,34,6,30,c)}B(b.x,b.y+30,z+30,6,60,6,'#6b5a44');B(b.x+10,b.y+30,z+56,22,14,3,col)}
     else if(b.k==='smithy'){B(b.x,b.y,z+20,56,40,44,'#6b6f78');RF(b.x,b.y,z+50,40,22,'#3e3a36');B(b.x+20,b.y-10,z+62,10,30,10,'#4a4440');B(b.x-34,b.y+20,z+10,18,14,12,'#2e2a28');B(b.x-34,b.y+20,z+18,10,4,6,'#ff8a3a')}
     else if(b.k==='stable'){B(b.x,b.y,z+18,70,36,40,'#8a6a44');RF(b.x,b.y,z+46,44,22,'#5a3f2a');for(let k=0;k<4;k++)B(b.x-45+k*30,b.y+36,z+10,4,20,4,'#6b5a44');B(b.x,b.y+36,z+16,96,4,4,'#6b5a44')}

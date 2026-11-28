@@ -77,7 +77,7 @@
     const r = S.run;
     const key = S.screen + ':' + (r ? r.screen : '');
     if (key !== lastRunScreen) fx.innerHTML = '';
-    const fullKey = key + ':' + (S.modal ? S.modal.k : '') + ':' + (S.cut ? S.cut.id : '');
+    const fullKey = key + ':' + (S.modal ? S.modal.k : '') + ':' + (S.cut ? S.cut.id : '') + ':' + (r && r.screen === 'fight' && r.fight ? r.fight.turn + (S.busy ? 'b' : '') + (S.tipLock ? 'l' : '') : '');
     const sameScreen = fullKey === navKey;
     if (sameScreen) navRemember(); else navMem = null;
     lastRunScreen = key; navKey = fullKey;
@@ -109,8 +109,8 @@
       <div class="stat sight" title="Sight: how many tokens you see face up at the start of each turn">◉ ${r.sight}</div>
       <div class="stat lim" title="Noise limit: hold more noise than this in one turn and you overload">≋ ${r.noiseLimit}</div>
       <div class="relics">${r.relics.map(id => `<img src="${ART.relicURL(id)}" alt="${esc(XR.R[id].name)}" title="${esc(XR.R[id].name + ': ' + XR.R[id].desc)}" data-a="relicInfo" data-id="${id}">`).join('')}</div>
-      <button data-a="bag" title="See every token you carry">Bag ${r.deck.length}</button>
-      <button data-a="pause" title="Menu (Esc)">☰</button>
+      <button data-a="bag" title="See every token you carry" ${S.tipLock && r.screen === 'fight' ? 'disabled' : ''}>Bag ${r.deck.length}</button>
+      <button data-a="pause" title="Menu (Esc)" ${S.tipLock && r.screen === 'fight' ? 'disabled' : ''}>☰</button>
       <div class="where">${esc(ART.PAL[r.act].name)} · floor ${r.floor} · <span class="dim">seed ${esc(r.seed)}</span></div>
     </div>`;
   }
@@ -374,6 +374,16 @@
     else if (!v.blindNow) drawLabel = `Draw <small>${esc(XR.T[next.id].name)}${riskPct ? ' · overloads!' : ''}</small>`;
     else drawLabel = `Draw blind <small class="${riskCls}">${riskPct}% overload</small>`;
     const tip = tipFor(v);
+    S.tipLock = !!(tip && tip.id === 'blind');
+    const lock = S.tipLock ? 'disabled' : '';
+    // what a special token does: when it is the next face-up token, or when it was just drawn blind (never both)
+    const PLAIN = { strike: 1, guard: 1, spark: 1 };
+    let info = null;
+    if (!v.blindNow && next && !PLAIN[next.id]) info = { lead: 'Next up', id: next.id, up: next.up };
+    else if (S.lastBlind && S.lastDrawn === v.staged.length && v.staged.length) {
+      const e = v.staged[v.staged.length - 1];
+      if (!PLAIN[e.id]) info = { lead: 'Drawn blind', id: e.id, up: e.up };
+    }
     const newCls = i => (i === v.staged.length - 1 && S.lastDrawn === v.staged.length ? (S.lastBlind ? 'flip' : 'new') : '');
     return `<div class="fight" id="fight">
       <div class="ixbox" id="ixbox"><canvas data-draw="ix"></canvas>
@@ -381,7 +391,7 @@
         <div class="bar pbar"><i style="width:${r.hp / r.maxHp * 100}%"></i><b>${r.hp}/${r.maxHp}</b></div>
         <div>${v.block ? `<span class="shield">⛨ ${v.block} block</span>` : '<span class="dim">no block</span>'}</div></div></div>
       <div class="foebox" id="foebox">
-        <div class="intent" title="What the foe will do when you bank"><div class="label">Next it will</div>${esc(v.foe.intentText)}${v.foe.incoming ? `<div class="dmg">${v.foe.incoming} incoming</div><div class="sub">you take ${takeS} on Strike · ${takeB} on Brace</div>` : ''}</div>
+        <div class="intent" title="What the foe will do when you bank"><div class="label">Next it will</div>${esc(v.foe.intentText)}${v.foe.incoming ? `<div class="dmg">${v.foe.incoming} incoming</div>` : ''}</div>
         <canvas data-draw="foe" data-art="${XR.F[v.foe.id].art}"></canvas>
         <div class="foename">${esc(v.foe.name)}</div>
         <div class="bar" style="width:220px"><i style="width:${foeHpPct}%"></i><b>${Math.max(0, v.foe.hp)}/${v.foe.maxHp}</b></div>
@@ -401,10 +411,13 @@
         </div>
       </div>
       <div class="controls">
-        ${tip ? `<div class="coach" role="status"><span>${esc(tip.text)}</span><button data-a="tipOk" data-id="${tip.id}">Got it</button></div>` : ''}
-        <button class="primary big drawbtn" data-a="draw" ${v.canDraw && !S.busy ? 'autofocus' : 'disabled'} title="Draw the next token (Space, or X on a controller)">${drawLabel}</button>
-        <button class="big stance" data-a="strike" ${S.busy ? 'disabled' : (v.canDraw ? '' : 'autofocus')} title="Bank: damage x${XR.CFG.strikeDmg}, block x${XR.CFG.strikeBlk} (S, or Y on a controller)">Strike <small>⚔ ${st.dmg + st.pierce} ⛨ ${st.blk}</small></button>
-        <button class="big stance" data-a="brace" ${S.busy ? 'disabled' : ''} title="Bank: block x${XR.CFG.braceBlk}, damage x${XR.CFG.braceDmg} (B on keyboard or controller)">Brace <small>⚔ ${br.dmg + br.pierce} ⛨ ${br.blk}</small></button>
+        ${tip ? `<div class="coach${S.tipLock ? ' lock' : ''}" role="status"><span>${esc(tip.text)}</span><button data-a="tipOk" data-id="${tip.id}" ${S.tipLock ? 'autofocus' : ''}>Got it</button></div>`
+          : info ? `<div class="coach info" role="status"><img src="${ART.tokenURL(info.id, info.up)}" alt=""><span><b>${info.lead}: ${esc(XR.T[info.id].name)}${info.up ? '+' : ''}.</b> ${esc(XR.tokenText(info.id, info.up))}</span></div>` : ''}
+        <button class="primary big drawbtn" data-a="draw" ${v.canDraw && !S.busy && !S.tipLock ? 'autofocus' : 'disabled'} title="Draw the next token (Space, or X on a controller)">${drawLabel}</button>
+        <div class="stancecol"><div class="take">${v.foe.incoming ? `you take ${takeS}` : 'no attack coming'}</div>
+        <button class="big stance" data-a="strike" ${S.busy || S.tipLock ? 'disabled' : (v.canDraw ? '' : 'autofocus')} title="Bank: damage x${XR.CFG.strikeDmg}, block x${XR.CFG.strikeBlk} (S, or Y on a controller)">Strike <small>⚔ ${st.dmg + st.pierce} ⛨ ${st.blk}</small></button></div>
+        <div class="stancecol"><div class="take">${v.foe.incoming ? `you take ${takeB}` : 'no attack coming'}</div>
+        <button class="big stance" data-a="brace" ${S.busy || S.tipLock ? 'disabled' : ''} title="Bank: block x${XR.CFG.braceBlk}, damage x${XR.CFG.braceDmg} (B on keyboard or controller)">Brace <small>⚔ ${br.dmg + br.pierce} ⛨ ${br.blk}</small></button></div>
         <span class="hint">${PAD.connected ? '<kbd>X</kbd> draw · <kbd>Y</kbd> strike · <kbd>B</kbd> brace' : '<kbd>Space</kbd> draw · <kbd>S</kbd> strike · <kbd>B</kbd> brace'} · bag ${v.pileCount} · used ${Object.values(v.discard).reduce((s, n) => s + n, 0)}</span>
       </div>
     </div>`;
@@ -685,6 +698,7 @@
   }
   function handle(a, d) {
     const r = S.run;
+    if (S.tipLock && r && r.screen === 'fight' && S.screen === 'run' && a !== 'tipOk') return sfx('deny');
     switch (a) {
       case 'splashGo': AU.init(); AU.music('title'); sfx('click'); return go('title');
       case 'go': sfx('click'); if (d.s === 'run') { S.menu = null; return go('run'); } return go(d.s);
@@ -723,7 +737,7 @@
       case 'draw': if (S.busy) return; tipSeen('draw'); if (r && r.fight && r.fight.revealed === 0) tipSeen('blind'); if (r && r.fight && r.fight.turn >= 2) tipSeen('carry'); return doAct({ t: 'draw' });
       case 'bank': case 'strike': if (S.busy) return; tipSeen('stance'); return doAct({ t: 'bank', stance: 'strike' });
       case 'brace': if (S.busy) return; tipSeen('stance'); return doAct({ t: 'bank', stance: 'brace' });
-      case 'tipOk': sfx('click'); tipSeen(d.id); return render();
+      case 'tipOk': sfx('click'); tipSeen(d.id); S.tipLock = false; return render();
       case 'take': return doAct({ t: 'take', i: +d.i });
       case 'relicPick': return doAct({ t: 'relic', i: +d.i });
       case 'rewardDone': return doAct({ t: 'done' });
@@ -776,7 +790,7 @@
   function setPadMode(on) { if (document.body.classList.contains('pad') !== on) document.body.classList.toggle('pad', on); }
   document.addEventListener('pointerdown', () => setPadMode(false));
   document.addEventListener('mousemove', e => { if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) setPadMode(false); });
-  function navRoot() { return app.querySelector('.modal') || app; }
+  function navRoot() { return app.querySelector('.modal') || app.querySelector('.coach.lock') || app; }
   function navItems() {
     return Array.from(navRoot().querySelectorAll(NAV_SEL)).filter(el => {
       const r = el.getBoundingClientRect();

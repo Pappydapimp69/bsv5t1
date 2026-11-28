@@ -127,6 +127,12 @@ p { line-height: 1.5; }
 .intent .sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
 .coach { flex: 1 1 100%; order: -1; display: flex; gap: 12px; align-items: center; justify-content: space-between; background: rgba(40, 32, 10, .92); border: 2px solid var(--b); border-radius: 10px; padding: 10px 12px; font-size: 14px; line-height: 1.45; animation: pop .3s ease-out; }
 .coach button { flex: none; padding: 6px 10px; font-size: 13px; }
+.coach.lock { box-shadow: 0 0 0 9999px rgba(2, 4, 8, .55); position: relative; z-index: 5; }
+.coach.info { border-color: var(--a); background: rgba(8, 30, 40, .92); justify-content: flex-start; }
+.coach.info img { width: 34px; height: 34px; flex: none; }
+.controls { align-items: flex-end; }
+.stancecol { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.stancecol .take { text-align: center; font-size: 12px; color: var(--bad); }
 .tok.flip img { animation: flip .45s ease-out; }
 @keyframes flip { 0% { transform: rotateY(90deg); filter: brightness(.2); } 60% { filter: brightness(1.6); } 100% { transform: none; filter: none; } }
 .pbar { width: 140px; }
@@ -184,6 +190,8 @@ kbd { border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-fa
   .totals { font-size: 14px; }
   .controls .hint { display: none; }
   .controls button.big { min-width: 0; flex: 1; padding: 10px 8px; font-size: 16px; }
+  .stancecol { flex: 1; min-width: 0; }
+  .stancecol button.big { width: 100%; }
   .coach { font-size: 13px; }
   .toast { top: 110px; }
   .table { grid-row: 3; }

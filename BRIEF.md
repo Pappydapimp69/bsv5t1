@@ -17,11 +17,14 @@ Keith Burgun separates randomness the player sees before choosing (input randomn
 
 xrndm makes that line something the player can move. Lookahead turns blind draws into visible ones, and the bag's makeup is always shown, so even a blind draw is a known risk. The core question is whether play gets deeper as the player buys their way from output randomness toward input randomness.
 
-## Scope for the first build
+## What was built (first full version)
 
-- One HTML file, no dependencies, plays on desktop and phone.
-- One run of 10 encounters ending in a boss. Runs take about 10 minutes.
-- Two bots, one greedy and one cautious, that play whole runs headlessly for tests and balance sweeps.
+- **Static files with no dependencies and no build step.** All art is drawn on canvas and all sound is synthesized. It plays on desktop and phone. The brief first said one HTML file; the code is split into `core.js`, `art.js`, `audio.js` and `ui.js` so the game rules can run and be tested headlessly.
+- **A run** crosses three layers of about nine floors each: the Static Fields, the Echo Halls and the Core. Each layer has a branching map and ends in a boss (the Shuffler, the Echo Queen, RNDM).
+- **Story:** an intro, a cutscene between each layer and an ending. The cast is Ix, Vell the Archivist, Oma, Pell the Tinker and the three bosses.
+- **Two difficulties:** Standard and Story.
+- **Goals and stats:** ten goals, and run stats, are kept across runs.
+- **Bots:** a greedy bot and a cautious bot play whole runs headlessly for the tests and balance sweeps. They see only what the player sees.
 
 ## Open questions
 

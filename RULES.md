@@ -1,13 +1,26 @@
 # xrndm rules
 
-Binding rules for every change. Each rule names the test that enforces it. A rule marked "no test yet" must get one in the build that first touches it, and that test must be seen failing once before it is trusted.
+These rules bind every change. Each rule names the test that enforces it. Every test listed here was seen failing once against a deliberately broken build before it was trusted. Commit only when `node tests/core.test.js` and `node tests/browser.test.js` both exit 0.
 
 | # | Rule | Test |
 |---|------|------|
-| 1 | Every random draw goes through the seeded RNG. No `Math.random()` or wall-clock time in game logic. | no test yet: grep the source for `Math.random` and `Date.now` |
-| 2 | Each system (bag shuffle, encounters, shop, rewards) has its own RNG stream, derived from hash(seed, system name), so one added roll cannot shift other systems. | no test yet: add a roll in one system and check the others' rolls are unchanged |
-| 3 | A save stores the RNG state words, not seed plus roll count. | no test yet: save mid-run, load, compare the state hash with an unbroken run |
-| 4 | The same seed and the same inputs give the same run. | no test yet: run each bot twice per seed and compare final state hashes |
-| 5 | The bag's full makeup and the face-up tokens are always on screen while a draw decision is open. | no test yet: browser check that both are visible at every draw prompt |
-| 6 | Every run can be finished: no state leaves the player with no legal action. | no test yet: both bots finish runs on 50 seeds without stalling |
-| 7 | A balance change is checked over whole runs on several seeds with both bots, not by playing one run. | no test yet: bot sweep reports win rate and run length per seed |
+| 1 | Every random draw in game logic goes through the seeded RNG. No `Math.random()` or wall-clock time in `core.js`. The UI may use them for visual noise only. | `tests/core.test.js` "rule 1" |
+| 2 | Each system (map, encounters, foe moves, bag, loot, shop, events) has its own RNG stream from hash(seed, system name). An extra roll in one system must change that system and no other. | `tests/core.test.js` "rule 2" |
+| 3 | A save stores the RNG state words, not seed plus roll count. Loading mid-run must give the same run as never stopping. | `tests/core.test.js` "rule 3" |
+| 4 | The same seed and the same inputs give the same run. | `tests/core.test.js` "rule 4"; `tests/browser.test.js` checks the UI ends each run where the engine does |
+| 5 | While a draw decision is open, the face-up tokens, the full makeup of the blind part of the bag and the exact overload odds are on screen, and they match the engine. | `tests/browser.test.js`, checked at every draw prompt of two whole runs |
+| 6 | Every run can be finished: no state leaves the player without a legal action, and no fight runs forever (foes enrage after turn 18). | `tests/core.test.js` "rule 6" (both bots, 50 seeds) |
+| 7 | A balance change is checked over whole runs with both bots on many seeds, using the lowest HP reached per fight, not by playing one run. | `node tests/sweep.js 150` (report). Compare it with the last sweep in this file before committing. |
+| 8 | Bots read only `XR.view()`, which is what the player sees. They never see the hidden bag order. | `tests/core.test.js` "bots see only the player view" |
+| 9 | Every foe, foe behaviour, event and map node type actually occurs in play. | `tests/core.test.js` "every foe, intent, event, relic and map node type occurs" |
+
+## Last balance sweep
+
+`node tests/sweep.js 150`. The bots read exact odds, so a human will do worse.
+
+| Mode | Greedy bot wins | Cautious bot wins |
+|------|-----------------|-------------------|
+| Standard | 44% | 53% |
+| Story | 72% | 78% |
+
+Deaths are spread across all three bosses. Normal fights end in about 2.5 turns, elites in 4 to 5, and bosses in 6 to 7.

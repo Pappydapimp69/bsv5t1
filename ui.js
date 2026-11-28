@@ -75,7 +75,11 @@
     let h = '';
     const r = S.run;
     const key = S.screen + ':' + (r ? r.screen : '');
-    if (key !== lastRunScreen) { fx.innerHTML = ''; lastRunScreen = key; }
+    if (key !== lastRunScreen) fx.innerHTML = '';
+    const fullKey = key + ':' + (S.modal ? S.modal.k : '') + ':' + (S.cut ? S.cut.id : '');
+    const sameScreen = fullKey === navKey;
+    if (sameScreen) navRemember(); else navMem = null;
+    lastRunScreen = key; navKey = fullKey;
     switch (S.screen) {
       case 'splash': h = splashHTML(); break;
       case 'title': h = titleHTML(); break;
@@ -90,8 +94,10 @@
     if (S.modal) h += modalHTML();
     app.innerHTML = h;
     bindCanvases();
+    app.querySelectorAll('.card, [data-a]:not(button):not(input):not(.modal):not(.screen):not(.textbox)').forEach(el => { if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0'); });
     if (S.screen === 'run' && r && r.screen === 'map') scrollMap();
-    const focus = app.querySelector('[autofocus]'); if (focus) focus.focus();
+    const focus = app.querySelector('[autofocus]'); if (focus) focus.focus({ preventScroll: true });
+    navAfterRender(sameScreen);
   }
   function hud() {
     const r = S.run;
@@ -167,7 +173,7 @@
     return `<div class="cut">
       <canvas class="scene" data-draw="scene" data-id="${p.scene}"></canvas>
       <div class="textbox" data-a="cutNext">${p.who ? `<div class="speaker">${esc(p.who)}</div>` : ''}<span id="cuttext">${esc(shown)}</span></div>
-      <div class="row"><span class="dim" style="font-size:12px">${c.i + 1} / ${c.panels.length} · click or press Space</span><button data-a="cutSkip">Skip</button></div>
+      <div class="row"><span class="dim" style="font-size:12px">${c.i + 1} / ${c.panels.length} · click, Space or A to continue · Start to skip</span><button data-a="cutSkip">Skip</button></div>
     </div>`;
   }
   function goalsHTML() {
@@ -185,7 +191,7 @@
     ['Bank', 'Bank whenever you like. Everything on your line happens at once: damage, block, bits, healing. Then the foe acts. You always see what it will do next.', ['heavy', 'bulwark']],
     ['The way down', 'Each layer is a map of paths. Pick your route: fights, elites with relics, shops, quiet spots to rest, and strange events. A boss waits at the bottom of each of the three layers.', ['prism', 'echo']],
     ['Build your luck', 'After fights you take new tokens. At the shop you can filter out Static, grind your lens for more sight, or insulate for a higher noise limit. A small, clean bag is a bag you can read.', ['pierce', 'fuse']],
-    ['Keys', 'Space or D: draw. B or Enter: bank. 1, 2, 3: choose. Esc: menu. Everything also works with a mouse or a finger.', []],
+    ['Controls', 'Keyboard: arrow keys move, Enter chooses, Space or D draws, B banks, 1 to 4 pick, Esc opens the menu. Controller: D-pad or stick moves, A chooses, B goes back, X draws, Y banks, Start opens the menu, Select shows your bag. Mouse and touch work everywhere too.', []],
   ];
   function helpHTML() {
     const [t, body, toks] = HELP[S.help];
@@ -309,10 +315,11 @@
         lines += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${walked ? '#7cf7ff' : '#2a3a58'}" stroke-width="${walked ? 3 : 2}" stroke-dasharray="${walked ? '' : '5 5'}"/>`;
       }
     }
+    const firstCan = XR.options(r)[0];
     for (const n of m.nodes) {
       const p = nodeXY(n), info = NODE_INFO[n.type], here = r.node === n.id, seen = r.visited.indexOf(n.id) >= 0, ok = can.has(n.id);
       const R = n.type === 'boss' ? 30 : 19;
-      nodes += `<g class="node ${ok ? 'can' : ''}" ${ok ? `data-a="goNode" data-n="${n.id}" role="button" tabindex="0" aria-label="${info.name}"` : ''}>
+      nodes += `<g class="node ${ok ? 'can' : ''}" ${ok ? `data-a="goNode" data-n="${n.id}" role="button" tabindex="0" aria-label="${info.name}"${n.id === firstCan ? ' autofocus' : ''}` : ''}>
         <title>${info.name}: ${info.desc}</title>
         <circle class="ring" cx="${p.x}" cy="${p.y}" r="${R}" fill="${seen ? '#14233a' : '#0b111c'}" stroke="${ok ? info.col : here ? '#ffffff' : seen ? '#3a5a80' : '#26344f'}" stroke-width="${ok ? 3 : 2}" opacity="${seen || ok || here ? 1 : 0.75}"/>
         ${nodeIcon(n.type, p.x, p.y, n.type === 'boss' ? 26 : 16)}
@@ -374,9 +381,9 @@
         </div>
       </div>
       <div class="controls">
-        <button class="primary big" data-a="draw" ${v.canDraw && !S.busy ? '' : 'disabled'} title="Draw the top token (Space)">Draw</button>
-        <button class="big" data-a="bank" ${S.busy ? 'disabled' : ''} title="Resolve your line, then the foe acts (B)">Bank</button>
-        <span class="hint"><kbd>Space</kbd> draw · <kbd>B</kbd> bank · bag ${v.pileCount} · used ${Object.values(v.discard).reduce((s, n) => s + n, 0)}</span>
+        <button class="primary big" data-a="draw" ${v.canDraw && !S.busy ? 'autofocus' : 'disabled'} title="Draw the top token (Space, or X on a controller)">Draw</button>
+        <button class="big" data-a="bank" ${S.busy ? 'disabled' : (v.canDraw ? '' : 'autofocus')} title="Resolve your line, then the foe acts (B, or Y on a controller)">Bank</button>
+        <span class="hint">${PAD.connected ? '<kbd>X</kbd> draw · <kbd>Y</kbd> bank · <kbd>Start</kbd> menu' : '<kbd>Space</kbd> draw · <kbd>B</kbd> bank'} · bag ${v.pileCount} · used ${Object.values(v.discard).reduce((s, n) => s + n, 0)}</span>
       </div>
     </div>`;
   }
@@ -496,6 +503,7 @@
       else if (c.kind === 'scene') ART.scene(c.ctx, w, h, c.el.dataset.id, lt);
     }
     if (S.screen === 'cut') tickCut(dt);
+    pollPad(ts);
     requestAnimationFrame(frame);
   }
 
@@ -732,24 +740,167 @@
     if (el.dataset.a === 'vol') { S.settings[el.dataset.k] = +el.value; AU.settings[el.dataset.k] = +el.value; AU.applySettings(); store.set('settings', S.settings); }
     if (el.id === 'seed') S.newSeed = el.value;
   });
-  app.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.closest && e.target.closest('g.node')) { handle('goNode', e.target.closest('g.node').dataset); }
-  });
   let hoverEl = null;
   app.addEventListener('mouseover', e => { const b = e.target.closest('button,.card'); if (b && b !== hoverEl && !b.disabled) { hoverEl = b; sfx('hover'); } });
 
+  // ------------------------------------------------------- FOCUS NAVIGATION
+  // Arrow keys and the gamepad move a visible focus by on-screen geometry
+  // (not a flat list), A/Enter activates it, B/Esc goes back.
+  const NAV_SEL = 'button:not(:disabled), .card:not(.off):not(.sold), g.node.can, input, [data-a][tabindex]';
+  const NAV = { guardUntil: 0, latch: false, pad: false };
+  function setPadMode(on) { if (document.body.classList.contains('pad') !== on) document.body.classList.toggle('pad', on); }
+  document.addEventListener('pointerdown', () => setPadMode(false));
+  document.addEventListener('mousemove', e => { if (Math.abs(e.movementX) + Math.abs(e.movementY) > 2) setPadMode(false); });
+  function navRoot() { return app.querySelector('.modal') || app; }
+  function navItems() {
+    return Array.from(navRoot().querySelectorAll(NAV_SEL)).filter(el => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && !el.classList.contains('modal');
+    });
+  }
+  function defaultFocus(items) {
+    return items.find(el => el.hasAttribute('autofocus')) || items.find(el => el.classList.contains('primary')) || items[0];
+  }
+  function focusEl(el, quiet) {
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (!quiet) sfx('hover');
+  }
+  function centerOf(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  function navMove(dir) {
+    setPadMode(true);
+    const items = navItems(); if (!items.length) return;
+    const cur = document.activeElement;
+    if (items.indexOf(cur) < 0) return focusEl(defaultFocus(items)); // first press only lands focus
+    if (cur.type === 'range' && (dir === 'left' || dir === 'right')) {
+      cur.value = +cur.value + (dir === 'right' ? 1 : -1) * (+cur.step || 1);
+      cur.dispatchEvent(new Event('input', { bubbles: true })); sfx('hover'); return;
+    }
+    const c = centerOf(cur);
+    let best = null;
+    for (const wide of [false, true]) {
+      let bs = Infinity;
+      for (const el of items) {
+        if (el === cur) continue;
+        const e = centerOf(el), dx = e.x - c.x, dy = e.y - c.y;
+        const prim = dir === 'up' ? -dy : dir === 'down' ? dy : dir === 'left' ? -dx : dx;
+        const sec = Math.abs(dir === 'up' || dir === 'down' ? dx : dy);
+        if (prim <= 4) continue;
+        if (!wide && sec > prim * 1.5 + 24) continue; // stay roughly in the pressed direction first
+        const score = prim + sec * (wide ? 1 : 2);
+        if (score < bs) { bs = score; best = el; }
+      }
+      if (best) break;
+    }
+    if (best) focusEl(best); else sfx('deny');
+  }
+  function activate(el) {
+    if (!el) return;
+    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT') return el.click();
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }
+  function navConfirm() {
+    setPadMode(true);
+    if (S.screen === 'splash') return handle('splashGo', {});
+    if (performance.now() < NAV.guardUntil) return;
+    if (S.screen === 'cut') return cutNext();
+    const items = navItems(), cur = document.activeElement;
+    if (items.indexOf(cur) < 0) return focusEl(defaultFocus(items));
+    if (cur.type === 'range' || cur.type === 'text') return navMove('down');
+    activate(cur);
+  }
+  function navBack() {
+    setPadMode(true);
+    if (S.screen === 'splash') return handle('splashGo', {});
+    if (S.screen === 'cut') return;
+    if (S.modal) return handle('closeModal', {});
+    if (S.screen === 'run') return;
+    if (S.screen !== 'title') { sfx('click'); if (S.run && S.menu) { S.menu = null; return go('run'); } return go('title'); }
+  }
+  function navStart() {
+    setPadMode(true);
+    if (S.screen === 'splash') return handle('splashGo', {});
+    if (S.screen === 'cut') { sfx('click'); return endCut(); }
+    if (S.modal && S.modal.k === 'pause') return handle('closeModal', {});
+    if (S.screen === 'run' && S.run && !S.modal && !S.busy) return handle('pause', {});
+  }
+  // Called after every render: keep focus where it was if the screen is the
+  // same, otherwise land on the default; held directions must be released.
+  let navKey = null, navMem = null;
+  function navAfterRender(sameScreen) {
+    if (!sameScreen) { NAV.guardUntil = performance.now() + 250; NAV.latch = true; }
+    if (!document.body.classList.contains('pad')) return;
+    const items = navItems(); if (!items.length) return;
+    let el = null;
+    if (sameScreen && navMem) {
+      el = items.find(x => x.dataset.a === navMem.a && (x.dataset.i || x.dataset.n || x.dataset.k || x.dataset.s || x.dataset.uid || '') === navMem.id) || items[Math.min(navMem.idx, items.length - 1)];
+    }
+    focusEl(el || defaultFocus(items), true);
+  }
+  function navRemember() {
+    const items = navItems(), cur = document.activeElement, idx = items.indexOf(cur);
+    navMem = idx < 0 ? null : { a: cur.dataset.a, id: cur.dataset.i || cur.dataset.n || cur.dataset.k || cur.dataset.s || cur.dataset.uid || '', idx };
+  }
+
+  // ---------------------------------------------------------------- GAMEPAD
+  const PAD = { prev: [], held: {}, next: {}, connected: false };
+  window.addEventListener('gamepadconnected', () => {
+    PAD.connected = true;
+    toast('<div class="label">Controller connected</div>D-pad or stick: move · A: choose · B: back<br>X: draw · Y: bank · Start: menu · Select: bag');
+    if (S.screen === 'run') render();
+  });
+  window.addEventListener('gamepaddisconnected', () => { PAD.connected = false; });
+  function pollPad(now) {
+    let list;
+    try { list = navigator.getGamepads ? navigator.getGamepads() : null; } catch (e) { return; }
+    const gp = list && Array.from(list).find(p => p && p.connected);
+    if (!gp) return;
+    if (!PAD.connected) PAD.connected = true;
+    const btn = i => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
+    const ax = gp.axes || [];
+    const dirs = { up: btn(12) || ax[1] < -0.55, down: btn(13) || ax[1] > 0.55, left: btn(14) || ax[0] < -0.55, right: btn(15) || ax[0] > 0.55 };
+    const press = i => btn(i) && !PAD.prev[i];
+    const anyNew = [0, 1, 2, 3, 8, 9].some(press);
+    if (anyNew) AU.init();
+    if (NAV.latch) { if (!dirs.up && !dirs.down && !dirs.left && !dirs.right) NAV.latch = false; }
+    else for (const d of Object.keys(dirs)) {
+      if (dirs[d] && !PAD.held[d]) { navMove(d); PAD.next[d] = now + 380; }
+      else if (dirs[d] && now >= PAD.next[d]) { navMove(d); PAD.next[d] = now + 130; }
+    }
+    PAD.held = NAV.latch ? {} : dirs;
+    if (press(0)) navConfirm();
+    else if (press(1)) navBack();
+    else if (press(9)) navStart();
+    else if (press(8) && S.screen === 'run' && S.run && !S.modal) { setPadMode(true); handle('bag', {}); }
+    else if (press(2) && S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('draw', {}); }
+    else if (press(3) && S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('bank', {}); }
+    PAD.prev = gp.buttons.map((b, i) => btn(i));
+  }
+
   document.addEventListener('keydown', e => {
-    if (e.target && e.target.tagName === 'INPUT' && e.key !== 'Enter' && e.key !== 'Escape') return;
     const k = e.key.toLowerCase();
+    const inText = e.target && e.target.tagName === 'INPUT' && e.target.type === 'text';
+    const ARROWS = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' };
+    if (ARROWS[k] && !(inText && (k === 'arrowleft' || k === 'arrowright')) && S.screen !== 'splash' && S.screen !== 'cut') {
+      e.preventDefault(); return navMove(ARROWS[k]);
+    }
+    if ((k === 'enter' || k === ' ') && (e.repeat || performance.now() < NAV.guardUntil) && S.screen !== 'splash') { e.preventDefault(); return; }
+    if (e.target && e.target.tagName === 'INPUT' && k !== 'enter' && k !== 'escape') return;
     if (S.screen === 'splash') { e.preventDefault(); return handle('splashGo', {}); }
     if (S.screen === 'cut') { if (k === ' ' || k === 'enter') { e.preventDefault(); cutNext(); } if (k === 'escape') endCut(); return; }
+    // Enter on a focused non-button (card, map node) activates it
+    const focused = document.activeElement;
+    const onItem = focused && focused !== document.body && app.contains(focused) && navItems().indexOf(focused) >= 0;
+    if (k === 'enter' && onItem && focused.tagName !== 'BUTTON' && focused.tagName !== 'INPUT') { e.preventDefault(); return activate(focused); }
     if (S.modal) { if (k === 'escape') handle('closeModal', {}); return; }
-    if (S.screen !== 'run' || !S.run) { if (k === 'escape' && S.screen !== 'title') go('title'); return; }
+    if (S.screen !== 'run' || !S.run) { if (k === 'escape' && S.screen !== 'title') navBack(); return; }
     const r = S.run;
     if (k === 'escape') return handle('pause', {});
     if (r.screen === 'fight') {
       if (k === ' ' || k === 'd') { e.preventDefault(); return handle('draw', {}); }
-      if (k === 'b' || k === 'enter') { e.preventDefault(); return handle('bank', {}); }
+      if (k === 'b') { e.preventDefault(); return handle('bank', {}); }
+      if (k === 'enter' && !(onItem && focused.tagName === 'BUTTON')) { e.preventDefault(); return handle('bank', {}); }
     }
     const n = parseInt(k, 10);
     if (n >= 1 && n <= 4) {
@@ -762,7 +913,7 @@
   window.addEventListener('resize', () => { resizeBg(); bindCanvases(); });
 
   // test hooks: state lives on window.APP once the app has started
-  window.APP = { S, XR, handle, render, startRun, doAct, endCut, get run() { return S.run; }, ready: false };
+  window.APP = { S, XR, handle, render, startRun, doAct, endCut, navMove, get run() { return S.run; }, ready: false };
   resizeBg(); render(); requestAnimationFrame(frame);
   window.APP.ready = true;
 })();

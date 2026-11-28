@@ -1,6 +1,6 @@
 # xrndm rules
 
-These rules bind every change. Each rule names the test that enforces it. Every test listed here was seen failing once against a deliberately broken build before it was trusted. Commit only when `node tests/core.test.js` and `node tests/browser.test.js` both exit 0.
+These rules bind every change. Each rule names the test that enforces it. Every test listed here was seen failing once against a deliberately broken build before it was trusted. Commit only when `node tests/core.test.js`, `node tests/browser.test.js` and `node tests/input.test.js` all exit 0. After changing `index.html`, run `python3 tools/build-artifact.py` so the playtest page matches.
 
 | # | Rule | Test |
 |---|------|------|
@@ -13,6 +13,7 @@ These rules bind every change. Each rule names the test that enforces it. Every 
 | 7 | A balance change is checked over whole runs with both bots on many seeds, using the lowest HP reached per fight, not by playing one run. | `node tests/sweep.js 150` (report). Compare it with the last sweep in this file before committing. |
 | 8 | Bots read only `XR.view()`, which is what the player sees. They never see the hidden bag order. | `tests/core.test.js` "bots see only the player view" |
 | 9 | Every foe, foe behaviour, event and map node type actually occurs in play. | `tests/core.test.js` "every foe, intent, event, relic and map node type occurs" |
+| 10 | Every screen can be played with a controller or arrow keys alone. Focus moves by on-screen position and is always visible. The press that leaves a screen does nothing on the next one. A direction held while a screen opens must be released before it moves focus. | `tests/input.test.js` (a fake gamepad plays from the splash into a fight, plus the arrow keys) |
 
 ## Last balance sweep
 

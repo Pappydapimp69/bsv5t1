@@ -10,7 +10,11 @@ Open `index.html` in a desktop or phone browser. To run it from a local server i
 python3 -m http.server 8000   # then open http://localhost:8000
 ```
 
-Click the splash screen to start the sound. Space or D draws, B or Enter banks, 1 to 4 choose, and Esc opens the menu. Everything also works with a mouse or a finger. Choose **Story** difficulty to see the whole tale, or **Standard** for the real game.
+Click the splash screen to start the sound.
+
+- **Keyboard:** arrow keys move, Enter chooses, Space or D draws, B banks, 1 to 4 pick, and Esc opens the menu.
+- **Controller:** the D-pad or left stick moves, A chooses, B goes back, X draws, Y banks, Start opens the menu (and skips cutscenes), and Select shows your bag.
+- **Mouse and touch** work everywhere. Choose **Story** difficulty to see the whole tale, or **Standard** for the real game.
 
 ## The game
 
@@ -39,11 +43,14 @@ The design premise and its source are in `BRIEF.md`. The binding rules and their
 | `tests/core.test.js` | Headless rule tests (RULES 1 to 4, 6, 8, 9). |
 | `tests/browser.test.js` | Plays two whole runs through the real UI at desktop and phone sizes (RULES 4, 5). |
 | `tests/sweep.js` | Balance report over many seeds (RULES 7). |
+| `tests/input.test.js` | Plays from the splash into a fight with a fake gamepad and the arrow keys (RULES 10). |
+| `tools/build-artifact.py` | Rebuilds `artifact/xrndm.html`, the playtest artifact page, from `index.html`. |
 
 ## Tests
 
 ```sh
 node tests/core.test.js
 node tests/browser.test.js [screenshot-dir]   # needs Playwright with Chromium
+node tests/input.test.js
 node tests/sweep.js 150
 ```

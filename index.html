@@ -32,6 +32,12 @@ button.primary { border-color: var(--a); color: var(--a); }
 button.warn { border-color: var(--d); color: var(--d); }
 button.big { font-size: 20px; padding: 14px 22px; min-width: 150px; }
 button:focus-visible { outline: 2px solid var(--b); outline-offset: 2px; }
+body.pad :focus { outline: 3px solid var(--b); outline-offset: 3px; box-shadow: 0 0 18px rgba(255,207,110,.45); }
+body.pad .card:focus { transform: translateY(-3px); border-color: var(--b); }
+body.pad g.node:focus { outline: none; box-shadow: none; }
+body.pad g.node:focus circle.ring { stroke: var(--b); stroke-width: 5; }
+body.pad input[type=range]:focus { outline-offset: 6px; }
+.card:focus-visible, g.node:focus-visible { outline: 2px solid var(--b); outline-offset: 2px; }
 h1, h2, h3 { margin: 0 0 10px; letter-spacing: 2px; }
 h2 { color: var(--a); font-size: 22px; text-transform: uppercase; }
 p { line-height: 1.5; }

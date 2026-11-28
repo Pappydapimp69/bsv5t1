@@ -149,3 +149,5 @@ body.film #res,body.titling #res{visibility:hidden}
 .card .mb.quest{border-left:4px solid var(--accent)}.card .mb.quest.new{background:#2f2c1c}
 #goal .jg.urgent{font-style:normal;opacity:1;color:#ffb8a8}
 #skillbar.side{transform:none;align-items:flex-start}#skillbar.side .skrow{flex-wrap:wrap;justify-content:flex-start}#skillbar.side .xpt{text-align:left}
+#goal .jg.qrow{border-top:1px solid rgba(255,255,255,.12);padding-top:.2rem}
+#res .rs.short b{color:#ffb8a8}

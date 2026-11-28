@@ -85,7 +85,7 @@ function paintSkills(){const h=S&&S.you;if(!h||FILM||S.role!=='human'){if(skSig)
   if(h.picks>0)parts.push(`<div class="sk tal" data-sk="talent"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
   if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}" data-sk="ride"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);
   const f=Math.round(h.xp/(h.lvl*50)*100),sig=`<div class="xpt">Level ${h.lvl} \u00b7 ${h.xp}/${h.lvl*50} XP${h.buff&&h.buff.until>S.t?' \u00b7 '+SHRINES[h.buff.k].n.replace('Shrine of ','Blessed: ')+' '+Math.ceil(h.buff.until-S.t)+'s':''}${h.combo&&S.t-h.comboT<.9?' \u00b7 combo '+h.combo+'/3':''}${S.goals&&!tutActive()?' \u00b7 goals '+S.goals.filter(g=>g.done).length+'/3':''}</div><div class="xpb"><i style="width:${f}%"></i></div><div class="skrow">${parts.join('')}</div>`;if(sig!==skSig){skSig=sig;skillEl.innerHTML=sig}}
-function paintHud(){paintSkills();paintRes();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
+function paintHud(){paintSkills();paintRes();paintRoads();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
   paintPanel();
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
@@ -105,9 +105,10 @@ function tutJournal(h){const T=S.tut,C2=CHAPTERS[T.ch],tr=tutTracked(),chGoals=F
   const lines=tutGoals().sort((a,b)=>(b.ch===T.ch)-(a.ch===T.ch)).map(g=>'<div class="jg'+(g===tr?' tr':'')+(g.ch<T.ch?' old':'')+'" data-goal="'+g.id+'">'+(g===tr?'\u25b8 ':'\u25cb ')+g.name+(g.count&&g.count(h)?' '+g.count(h):'')+(g.req?' <b>needed</b>':g.lesson?' <i>lesson</i>':'')+'</div>');
   const just=FIRST_DAY.filter(g=>T.done_[g.id]&&S.t-T.done_[g.id]<6).map(g=>'<div class="jg dn">\u2713 '+g.name+'</div>');
   // collapsed (the default), the journal is the chapter and the goal the light follows; O or the arrow opens every goal
-  const open=!!save.qOpen,tog=`<span class="qt" data-q="toggle" title="Journal (O)">${open?'\u25b4':'\u25be'} ${tutGoals().length}</span>`;
-  if(!open)return'<div class="qh"><span>'+head+'</span>'+tog+'</div>'+(tr?'<div class="jg tr" data-goal="'+tr.id+'">\u25b8 '+tr.name+(tr.count&&tr.count(h)?' '+tr.count(h):'')+'</div>':'')+just.join('');
-  return'<div class="qh">'+head+tog+'</div>'+lines.join('')+just.join('')+(T.ch===1&&tutLandmarks().length?'<div class="jg hint">Soft lights mark places you have not found</div>':'')}
+  // quests taken from the Board during the first day follow under it (they were never drawn while the journal held this box)
+  const open=!!save.qOpen,qs=questRows(h,open),tog=`<span class="qt" data-q="toggle" title="Journal (O)">${open?'\u25b4':'\u25be'} ${tutGoals().length+trackEntries(h).length}</span>`;
+  if(!open)return'<div class="qh"><span>'+head+'</span>'+tog+'</div>'+(tr?'<div class="jg tr" data-goal="'+tr.id+'">\u25b8 '+tr.name+(tr.count&&tr.count(h)?' '+tr.count(h):'')+'</div>':'')+just.join('')+qs;
+  return'<div class="qh">'+head+tog+'</div>'+lines.join('')+just.join('')+(T.ch===1&&tutLandmarks().length?'<div class="jg hint">Soft lights mark places you have not found</div>':'')+qs}
 goalEl.addEventListener('pointerdown',e=>{const qe=e.target.closest('[data-q]');if(qe&&S&&S.you&&!menu){e.preventDefault();e.stopPropagation();if(qe.dataset.q==='toggle')questToggle();else{S.you.track=qe.dataset.q;hudSig=''}hudSig='';return}
   const el=e.target.closest('[data-goal]');if(!el||!tutActive()||menu)return;e.preventDefault();e.stopPropagation();S.tut.track=el.dataset.goal;const g=tutGoal(el.dataset.goal);if(g&&!(g.target&&g.target(S.you)))toast(g.name+': '+g.hint)});
 

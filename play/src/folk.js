@@ -36,8 +36,8 @@ function pickGoalFolk(h){
     if(withinLimits(home,x,y)&&!inSolid(x,y,30))return{k:'build',what:'house',x,y};
   }
   // a hero bot grows its town too: farms when houses go hungry, then a well, market, smithy and stable as gold allows
-  if(h.hero&&home&&!home.outpost){const hungry=(home.houses||0)>2*civicIn(home,'farm')+1||!civicIn(home,'farm')&&stockOf(home,'food')<150,want=hungry?'farm':['well','market','smithy','stable'].find(k=>!civicIn(home,k)&&(!CIVIC[k].lvl||lv(home)>=CIVIC[k].lvl));
-    if(want&&h.gold>=C.COST[want]+30){const a=rr(0,6.28),d=home.r*.6+rr(40,160),x=home.x+Math.cos(a)*d,y=home.y+Math.sin(a)*d;if(withinLimits(home,x,y)&&!inSolid(x,y,30)&&!S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<60))return{k:'build',what:want,x,y}}}
+  if(h.hero&&home&&!home.outpost){const want=botWant(home),p=want&&botSite(home,want,()=>rr(0,1));
+    if(want&&p&&h.gold>=C.COST[want]+30){const x=p.x,y=p.y;if((want==='woodcutter'||want==='quarry'||withinLimits(home,x,y))&&!inSolid(x,y,30)&&!S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<60))return{k:'build',what:want,x,y}}}
   if(q?.k==='troll'){
     const troll=S.monsters.find(m=>m.kind==='troll'&&local(m));if(troll)return{k:'monster',id:troll.id};
   }

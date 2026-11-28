@@ -243,6 +243,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
     add(p.d-.5,()=>{const hp=Math.max(h.you?22:15,(h.you?30:24)*p.s);ctx.globalAlpha=1-fogOf(p.d);
       if(h.swing>0){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-hp*.5,hp*.75,-2.4,-.7);ctx.stroke()}
       figure(p,hp*(h.sol?1.15:1),h.you?'#c0392b':T.col,T.shape,h.sol?'#fff':T.col,h.you||!!h.sol);ctx.globalAlpha=1;if(h.you)pbar(p.x,p.y-hp*1.6,36,h.hp/h.max,'#9be08a')})}
+  for(const w of S.walkers||[]){const p=proj(w.x,w.y,0);if(!p||p.d>5000)continue;const T=TOWNS[w.town];add(p.d-.5,()=>{ctx.globalAlpha=1-fogOf(p.d);figure(p,Math.max(11,19*p.s),w.k==='leaver'?'#7a6e62':'#c9b896',T.shape,T.col,false);ctx.globalAlpha=1})}
   for(const b of giantBoulders(g)){const p=proj(b.x,b.y,b.z);if(!p)continue;const col=partStone(b.part);add(p.d,()=>{ctx.globalAlpha=(1-clamp((p.d-1200)/5000,0,.62))*(S.role==='giant'?.85:nearFade(p));stone(p.x,p.y,b.r*p.s,col,b.n);ctx.globalAlpha=1})}
   for(const ch of S.chains){if(ch.hp<=0)continue;const a=bodyWorld(ch.c,ch.r),f=fwd(g),sx=-f.y,sy=f.x,dir=ch.c<COLS/2?-1:1,bx=a.x+sx*dir*520,by=a.y+sy*dir*520;const p1=proj(a.x,a.y,a.z),p2=proj(bx,by,0);if(!p1||!p2)continue;
     add(Math.max(p1.d,p2.d),()=>{ctx.strokeStyle='#26262a';ctx.lineWidth=Math.max(2,14*Math.min(p1.s,p2.s));ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.quadraticCurveTo((p1.x+p2.x)/2,Math.max(p1.y,p2.y)+20*p2.s,p2.x,p2.y);ctx.stroke();
@@ -251,7 +252,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const h of climbers()){const a=climberWorld(h),p=proj(a.x,a.y,a.z);if(!p)continue;const T=TOWNS[h.town];add(p.d-90,()=>figure(p,Math.max(10,22*p.s),h.you?'#c0392b':T.col,T.shape,T.col,h.you))}
   for(const s of S.shots){const z=1300*(1-s.t)+Math.sin(s.t*Math.PI)*350,p=proj(s.x,s.y,z);if(!p)continue;add(p.d,()=>{ctx.fillStyle='#1d1d1d';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(3,12*p.s),0,7);ctx.fill()})}
   items.sort((a,b)=>b.d-a.d);for(const it of items)it.fn();
-  quarryLabels(proj);
+  econLabels(proj);
   for(const t of S.towns){const p=proj(t.x,t.y,200);if(!p||p.d>9500)continue;lbl(t.name+(t.alive?' \u00b7 '+ageOf(t):' (ruins)'),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   labelRivalHeroes(proj);
   if(g.fallen>0&&!g.dead){const p=proj(g.x+fwd(g).x*700,g.y+fwd(g).y*700,300);if(p)lbl('The giant is down: '+Math.ceil(g.fallen)+' s to strike the Heart-stone',p.x,Math.max(70,p.y),13,'#ffcf6a')}

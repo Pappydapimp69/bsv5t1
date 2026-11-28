@@ -47,7 +47,7 @@ function questStepText(h,q){const s=questStep(h,q);return s?s.t+(s.need>1?' '+s.
 // once a second: steps that are now true are paid and the quest moves on
 function stepQuests(){const h=S.you;if(!h||S.role!=='human')return;for(const q of questOpen(h)){const D=QUESTS[q.id];
   if(D.saga){if(h.saga&&h.saga.done){q.done=true;(h.qDone=h.qDone||{})[q.id]=1}continue}
-  let guard=0;while(D.steps[q.i]&&guard++<9){const[n,need]=D.steps[q.i].p(h);if(n<need)break;q.i++;const last=!D.steps[q.i],g=last?D.reward:20+10*q.i;h.gold+=g;gainXp(h,last?60:15);
+  let guard=0;while(D.steps[q.i]&&guard++<9){const[n,need]=D.steps[q.i].p(h);if(n<need)break;q.i++;const last=!D.steps[q.i],g=last?D.reward:20+10*q.i;h.gold+=g;{const tt=firstTown(h.town);if(tt&&!last)giveStock(tt,scarcer(tt),25)}gainXp(h,last?60:15);
     if(last){q.done=true;(h.qDone=h.qDone||{})[q.id]=1;announce('Quest complete: '+D.n+'. +'+g+' gold.');sfx('fanfare');if(h.track==='q:'+q.id)h.track=null}
     else{toast(D.n+': step done (+'+g+' gold). Next: '+questStepText(h,q)+'.');sfx('coin')}}}}
 

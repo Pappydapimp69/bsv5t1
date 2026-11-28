@@ -20,6 +20,7 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if(e.code==='KeyN'&&!e.repeat&&tutActive()){tutCycle();e.preventDefault();return}
   if(e.code==='KeyN'&&!e.repeat&&S.you){questCycle(S.you);e.preventDefault();return}
   if(e.code==='KeyO'&&!e.repeat&&S.you){questToggle();e.preventDefault();return}
+  if(e.code==='KeyV'&&!e.repeat&&S.you){ringsOn=!ringsOn;toast(ringsOn?'Building ranges shown (V to hide).':'Building ranges hidden.');e.preventDefault();return}
   {const sk=SKILLS.find(k=>'Digit'+k.key===e.code);if(sk&&!e.repeat&&S.you){useSkill(S.you,sk.id);e.preventDefault();return}}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});

@@ -76,24 +76,26 @@ const {chromium} = require('playwright');
       // nobody walks about without a purpose: every walker is a newcomer, a leaver or a carrier with a load
       run(S, 60); out.noIdleWalkers = S.walkers.every(w => ['settler', 'leaver', 'water', 'food', 'grain', 'harvest'].includes(w.k));
       // workers are where they work: a staffed building shows its workers beside it
-      out.workersAtWork = workerSpots(farm, 1).length === 4 && workerSpots({...gran, staff: 0}, 1).length === 0 && workerSpots(gran, 1).every(p => Math.hypot(p.x - gran.x, p.y - gran.y) < 70);
+      out.workersAtWork = workerSpots({...farm, present: 1}, 1).length === 1 && workerSpots({...farm, present: 6}, 1).length === 6 && workerSpots({...gran, present: 0}, 1).length === 0 && workerSpots({...gran, present: 5, out: {}}, 1).length === 4 && workerSpots({...gran, present: 5}, 1).every(p => Math.hypot(p.x - gran.x, p.y - gran.y) < 70);
       // woodcutters and quarries: staffed from the settlers and productive only while staffed
       const wsite = spot(p => free(p) && canBuild(h, 'woodcutter') === null); out.woodcutterBuilt = build(h, 'woodcutter'); stepJob(h, 30);
       const q0 = S.quarries.find(q => q.town === h.town); at({x: q0.x + 120, y: q0.y}); out.quarryBuilt = build(h, 'quarry'); stepJob(h, 30);
       const wc = S.builds.find(b => b.k === 'woodcutter'), qy = S.builds.find(b => b.k === 'quarry');
-      home.hall = 30; allocate(home); out.staffedFromSettlers = wc.staff > 0 && qy.staff > 0 && home.employed + home.idle === Math.floor(home.pop);
+      home.hall = 30; allocate(home); for (const p of S.people) if (p.job) { quit(p); } for (const p of S.people) if (p.tid === home.id && !p.job) { const b = [wc, qy].find(b => b.staff < 99 && S.people.filter(q => q.job === b).length < C.JOBS[b.k]); if (b) { p.job = b; p.st = 'work'; } } countPresent(); wc.staff = S.people.filter(p => p.job === wc).length; qy.staff = S.people.filter(p => p.job === qy).length;
+      out.staffedFromSettlers = wc.present > 0 && qy.present > 0;
       const tick = () => { const w = home.wood, st = home.stone; S.t = Math.floor(S.t / RENT_INTERVAL + 1) * RENT_INTERVAL + .01; stepEconomy(.02); return [home.wood - w, home.stone - st]; };
       const [dw, ds] = tick(); out.workplacesProduce = dw >= C.PROD.woodcutter.wood * wc.staff / C.JOBS.woodcutter - .01 && ds > 0;
       home.hall = 0; for (const b of S.builds) if (b.k === 'house') b.occ = 0; allocate(home); const emptied = wc.staff === 0 && qy.staff === 0; const [dw0, ds0] = tick();
       out.emptyWorkplacesIdle = emptied && dw0 < 3 && ds0 < 2; // only the hall's small trickle (2 wood, 1 stone a 10 s)
       // labour order: raising a kind in the Hall gives it workers first
       const aside = [farm, gran, baz, well]; aside.forEach(b => { b.hp = 0; });
-      home.hall = 8; home.pri = 'quarry'; allocate(home); const qFirst = qy.staff === 8 && wc.staff === 0; home.pri = 'woodcutter'; allocate(home);
-      out.labourPriority = qFirst && wc.staff === 3 && qy.staff === 5; home.pri = null; home.hall = 30; allocate(home); aside.forEach(b => { delete b.hp; }); allocate(home);
+      // one worker: the kind put first in the Hall gets it; two: each gets one before either gets a second
+      home.hall = 1; home.pri = 'quarry'; allocate(home); const qFirst = qy.staff === 1 && wc.staff === 0; home.pri = 'woodcutter'; allocate(home); const wFirst = wc.staff === 1 && qy.staff === 0;
+      home.hall = 2; home.pri = 'quarry'; allocate(home); out.labourPriority = qFirst && wFirst && wc.staff === 1 && qy.staff === 1; home.pri = null; home.hall = 30; allocate(home); aside.forEach(b => { delete b.hp; }); allocate(home);
       // different workplaces employ different numbers (owner)
       out.jobsDiffer = new Set(Object.values(C.JOBS)).size >= 6;
       // a staffed granary holds more food
-      const cap0 = foodCap(home); gran.staff = 0; const capE = foodCap(home); gran.staff = 5; out.granaryStores = foodCap(home) === capE + C.GRANARY_CAP;
+      gran.present = 0; const capE = foodCap(home); gran.present = 5; out.granaryStores = foodCap(home) === capE + C.GRANARY_CAP;
       // fire: a building no fire station reaches can catch fire; you beat it out, or a staffed fire station does
       const p0 = C.FIRE_P; C.FIRE_P = 1; wc.risk = C.FIRE_SAFE + 1; S.you.x = home.x; S.you.y = home.y; stepFires(); C.FIRE_P = p0;
       const caught = !!wc.fire; at({x: wc.x + 40, y: wc.y}); stepFires(); stepFires(); stepFires();

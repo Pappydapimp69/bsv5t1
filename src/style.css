@@ -151,3 +151,4 @@ body.film #res,body.titling #res{visibility:hidden}
 #skillbar.side{transform:none;align-items:flex-start}#skillbar.side .skrow{flex-wrap:wrap;justify-content:flex-start}#skillbar.side .xpt{text-align:left}
 #goal .jg.qrow{border-top:1px solid rgba(255,255,255,.12);padding-top:.2rem}
 #res .rs.short b{color:#ffb8a8}
+.card .mb.danger{border-color:#b84a32}.card .mb.danger:hover,.card .mb.danger.focus{background:#3a1e18}

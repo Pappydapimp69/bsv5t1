@@ -66,6 +66,21 @@ const {chromium} = require('playwright');
       out.openLists = g.querySelectorAll('.jg[data-q]').length === 2 && !!save.qOpen;
       questToggle(); paintHud(); out.closesAgain = g.querySelectorAll('.jg').length === 0;
       questCycle(h); out.cycleTracks = !!h.track;
+      // soldiers eat: training one takes food from the barracks' settlement, and without the food it says so
+      h.x = home.x + 230; h.y = home.y - 60; h.gold += 500; build(h, 'barracks'); stepJob(h, 10);
+      const bk = S.builds.find(b => b.k === 'barracks' && b.owner === h.id);
+      home.food = 10; openBarracks(bk); const tItem = () => menu.items.find(i => /^Train a soldier/.test(i.label));
+      const blocked = tItem().why === 'Need 30 more food'; home.food = 100; openBarracks(bk); tItem().act(); closeMenu();
+      out.soldierFood = !!bk && blocked && home.food === 100 - C.SOLDIER_FOOD && bk.q === 1;
+      // a market sells surplus materials for gold; without one the Hall offers no sale
+      h.x = home.x; h.y = home.y; openTown(home, 'Hall'); const noMarket = !menu.items.some(i => /^Sell 100/.test(i.label)); closeMenu();
+      S.builds.push({k: 'market', x: home.x + 60, y: home.y, town: h.town, owner: h.id, settlementId: home.id, cd: 0});
+      home.food = 300; const gm = h.gold; openTown(home, 'Hall'); menu.items.find(i => i.label.startsWith('Sell 100 food')).act(); closeMenu();
+      out.marketSells = noMarket && home.food === 200 && h.gold === gm + C.SELL.food;
+      // an urgent pointer shows under the collapsed tracker; an ordinary one does not
+      save.qOpen = 0; h.x = home.x + 900; h.y = home.y; h.pack.crystals = packCap(h); paintHud();
+      const urgentShown = !!document.querySelector('#goal .jg.urgent'); h.pack.crystals = 0; paintHud();
+      out.urgentNow = urgentShown && !document.querySelector('#goal .jg.urgent');
       // nothing the feed says is lost: the message log keeps it
       toast('test message 42'); out.messageLog = msgLog.some(m => m.text === 'test message 42');
       // the resource bar shows the stockpile of your town

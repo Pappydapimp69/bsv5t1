@@ -147,3 +147,5 @@ body.film #res,body.titling #res{visibility:hidden}
 #goal .qt:hover{background:rgba(255,255,255,.2)}
 #goal .jg{margin-top:.2rem}#goal .jg .qn{color:var(--accent);font-weight:700}#goal .jg i{color:var(--dim);font-style:normal;font-size:.7rem}
 .card .mb.quest{border-left:4px solid var(--accent)}.card .mb.quest.new{background:#2f2c1c}
+#goal .jg.urgent{font-style:normal;opacity:1;color:#ffb8a8}
+#skillbar.side{transform:none;align-items:flex-start}#skillbar.side .skrow{flex-wrap:wrap;justify-content:flex-start}#skillbar.side .xpt{text-align:left}

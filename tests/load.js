@@ -25,6 +25,21 @@ const {chromium} = require('playwright');
     assert.deepEqual(errors, []);
     assert.deepEqual(failed, []);
     assert.ok(r.title, 'title menu'); assert.ok(r.human, 'human start'); assert.ok(r.giant, 'giant start');
+    // a 360x740 portrait phone (touch and keys): the skill bar, stats, action buttons and quest line must not cover each other
+    const overlaps = [];
+    for (const dev of ['touch', 'keys']) {
+      const ph = await browser.newPage({viewport: {width: 360, height: 740}, hasTouch: dev === 'touch', isMobile: dev === 'touch'});
+      await ph.route('**/three.min.js', r => r.abort());
+      await ph.goto(pathToFileURL(path.resolve(__dirname, '../index.html')).href);
+      await ph.waitForFunction(() => window.__col);
+      await ph.evaluate(dev => { device = dev; save.firstDay = 1; start('human', 5); closeMenu(); const S = __col.S; S.t = OPENING.len + 2; __col.step(60); S.you.lvl = 3; takeQuest(S.you, 'charter'); }, dev);
+      await ph.waitForFunction(() => document.querySelectorAll('#skillbar .sk').length >= 2);
+      await ph.waitForTimeout(300);
+      overlaps.push(...await ph.evaluate(dev => { const R = id => document.getElementById(id).getBoundingClientRect(), ov = (a, b) => a.width && b.width && !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+        const ids = ['skillbar', 'stats', 'pad', 'goal', 'res'], out = []; for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) if (ov(R(ids[i]), R(ids[j]))) out.push(dev + ': ' + ids[i] + '/' + ids[j]); return out; }, dev));
+      await ph.close();
+    }
+    assert.deepEqual(overlaps, [], 'phone HUD zones overlap');
     console.log('page loads (' + r.scripts.length + ' local scripts), title menu, human and giant start');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

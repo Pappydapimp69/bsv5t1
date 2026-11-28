@@ -58,7 +58,9 @@ function questTracker(h){const es=trackEntries(h),open=!!save.qOpen,now=nextAim(
   if(h.track&&!es.some(e=>e.key===h.track))h.track=null;const tr=es.find(e=>e.key===h.track)||es.find(e=>e.key!=='task')||es[0];
   const head=tr?'<span class="k">'+tr.k+'</span> '+tr.t:now?'<span class="k">Now</span> '+now:'';
   const tog=`<span class="qt" data-q="toggle" title="Quests (O)">${open?'▴':'▾'} ${es.length?es.length:''}</span>`;
-  if(!open)return'<div class="qh"><span>'+head+'</span>'+tog+'</div>';
+  // urgent pointers outrank a tracked quest (GPTBS fe311386: threats to your town come first), so they show even collapsed
+  const urgent=tr&&now&&/^(your pack is full|beasts are at|horn race|sound your wake horn|the giant is angry)/.test(now);
+  if(!open)return'<div class="qh"><span>'+head+'</span>'+tog+'</div>'+(urgent?'<div class="jg hint urgent"><b>Now</b> '+now+'</div>':'');
   const rows=es.map(e=>`<div class="jg${e===tr?' tr':''}" data-q="${e.key}">${e===tr?'▸':'○'} <span class="qn">${e.k}</span>${e.of?' <i>'+e.of[0]+'/'+e.of[1]+'</i>':''}<br>${e.t}</div>`).join('');
   const room=C.QUEST_MAX-questOpen(h).length,offer=questsOffered(h).length;
   return'<div class="qh"><span class="k">Quests</span>'+tog+'</div>'+(rows||'<div class="jg hint">No quests taken.</div>')+(now&&tr&&tr.key!=='now'?'<div class="jg hint"><b>Now</b> '+now+'</div>':'')+

@@ -14,7 +14,14 @@ C.RES_COST={house:{wood:40},tower:{stone:40},barracks:{wood:50,stone:20},farm:{w
 // barracks 60, market 90, smithy 80, stable 60, well 30 gold)
 Object.assign(C.COST,{house:30,farm:25,tower:45,barracks:45,market:60,smithy:55,stable:45,well:20});
 C.START_RES={food:200,wood:200,stone:100};C.VILLAGE_RES={food:60,wood:60,stone:0};
-C.VILLAGER_FOOD=50;C.VILLAGER_TIME=10;C.HARVEST_T=5;C.CARRY={food:10,wood:10,stone:8,forage:5};C.FARM_FOOD=6;
+// a soldier eats as well as costs gold: food is spent on the army as on villagers (official AoE2 guide, Lesson 3:
+// basic units 'only cost Food, or a combination of Food and Wood'); without it food piled up unused in bot towns
+C.SOLDIER_FOOD=40;const solFoodWhy=b=>{const t=S.towns[b.settlementId],f=Math.floor(stockOf(t,'food'));return f<C.SOLDIER_FOOD?'Need '+(C.SOLDIER_FOOD-f)+' more food':null};
+// a market turns a surplus into coin, so a material that stops binding late (towns at their caps) still has a use
+C.SELL={food:15,wood:20,stone:25};const sellItems=(h,t,reopen)=>civicIn(t,'market')?MATS.map(k=>({label:'Sell 100 '+k+' \u2013 '+C.SELL[k]+' gold',sub:'At the market; '+Math.floor(stockOf(t,k))+' in store',why:stockOf(t,k)<100?'Need 100 '+k:null,act:()=>{spendStock(t,k,100);h.gold+=C.SELL[k];sfx('coin');reopen()}})):[];
+C.VILLAGER_FOOD=50;
+// bot villagers training soldiers keep a villager's worth of food back while the settlement has room for one: economy first
+const botFoodSpare=t=>!t||stockOf(t,'food')>=C.SOLDIER_FOOD+(villagerRoom(t)?C.VILLAGER_FOOD:0);C.VILLAGER_TIME=10;C.HARVEST_T=5;C.CARRY={food:10,wood:10,stone:8,forage:5};C.FARM_FOOD=6;
 const AGES=['Hamlet','Village','Town','City'];
 const ageOf=t=>t.outpost?'Outpost':AGES[Math.min(AGES.length,lv(t))-1];
 const nextAge=t=>t.outpost?'Town':AGES[Math.min(AGES.length-1,lv(t))];

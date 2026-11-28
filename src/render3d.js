@@ -10,6 +10,11 @@ let UI=1,UIX={top:8,rb:0};const uiEls={};
 function uiMeasure(){const g=n=>uiEls[n]||(uiEls[n]=document.getElementById(n));UI=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/16;
   const t=g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;{const re=g('res');if(re&&!re.hidden){const hr=t.getBoundingClientRect();re.style.top='';const rr0=re.getBoundingClientRect();if(rr0.right>hr.left-8*UI){re.style.top=UIX.top+'px';UIX.top+=rr0.height+6*UI}}}g('side').style.top=UIX.top+'px';let rb=H-16*UI;
   if(!document.body.classList.contains('titling'))for(const n of['stats','pad']){const r=g(n).getBoundingClientRect();if(r.width&&r.left<W-18*UI&&r.right>W-34*UI)rb=Math.min(rb,r.top-8*UI)}UIX.rb=Math.max(UIX.top+60*UI,rb);
+  // the skill bar sits bottom-centre; where it would cover the action buttons or the stats (a narrow phone), it moves to
+  // the left above the stats and wraps into the space left of the buttons (GPTBS 0101#E4: check at 360x740 portrait)
+  {const sk=g('skillbar'),st=g('stats'),pd=g('pad'),ov=(a,b)=>a.width&&b.width&&!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top);
+    sk.classList.remove('side');sk.style.left=sk.style.bottom=sk.style.maxWidth='';const a=sk.getBoundingClientRect(),s=st.getBoundingClientRect(),p=pd.getBoundingClientRect();
+    if(ov(a,s)||ov(a,p)){const l=s.left;sk.classList.add('side');sk.style.left=l+'px';sk.style.bottom=(H-s.top+6*UI)+'px';sk.style.maxWidth=Math.max(120*UI,p.left-l-8*UI)+'px'}}
   // the giant's body panel stands at the right edge; the goal line and feed keep to its left
   {const gs=S&&S.role==='giant'&&!document.body.classList.contains('titling');g('side').style.right=gs?(COLS*Math.min(UIX.rb-UIX.top,440*UI)/ROWS+30*UI)+'px':''}}
 function fit(){const r=cv.getBoundingClientRect(),d=Math.min(2.5,window.devicePixelRatio||1);if(r.width!==W||r.height!==H||d!==DPR){W=r.width;H=r.height;DPR=d;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR)}uiMeasure()}

@@ -131,7 +131,7 @@ function botHeroShop(h,t){
   if(t.i!==h.town)return;
   if(!h.horse&&h.gold>=C.HORSE_COST+20&&!wallsDown(t)){h.gold-=C.HORSE_COST;h.horse={hp:C.HORSE_HP,max:C.HORSE_HP}}
   // grow the town: farms when houses go hungry, then a well, market, smithy and stable, built on a free spot near the hall
-  if(S.t>=120&&!t.outpost&&!h.job&&!h.horn&&h.crystals<C.HORN_CRYSTALS&&!wallsDown(t)){const want=(t.houses||0)>2*civicIn(t,'farm')+1?'farm':['well','market','smithy','stable','farm'].find(k=>!civicIn(t,k)&&(!CIVIC[k].lvl||lv(t)>=CIVIC[k].lvl));
+  if(S.t>=120&&!t.outpost&&!h.job&&!h.horn&&h.crystals<C.HORN_CRYSTALS&&!wallsDown(t)){const want=(t.houses||0)>2*civicIn(t,'farm')+1||!civicIn(t,'farm')&&stockOf(t,'food')<150?'farm':['well','market','smithy','stable','farm'].find(k=>!civicIn(t,k)&&(!CIVIC[k].lvl||lv(t)>=CIVIC[k].lvl));
     if(want&&h.gold>=C.COST[want]+40)for(let k=0;k<12;k++){const a=rnd()*6.28,d=t.r*.5+rnd()*120,x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d,hx=h.x,hy=h.y;h.x=x;h.y=y;const why=canBuild(h,want);h.x=hx;h.y=hy;
       if(!why&&!inSolid(x,y,30)){h.gold-=C.COST[want];payRes(payerFor(h,want,x,y),want);startJob(h,{kind:'ground',k:want,x,y});break}}}
   if(wallsDown(t)){const repair=repairWalls(h,t);if(!repair.why){h.gold-=repair.need;t.hp=t.max}}

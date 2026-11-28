@@ -124,7 +124,7 @@ function trainedCount(b){return b.sol.length+b.q+(b.train>0?1:0)}
 function barracksWork(h,b){
   const home=foragerHome(h);
   if(!home||b.hp===0||b.settlementId!==home.id||!heroBuilt(b))return null;
-  if(!tutHoldsTraining(b)&&h.gold>=ARMY.SOLDIER&&trainedCount(b)<ARMY.CAP)return{train:true};
+  if(!tutHoldsTraining(b)&&h.gold>=ARMY.SOLDIER&&!solFoodWhy(b)&&botFoodSpare(home)&&trainedCount(b)<ARMY.CAP)return{train:true};
   const soldiers=readySoldiers(b);
   for(const k of ['blade','armour'])for(const soldier of soldiers){
     const gear=nextGear(soldier,k);
@@ -136,7 +136,7 @@ function barracksWork(h,b){
 function tendBarracks(h,b){
   const work=barracksWork(h,b);
   if(!work||!S.builds.includes(b)||dist(h,b)>90)return false;
-  if(work.train){h.gold-=ARMY.SOLDIER;b.q++}
+  if(work.train){h.gold-=ARMY.SOLDIER;spendStock(S.towns[b.settlementId],'food',C.SOLDIER_FOOD);b.q++}
   else if(work.kit){h.gold-=C.COST[work.kit];work.soldier.kits[work.kit]++}
   else buyGear(work.soldier,work.k,h);
   return true;
@@ -262,7 +262,7 @@ function openBarracks(b){const h=S.you;if(!h)return;const sol=soldiersOf(b),read
   const ord=(k,ti,label,sub)=>({label:(on&&on.k===k&&on.ti===ti?'\u2713 ':'')+label,sub,why:!sol.length&&!tr?'No soldiers yet: train some':null,act:()=>{b.order={k,ti};const n=giveOrder(b,k,ti);closeMenu();toast((n?n+(n>1?' soldiers march':' soldier marches')+' to '+ordName(k,ti)+'. ':'')+'They will keep going back to '+ordName(k,ti)+' until you change the order.')}});
   const foes=[0,1,2].filter(j=>j!==b.town&&factionAlive(j)).map(j=>ord('attack',j,'Attack '+TOWNS[j].name,'Walk there, fight its people, buildings and walls for '+ARMY.HOLD+' s'));
   openMenu({title:'Barracks',body:`<p class="dim">${sol.length}/${ARMY.CAP} soldiers${tr?', '+tr+' training':''}${out?', '+out+' out':''}. ${h.gold} gold. Health ${Math.ceil(b.hp)}/${b.max}. ${on?'Standing order: '+ordName(on.k,on.ti)+'. ':''}Orders: they walk there in real time, hold ${ARMY.HOLD} s, tire and are back here at once, then set out again until you change the order.</p>`,
-    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:!home?'Its settlement has fallen':trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':null,act:()=>{h.gold-=ARMY.SOLDIER;b.q++;h.trained=(h.trained||0)+1;sfx('coin');openBarracks(b)}},braceItem,
+    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold, '+C.SOLDIER_FOOD+' food',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:!home?'Its settlement has fallen':trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':solFoodWhy(b),act:()=>{h.gold-=ARMY.SOLDIER;spendStock(S.towns[b.settlementId],'food',C.SOLDIER_FOOD);b.q++;h.trained=(h.trained||0)+1;sfx('coin');openBarracks(b)}},braceItem,
       ...(home?[ord('town',null,'Defend town','Hold the walls of '+home.name)]:[]),ord('giant',null,'Defend giant','Stand at the nearest foot and fight what threatens it'),ord('tend',null,'Tend the giant','Break its chains once they open, sound a horn, pull wedges, bolt on braces and cannons'),ord('hunt',null,'Hunt the giant','Break its chains once they open, then wedge and strike its joints'),...foes,
       ...(on?[{label:'Stand down',sub:'Soldiers stay at the barracks when they come back',act:()=>{b.order=null;closeMenu();toast('Your soldiers will stay at the barracks when they return.')}}]:[]),
       {label:'Build here',sub:'House, watchtower or outpost',act:()=>openBuild()},{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}

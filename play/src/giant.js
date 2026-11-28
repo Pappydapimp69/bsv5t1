@@ -180,9 +180,10 @@ function stepGiant(dt){const g=S.g;if(g.dead)return;
     b.cd-=dt;if(b.cd>0)continue;const tgt=cannonTarget(b.town);
     if(tgt){b.cd=C.CANNON_CD/Math.sqrt(lv(b));S.shots.push({dmg:C.CANNON_TOWN*(1+.6*(lv(b)-1)),sx:g.x,sy:g.y,x:g.x,y:g.y,tx:tgt.x+rr(-40,40),ty:tgt.y+rr(-40,40),t:0,dur:Math.max(.4,Math.hypot(tgt.x-g.x,tgt.y-g.y)/700),town:b.town,owner:b.owner});sfx('cannon',nearPlayer(g))}else b.cd=.6}}
 function cannonTarget(town){const g=S.g;let best=null,bd=C.CANNON_RANGE;
-  for(const t of aliveTowns())if(t.i!==town){const d=dist(g,t)-t.r;if(d<bd){bd=d;best=t}}
+  // rival cannons hold their fire on your town during the guided first day, as the beast waves do
+  for(const t of aliveTowns())if(t.i!==town&&!(tutActive()&&S.you&&t.i===S.you.town)){const d=dist(g,t)-t.r;if(d<bd){bd=d;best=t}}
   if(best)return best;
-  for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town!==town){const d=dist(g,h);if(d<bd*.7){bd=d;best=h}}
+  for(const h of S.humans)if(!h.dead&&h.mode==='ground'&&h.town!==town&&!(tutActive()&&S.you&&h.town===S.you.town)){const d=dist(g,h);if(d<bd*.7){bd=d;best=h}}
   return best}
 function footLand(ft,i){if(Math.random()<.45)sfx('step',nearPlayer(ft));seGiantStep(ft);shake(4);
   S.fx.push({k:'ring',x:ft.x,y:ft.y,r:C.FOOT_R*1.5,t:0,life:.5,col:'#c9b48a'});

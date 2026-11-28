@@ -23,7 +23,7 @@ C.HOUSE_CAP=[5,7,9];C.HALL_POP=6;C.OUTPOST_POP=3;C.SETTLER_EVERY=4;C.FOOD_CAP=25
 C.HOUSE_STORE=30;C.CARRY_WATER=100;C.CARRY_FOOD=100;C.CARRY_GRAIN=80;C.SERVE_R=120;C.WELL_R=650;C.BAZAAR_R=700;C.BAZAAR_MAX=300;C.GRAIN_R=2400;
 C.FARM_GROW=60;C.FARM_HARVEST=10;C.FARM_YIELD=100;C.LACK_GRACE=30;C.HUNGER_LEAVE=45;C.MOUNTAIN_H=120;C.WATER_R=260;
 C.PROD={woodcutter:{wood:12},quarry:{stone:10}};C.OUTCROP_R=240;C.WORK_REACH=2400;
-C.FIRE_R=700;C.FIRE_SAFE=420;C.FIRE_P=.003;C.ROAD_STEPS=6;C.WALK=55;
+C.RELOAD=10;C.OVERSEE=1.5;C.FIRE_R=700;C.FIRE_SAFE=420;C.FIRE_P=.003;C.ROAD_STEPS=6;C.WALK=55;
 // soldiers eat: food is spent on the army as on the town (official AoE2 guide, Lesson 3: basic units 'only cost Food, or a
 // combination of Food and Wood')
 C.SOLDIER_FOOD=40;const solFoodWhy=b=>{const t=S.towns[b.settlementId],f=Math.floor(stockOf(t,'food'));return f<C.SOLDIER_FOOD?'Need '+(C.SOLDIER_FOOD-f)+' more food':null};
@@ -62,9 +62,11 @@ const outcropNear=(x,y)=>(S.quarries||[]).find(q=>Math.hypot(q.x-x,q.y-y)<C.OUTC
 
 // ---- settlers, houses and work
 const settleOf=b=>{if(b.settlementId==null){const t=nearestOwn(b.town,b.x,b.y);if(t)b.settlementId=t.id}const t=S.towns[b.settlementId];return t&&t.alive?t:null};
-// a building nobody has staffed yet (built by older code paths or tests) counts as working until the next allocation
-const staffed=b=>!C.JOBS[b.k]||b.staff==null||b.staff>0;
-const staffK=b=>!C.JOBS[b.k]||b.staff==null?1:b.staff/C.JOBS[b.k];
+// staffing reads the workers present at the building (src/rpg/labour.js): not those walking in, gone home or out carrying.
+// A building no allocation has seen yet (made by older code paths or tests) counts as fully staffed.
+const crewOf=b=>b.present!=null?b.present:b.staff;
+const staffed=b=>!C.JOBS[b.k]||crewOf(b)==null||crewOf(b)>0;
+const staffK=b=>!C.JOBS[b.k]||crewOf(b)==null?1:crewOf(b)/C.JOBS[b.k];
 const civicOn=(t,k)=>t?S.builds.filter(b=>b.k===k&&b.hp!==0&&b.settlementId===t.id&&staffed(b)).length:0;
 const housesOf=t=>S.builds.filter(b=>b.k==='house'&&b.hp!==0&&b.settlementId===t.id);
 function houseInit(b){if(b.occ==null){b.occ=0;b.food=C.HOUSE_STORE;b.water=C.HOUSE_STORE;b.inc=0;b.lack=0;b.hungry=0}}
@@ -72,9 +74,6 @@ function popOf(t){let n=t.hall??(t.outpost?C.OUTPOST_POP:C.HALL_POP);for(const b
 function popCap(t){if(!t||!t.alive)return 0;let n=t.hall??(t.outpost?C.OUTPOST_POP:C.HALL_POP);for(const b of housesOf(t))n+=occCap(b);return n}
 function foodCap(t){let n=C.FOOD_CAP;for(const b of S.builds)if(b.k==='granary'&&b.hp!==0&&b.settlementId===t.id)n+=C.GRANARY_CAP*staffK(b);return n}
 function workplaces(t){return S.builds.filter(b=>C.JOBS[b.k]&&b.hp!==0&&b.town===t.i&&settleOf(b)===t)}
-function allocate(t){t.pop=popOf(t);const ws=workplaces(t),pri=t.pri?[t.pri]:[],order=[...pri,...C.LABOUR_ORDER.filter(k=>!pri.includes(k))];
-  ws.sort((a,b)=>order.indexOf(a.k)-order.indexOf(b.k));let pool=Math.floor(t.pop),jobs=0;
-  for(const b of ws){const need=b.fire?0:C.JOBS[b.k];jobs+=C.JOBS[b.k];b.staff=Math.min(pool,need);pool-=b.staff}t.idle=pool;t.jobs=jobs;t.employed=Math.floor(t.pop)-pool}
 // placement: farms by water (rivers, lakes, the giant's footprint lakes), wells off high ground
 function nearWater(x,y,R=C.WATER_R){return(S.rivers||[]).some(l=>l.some(p=>Math.hypot(p.x-x,p.y-y)<R))||(S.lakes||[]).some(l=>Math.hypot(l.x-x,l.y-y)<(l.r||150)+R)||S.prints.some(p=>S.t-p.t>4&&Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2+R)}
 const onMountain=(x,y)=>groundH(x,y)>C.MOUNTAIN_H||!!inSolid(x,y,40);
@@ -93,20 +92,23 @@ function nextNeedy(w,res,R){const src=w.src;let best=null,bd=1e9;for(const b of 
 function walkerArrive(w,t){const res=w.k==='water'?'water':'food';
   if(w.k==='settler'){const b=w.house;if(b&&b.hp!==0&&S.builds.includes(b)){b.inc=Math.max(0,b.inc-1);if(b.occ<occCap(b))b.occ++}return true}
   if(w.k==='leaver')return true;
-  if(w.back){if(w.src)w.src.out=null;return true}
+  if(w.back){if(w.src&&w.src.out===w){w.src.out=null;w.src.next=S.t+reloadGap(w.src)}return true}
+  if(w.k==='commute')return commuteArrive(w);
   if(w.k==='harvest'){giveStock(t,'food',w.load);t.food=Math.min(t.food,foodCap(t));w.load=0;return goBack(w,true)}
   if(w.k==='grain'){const z=w.to;if(z&&S.builds.includes(z)){z.store=(z.store||0)+w.load;w.load=0}return goBack(w)}
   // water and food: on to the next house that needs it, or home when the load is spent
   if(w.load>0){const nb=nextNeedy(w,res,w.k==='water'?C.WELL_R:C.BAZAAR_R);if(nb){(w.seen=w.seen||[]).push(nb);w.tx=nb.x;w.ty=nb.y;return false}}
   if(w.k==='food'&&w.src&&w.load>0){w.src.store=(w.src.store||0)+w.load;w.load=0}return goBack(w)}
-function goBack(w,gone){if(gone){if(w.src)w.src.out=null;return true}w.back=true;w.tx=w.home.x;w.ty=w.home.y;return false}
+function goBack(w,gone){if(gone){if(w.src&&w.src.out===w){w.src.out=null;w.src.next=S.t+reloadGap(w.src)}return true}w.back=true;w.tx=w.home.x;w.ty=w.home.y;return false}
 function stepWalkers(dt){const ws=S.walkers||[];for(let i=ws.length-1;i>=0;i--){const w=ws[i],t=S.towns[w.tid];if(!t||!t.alive||w.src&&!S.builds.includes(w.src)&&w.k!=='harvest'){ws.splice(i,1);continue}
     if(w.wait>0){w.wait-=dt;continue}if(w.k==='water'||w.k==='food')serve(w,w.k==='water'?'water':'food');
     if(Math.hypot(w.tx-w.x,w.ty-w.y)<24){if(walkerArrive(w,t))ws.splice(i,1);continue}
     const v=steerSolid(w,w.tx,w.ty,10),sp=C.WALK*(onRoad(w.x,w.y)?C.ROAD_PACE:1);w.x+=v.x*sp*dt;w.y+=v.y*sp*dt;w.fa=Math.atan2(v.y,v.x);footfall(w)}}
-// each staffed well, bazaar and granary keeps one carrier out at a time, more often the better it is staffed
-function dispatch(){for(const b of S.builds){if(b.hp===0||b.fire||b.out||!(b.staff>0)||S.t<(b.next||0))continue;const t=settleOf(b);if(!t)continue;
-    const gap=8/Math.max(.25,staffK(b));
+// each staffed well, bazaar and granary keeps one carrier out at a time, always with a full load; when it comes home the
+// next leaves after a reload that stretches with the crew present (owner): 10 s with a full crew, a well with 1 of 2 takes 20 s
+const reloadGap=b=>C.RELOAD*C.JOBS[b.k]/Math.max(1,crewOf(b)||0)/(overseen(b)?C.OVERSEE:1);
+function dispatch(){for(const b of S.builds){if(b.hp===0||b.fire||b.out||!staffed(b)||S.t<(b.next||0))continue;const t=settleOf(b);if(!t)continue;
+    const gap=0;
     if(b.k==='well'||b.k==='market'){const res=b.k==='well'?'water':'food',load=b.k==='well'?C.CARRY_WATER:Math.min(C.CARRY_FOOD,b.store||0);if(load<5)continue;
       const probe={x:b.x,y:b.y,town:b.town,src:b},first=nextNeedy(probe,res,b.k==='well'?C.WELL_R:C.BAZAAR_R);if(!first){b.next=S.t+3;continue}
       if(b.k==='market')b.store-=load;b.out=newWalker(t,res==='water'?'water':'food',b,first,{src:b,load,seen:[first]});b.next=S.t+gap}
@@ -114,8 +116,9 @@ function dispatch(){for(const b of S.builds){if(b.hp===0||b.fire||b.out||!(b.sta
       const load=Math.min(C.CARRY_GRAIN,Math.floor(stockOf(t,'food')));if(!z||load<10){b.next=S.t+3;continue}spendStock(t,'food',load);b.out=newWalker(t,'grain',b,z,{src:b,load,to:z});b.next=S.t+gap}}}
 // farms: 60 s of growing, 10 s of harvest, only while someone works them; the yield follows the crew; a carrier takes it to the granary
 function stepFarms(dt){for(const b of S.builds){if(b.k!=='farm'||b.hp===0||b.fire||!staffed(b))continue;
-    if(b.harvT!=null){b.harvT+=dt;if(b.harvT>=C.FARM_HARVEST){const t=settleOf(b);b.harvT=null;b.grow=0;if(t){const gr=S.builds.filter(g=>g.k==='granary'&&g.hp!==0&&g.town===b.town).sort((a,c)=>dist(a,b)-dist(c,b))[0]||t;
-          newWalker(t,'harvest',b,gr,{load:Math.round(C.FARM_YIELD*staffK(b))});b.harvests=(b.harvests||0)+1}}}
+    b.work=(b.work||0)+staffK(b)*(overseen(b)?C.OVERSEE:1)*dt;b.workT=(b.workT||0)+dt;
+    if(b.harvT!=null){b.harvT+=dt;if(b.harvT>=C.FARM_HARVEST){const t=settleOf(b),k=b.work/Math.max(1e-6,b.workT);b.harvT=null;b.grow=0;b.work=0;b.workT=0;if(t){const gr=S.builds.filter(g=>g.k==='granary'&&g.hp!==0&&g.town===b.town).sort((a,c)=>dist(a,b)-dist(c,b))[0]||t;
+          newWalker(t,'harvest',b,gr,{load:Math.round(C.FARM_YIELD*k)});b.harvests=(b.harvests||0)+1}}}
     else{b.grow=(b.grow||0)+dt;if(b.grow>=C.FARM_GROW){b.grow=C.FARM_GROW;b.harvT=0}}}}
 // houses: every 10 s their food and water fall by their occupants; without food settlers leave; without either for long, a house falls a level
 function stepHouses(){for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;houseInit(b);const t=settleOf(b);
@@ -123,12 +126,14 @@ function stepHouses(){for(const b of S.builds){if(b.k!=='house'||b.hp===0)contin
     if(b.occ&&(b.food<=0||b.water<=0))b.lack+=10;else b.lack=0;
     if(b.lack>=C.LACK_GRACE&&lv(b)>1){b.lvl=lv(b)-1;b.lack=0;if(S.you&&S.role==='human'&&b.town===S.you.town)toast('A house in '+(t?t.name:'your town')+' fell back to level '+lv(b)+': it ran out of '+(b.water<=0?'water':'food')+'.')}
     if(b.occ&&b.food<=0){b.hungry+=10;if(b.hungry>=C.HUNGER_LEAVE){b.hungry=0;b.occ--;if(t){const a=rnd()*6.283;newWalker(t,'leaver',b,{x:t.x+Math.cos(a)*1100,y:t.y+Math.sin(a)*1100})}}}else b.hungry=0;
-    while(b.occ>occCap(b)){b.occ--;if(t){const a=rnd()*6.283;newWalker(t,'leaver',b,{x:t.x+Math.cos(a)*1100,y:t.y+Math.sin(a)*1100})}}}}
+    // a house that fell a level and holds too many: the extra people are homeless and look for places elsewhere
+    if(b.occ>occCap(b)){const n=b.occ-occCap(b);b.occ=occCap(b);rehouse(b,n)}}}
 function stepEconomy(dt){const tick=p=>Math.floor(S.t/p)!==Math.floor((S.t-dt)/p);
   for(const t of aliveTowns()){for(const r of MATS)if(t[r]==null)t[r]=0;if(t.hall==null)t.hall=t.outpost?C.OUTPOST_POP:C.HALL_POP}
   if(tick(1))stepQuests();
   if(tick(2))for(const t of aliveTowns())allocate(t);
-  if(tick(1)){stepFires();dispatch()}
+  if(tick(1)){stepFires();stepPeople();dispatch()}
+  if(tick(10))easePrices();
   if(tick(10))stepHouses();
   stepFarms(dt);stepWalkers(dt);
   // settlers walk in to a house with room while the walls stand and no raid is on
@@ -137,8 +142,9 @@ function stepEconomy(dt){const tick=p=>Math.floor(S.t/p)!==Math.floor((S.t-dt)/p
     b.inc++;newWalker(t,'settler',{x:t.x+Math.cos(a)*1100,y:t.y+Math.sin(a)*1100},b,{house:b})}
   if(tick(10))for(const t of aliveTowns()){giveStock(t,'wood',2);giveStock(t,'stone',1)}
   // woodcutters and quarries work by how well they are staffed (nothing at all without workers)
-  if(tick(RENT_INTERVAL)){for(const b of S.builds){const P=C.PROD[b.k];if(!P||b.hp===0||b.fire)continue;const t=settleOf(b);if(!t)continue;if(b.k==='quarry'&&!outcropNear(b.x,b.y))continue;
-      for(const r in P)giveStock(t,r,P[r]*staffK(b))}
+  for(const b of S.builds)if(C.PROD[b.k]&&b.hp!==0&&!b.fire){b.work=(b.work||0)+staffK(b)*(overseen(b)?C.OVERSEE:1)*dt;b.workT=(b.workT||0)+dt}
+  if(tick(RENT_INTERVAL)){for(const b of S.builds){const P=C.PROD[b.k];if(!P||b.hp===0||b.fire)continue;const t=settleOf(b),k=(b.work||0)/Math.max(1e-6,b.workT||RENT_INTERVAL);b.work=0;b.workT=0;if(!t)continue;if(b.k==='quarry'&&!outcropNear(b.x,b.y))continue;
+      for(const r in P){giveStock(t,r,P[r]*k);b.made=P[r]*k}}
     for(const t of aliveTowns())t.food=Math.min(t.food,foodCap(t))}}
 
 // ---- placing buildings, and what the bot heroes build
@@ -182,7 +188,11 @@ function wireEconomy(){
   {const b0=g3Build;g3Build=function(){b0();if(!S.quarries||!G3.scene)return;const n=S.quarries.length*6,m=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),n);let i=0;
     for(const q of S.quarries){const R=mulberry32(q.seed);for(let k=0;k<6;k++){const a=R()*6.283,d=R()*q.r,x=q.x+Math.cos(a)*d,y=q.y+Math.sin(a)*d,r=12+R()*16;put(m,i,x,y,groundH(x,y)+r*.35,r*1.2,r*.9,r,R()*6);m.setColorAt(i++,_c.set(['#b9b4a8','#a8a398','#cfcabd'][k%3]))}}
     m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;G3.scene.add(m)}}
+  {const b1=g3Build;g3Build=function(){b1();if(G3.scene)econ3dBuild(G3.scene)}}
   {const s0=stepBuilds;stepBuilds=function(dt){s0(dt);stepEconomy(dt)}}
+  {const d0=destroyBuild;destroyBuild=function(b){if(b&&b.k==='house'&&b.occ>0){rehouse(b,b.occ);b.occ=0}return d0.apply(this,arguments)}}
+  // task rewards for you lean to materials your town is short of (owner: a way for the hero to get wood and stone)
+  {const q0=newQuest;newQuest=function(h,kind){const q=q0.apply(this,arguments);if(q&&h&&h.you&&q.gold&&rnd()<.5){const t=firstTown(h.town);q.mat={k:scarcer(t),n:Math.round(q.gold*1.5)};q.gold=Math.round(q.gold*.4)}return q}}
 }
 
 // ---- the resource bar (top left): your nearest settlement's stockpile, your purse and crystals, its settlers and work
@@ -193,14 +203,16 @@ function paintRes(){const h=S&&S.you;if(!h||S.role!=='human'||FILM){if(resSig){r
   const t=resTown(h);const short=t&&t.jobs>t.employed,sig=t?resRow(t)+`<span class="rs" title="Your gold">${RES_ICON.gold}<b>${h.gold}</b></span><span class="rs" title="Sky crystals: yours + the town store">${RES_ICON.crystals}<b>${h.crystals}${storeNear(h)?'+'+poolOf(storeNear(h)):''}</b></span><span class="rs" title="Settlers / room in houses">${RES_ICON.folk}<b>${Math.floor(t.pop||0)}/${popCap(t)}</b></span><span class="rs${short?' short':''}" title="Settlers at work / jobs">${RES_ICON.work}<b>${t.employed||0}/${t.jobs||0}</b></span><span class="rn">${t.name} · ${ageOf(t)}</span>`:'';
   if(sig!==resSig){resSig=sig;resEl.innerHTML=sig;resEl.hidden=!sig}}
 // carriers dress for their load: water blue, food and grain ochre, the harvest gold; newcomers pale, leavers grey
-const WALKER_COL={water:'#5f9fd8',food:'#d9a441',grain:'#c8a85a',harvest:'#e8c84a',settler:'#e0d2a8',leaver:'#7a6e62'};
+const WALKER_COL={commute:'#b8a888',water:'#5f9fd8',food:'#d9a441',grain:'#c8a85a',harvest:'#e8c84a',settler:'#e0d2a8',leaver:'#7a6e62'};
 const bName=b=>CIVIC[b.k]?CIVIC[b.k].n:b.k==='tower'?'Watchtower':b.k==='barracks'?'Barracks':b.k;
 // names on the land near you, in either view (proj: x, y, height -> screen): outcrops, fires, houses in need, workplaces short of hands
 function econLabels(proj){const h=S&&S.you;if(!h||S.role!=='human')return;for(const q of S.quarries||[]){if(Math.hypot(q.x-h.x,q.y-h.y)>2600)continue;const p=proj(q.x,q.y,70);if(p)lbl('Stone outcrop',p.x,p.y,11,'#d8d2c2')}
   for(const b of S.builds){if(b.hp===0||Math.hypot(b.x-h.x,b.y-h.y)>1600)continue;if(b.fire){const p=proj(b.x,b.y,140);if(p)lbl('Fire!',p.x,p.y,14,'#ff8a3a');continue}
     if(b.town!==h.town||Math.hypot(b.x-h.x,b.y-h.y)>500)continue;
     if(b.k==='house'&&b.occ!=null&&(b.food<=0||b.water<=0)){const p=proj(b.x,b.y,90);if(p)lbl('Needs '+(b.water<=0?'water':'')+(b.water<=0&&b.food<=0?' and ':'')+(b.food<=0?'food':''),p.x,p.y,11,'#9fd0ff')}
-    else if(C.JOBS[b.k]&&b.staff===0){const p=proj(b.x,b.y,120);if(p)lbl(bName(b)+': no workers',p.x,p.y,11,'#ff9a8a')}}}
+    else if(C.JOBS[b.k]&&overseen(b)){const p=proj(b.x,b.y,120);if(p)lbl('Overseen: half again the work',p.x,p.y,11,'#ffd27a')}
+    else if(C.JOBS[b.k]&&b.staff===0){const p=proj(b.x,b.y,120);if(p)lbl(bName(b)+(b.far?': far from homes, no workers':': no workers'),p.x,p.y,11,'#ff9a8a')}
+    else if(C.JOBS[b.k]&&b.far){const p=proj(b.x,b.y,120);if(p)lbl('Far from homes',p.x,p.y,11,'#ffcf8a')}}}
 // the Hall: settlers, houses' food and water, work and the labour order; clicking a workplace kind puts it first for workers
 function hallEconomy(h,t,reopen){const ws=workplaces(t),by={};for(const b of ws){const e=by[b.k]||(by[b.k]={n:0,staff:0,jobs:0});e.n++;e.staff+=b.staff||0;e.jobs+=C.JOBS[b.k]}
   const hs=housesOf(t);hs.forEach(houseInit);const wet=hs.filter(b=>b.water>0).length,fed=hs.filter(b=>b.food>0).length,baz=S.builds.filter(b=>b.k==='market'&&b.hp!==0&&b.settlementId===t.id).reduce((n,b)=>n+(b.store||0),0);
@@ -215,16 +227,69 @@ function drawFarm(b,z,B,RF,near){const{g,cut}=farmStage(b);for(let r=0;r<4;r++){
     if(near&&g>.6)for(let k=0;k<3;k++)B(x,b.y-30+k*30,z+6+h,10,6,10,'#f0d060')}
   B(b.x+60,b.y-30,z+14,26,28,22,'#9a7a4e');RF(b.x+60,b.y-30,z+34,20,16,'#7a4e38')}
 // where a workplace's workers stand, moving a little as they work; on a farm they walk the rows, faster at harvest
-function workerSpots(b,t){const n=Math.min(b.staff||0,b.k==='farm'?4:3),out=[];
+function workerSpots(b,t){const n=Math.max(0,(crewOf(b)||0)-(b.out?1:0)),out=[];
   for(let i=0;i<n;i++){if(b.k==='farm'){const{cut}=farmStage(b),hv=b.harvT!=null,u=hv?Math.min(.99,cut*4+i*.03)%1:(.5+.45*Math.sin(t*.25+i*1.7)),row=hv?Math.min(3,Math.floor(cut*4)):i%4;
       out.push({x:b.x-36+row*24+(i%2?8:-8),y:b.y-40+u*80,face:hv?Math.PI/2:Math.sin(t+i)})}
-    else{const a=i*2.1+.6,r=52;out.push({x:b.x+Math.cos(a)*r+Math.sin(t*.7+i)*3,y:b.y+Math.sin(a)*r,face:Math.atan2(-Math.sin(a),-Math.cos(a))})}}return out}
-// a market stall, a woodpile, a granary dome and a red fire station in the 3D view (render3d.js calls this for these kinds)
-function drawEconBuild(b,z,B,RF,col){if(b.k==='woodcutter'){B(b.x,b.y,z+16,50,32,40,'#8a6a44');RF(b.x,b.y,z+42,34,20,'#5a3f2a');for(let k=0;k<3;k++)B(b.x+40,b.y-14+k*14,z+6+k*2,36,10,10,'#7a5a36',1.57)}
-  else if(b.k==='quarry'){B(b.x,b.y,z+10,60,20,44,'#9c978c');B(b.x+10,b.y+4,z+26,30,14,26,'#b9b4a8');B(b.x-36,b.y,z+30,4,60,4,'#6b5a44');B(b.x-36,b.y+12,z+56,4,4,30,'#6b5a44')}
-  else if(b.k==='granary'){B(b.x,b.y,z+18,56,36,56,'#c8a85a');RF(b.x,b.y,z+48,40,26,'#8a6a3a');B(b.x+34,b.y,z+10,14,20,14,'#9a7a4e')}
-  else if(b.k==='firehouse'){B(b.x,b.y,z+18,56,36,44,'#b84a32');RF(b.x,b.y,z+46,38,20,'#5a2a1e');B(b.x+22,b.y,z+50,10,64,10,'#8a3a28');B(b.x-34,b.y+20,z+10,16,20,16,'#4f86a8')}
-  else return false;B(b.x,b.y,z+70,6,6,6,col);return true}
+    else{const a=i*6.283/n+.6,r=52+(i%2)*8;out.push({x:b.x+Math.cos(a)*r+Math.sin(t*.7+i)*3,y:b.y+Math.sin(a)*r,face:Math.atan2(-Math.sin(a),-Math.cos(a))})}}return out}
+// ---- each building its own design (inspired by the way the classic Nile builders make a building's job and stock readable
+// at a glance): extra pools of boxes, cylinders and domes that can tilt, reset every frame
+const E3={box:null,cyl:null,dom:null,nb:0,nc:0,nd:0,MAX:900};
+function econ3dBuild(sc){const mk=(g,n)=>{const m=new THREE.InstancedMesh(g,new THREE.MeshLambertMaterial({color:0xffffff}),n);m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.frustumCulled=false;for(let i=0;i<n;i++)m.setColorAt(i,_c.set('#ffffff'));m.count=0;sc.add(m);return m};
+  E3.box=mk(new THREE.BoxGeometry(1,1,1),E3.MAX);E3.cyl=mk(new THREE.CylinderGeometry(1,1,1,12),E3.MAX);E3.dom=mk(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),E3.MAX)}
+function econ3dStart(){E3.nb=E3.nc=E3.nd=0}
+function econ3dEnd(){for(const[m,n]of[[E3.box,E3.nb],[E3.cyl,E3.nc],[E3.dom,E3.nd]]){if(!m)continue;m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}}
+// box, cylinder (r, height) and dome (r, height) at a centre point; rx/rz tilt them
+function XB(x,y,z,sx,sy,sz,col,ry,rx,rz){if(!E3.box||E3.nb>=E3.MAX)return;put(E3.box,E3.nb,x,y,z,sx,sy,sz,ry||0,rx||0,rz||0);E3.box.setColorAt(E3.nb++,_c.set(col))}
+function XC(x,y,z,r,h,col,rx,rz){if(!E3.cyl||E3.nc>=E3.MAX)return;put(E3.cyl,E3.nc,x,y,z,r,h,r,0,rx||0,rz||0);E3.cyl.setColorAt(E3.nc++,_c.set(col))}
+function XD(x,y,z,r,h,col){if(!E3.dom||E3.nd>=E3.MAX||h<.3)return;put(E3.dom,E3.nd,x,y,z,r,h,r,0);E3.dom.setColorAt(E3.nd++,_c.set(col))}
+const MUD='#c9a87a',MUD2='#b8956a',ROOFC='#a88a5e',DOOR='#4a3a2c';
+// a house by its level; jars by the door while it has water, a grain basket while it has food
+function drawHouse(b,z,B,RF,col){const L=lv(b),x=b.x,y=b.y;houseInit(b);
+  if(L===1){B(x,y,z+9,32,18,26,MUD);B(x,y,z+19,34,3,28,ROOFC);B(x,y+13.5,z+6,8,12,2,DOOR)}
+  else if(L===2){B(x,y,z+16,36,32,30,MUD);B(x,y,z+33,38,3,32,ROOFC);for(const[dx,dy,w,d]of[[0,-15,38,2],[0,15,38,2],[-18,0,2,30],[18,0,2,30]])B(x+dx,y+dy,z+37,w,5,d,MUD2);
+    B(x,y+20,z+24,30,2,10,'#d9a34a');B(x,y+15.5,z+7,9,14,2,DOOR);B(x+22,y+4,z+10,6,20,6,MUD2)}
+  else{B(x-8,y,z+16,30,32,34,MUD);B(x+16,y+8,z+11,22,22,18,MUD2);B(x-8,y,z+33,32,3,36,ROOFC);B(x+16,y+8,z+23,24,3,20,ROOFC);B(x+10,y-16,z+6,26,12,3,MUD2);
+    XC(x+20,y-8,z+16,2,32,'#8a6a44');XD(x+20,y-8,z+32,11,7,'#4f7a3a');B(x-8,y+17.5,z+8,9,16,2,DOOR)}
+  B(x,y,z+(L===1?24:L===2?42:38),6,6,6,col);
+  const sh=houseShows(b);for(let i=0;i<sh.jars;i++)XC(x-12+i*7,y+17,z+4,3,8,'#6f8ea8');if(sh.basket)XD(x+10,y+17,z,5,sh.basket,'#e0bc48')}
+// what a house shows by its door: water jars (two when over half full) and a grain basket sized by its food
+function houseShows(b){houseInit(b);return{jars:b.water>0?(b.water>houseMax(b)*.5?2:1):0,basket:b.food>0?(b.food>houseMax(b)*.5?6:3.5):0}}
+// the granary: a walled yard of six open bins that fill one after another as the town's food store fills
+function granaryFill(b){const t=settleOf(b);return t?clamp(stockOf(t,'food')/Math.max(1,foodCap(t)),0,1):0}
+function drawGranary(b,z,B,RF,col){const x=b.x,y=b.y,f=granaryFill(b);for(const[dx,dy,w,d]of[[0,-36,84,4],[0,36,84,4],[-42,0,4,72],[42,0,4,72]])B(x+dx,y+dy,z+7,w,14,d,MUD2);
+  for(let i=0;i<6;i++){const bx=x-26+(i%3)*26,by=y-12+Math.floor(i/3)*24,k=clamp(f*6-i,0,1);XC(bx,by,z+11,10,22,MUD);XC(bx,by,z+22.2,8.5,.6,'#6b5034');if(k>0)XD(bx,by,z+22,8.5,2+12*k,'#e8c84a')}
+  B(x+34,y+30,z+12,18,24,14,MUD);B(x+34,y+30,z+25,20,3,16,ROOFC);B(x,y-36,z+18,8,8,8,col)}
+// the bazaar: a paved square of striped stalls; the heaps on the counters follow its food
+function drawBazaar(b,z,B,RF,col){const x=b.x,y=b.y,f=clamp((b.store||0)/C.BAZAAR_MAX,0,1);B(x,y,z+1,96,2,72,'#d8c8a2');
+  const cols=[['#d07a4a','#f2e6c8'],['#4a8ad0','#f2e6c8'],['#d0b04a','#f2e6c8'],['#8a5ac0','#f2e6c8']];
+  for(let i=0;i<4;i++){const sx=x-30+(i%2)*60,sy=y-18+Math.floor(i/2)*36;for(const[px,py]of[[-12,-9],[12,-9],[-12,9],[12,9]])B(sx+px,sy+py,z+12,2,24,2,'#6b5a44');
+    for(let s=0;s<4;s++)B(sx-9+s*6,sy,z+25,6,2,22,cols[i][s%2]);B(sx,sy+6,z+8,24,6,8,'#8a6a44');if(f>0)XD(sx-4,sy+6,z+11,5,2+6*f,i%2?'#c9a040':'#a8c050');if(f>.4)XD(sx+5,sy+6,z+11,4,2+5*f,'#d08040')}
+  B(x,y-38,z+20,6,6,6,col)}
+// the well: a stone ring with a lifting pole that dips while someone works it, and jars waiting
+function drawWell(b,z,B,RF,col,t){const x=b.x,y=b.y,on=staffed(b),a=on?Math.sin(t*1.6+b.x)*.35:.25;XC(x,y,z+6,15,12,'#8d8f94');XC(x,y,z+12.2,12,.6,'#4f86a8');
+  B(x-22,y,z+16,4,32,4,'#6b5a44');XB(x-22,y,z+33,60,3,3,'#7a5a36',0,0,a);XC(x-22-Math.cos(a)*28,y,z+33-Math.sin(a)*28-4,4,7,'#5a5a5a');XC(x-22+Math.cos(a)*28,y,z+33+Math.sin(a)*28-6,3,5,'#6f8ea8');
+  for(let i=0;i<3;i++)XC(x+18+i*7,y+14,z+4,3,8,'#b07a4a');B(x,y-20,z+5,6,6,6,col)}
+// the woodcutter: a shed, a sawhorse, and a log pile that grows with what it has cut since its last delivery
+function drawWoodcutter(b,z,B,RF,col){const x=b.x,y=b.y,k=clamp((b.work||0)/RENT_INTERVAL,0,1);B(x,y,z+16,50,32,40,'#8a6a44');RF(x,y,z+42,34,20,'#5a3f2a');
+  B(x-34,y+20,z+8,4,16,4,'#6b5a44');B(x-26,y+20,z+8,4,16,4,'#6b5a44');XC(x-30,y+20,z+16,3,22,'#8a6a45',0,Math.PI/2);
+  const n=1+Math.round(k*5);for(let i=0;i<n;i++)XC(x+40,y-14+(i%3)*10,z+5+Math.floor(i/3)*9,4.5,30,'#7a5a36',Math.PI/2,0);B(x,y,z+46,6,6,6,col)}
+// the quarry: cut steps in the outcrop, stacked blocks, a sledge
+function drawQuarry(b,z,B,RF,col){const x=b.x,y=b.y;for(let s=0;s<3;s++)B(x-20+s*6,y-10,z+6+s*8,40-s*12,12+s*4,30,s%2?'#b9b4a8':'#a8a398');
+  for(let i=0;i<5;i++)B(x+26+(i%3)*12,y+14,z+5+Math.floor(i/3)*10,10,10,10,'#cfcabd');B(x+4,y+26,z+3,26,4,12,'#7a5a36');B(x+4,y+26,z+8,12,8,10,'#cfcabd');B(x-30,y+20,z+20,4,40,4,'#6b5a44');B(x-30,y+20,z+40,20,6,6,col)}
+// the fire station: a brick house with a red door, a rack of water jars, a bell post
+function drawFirehouse(b,z,B,RF,col){const x=b.x,y=b.y;B(x,y,z+16,52,32,40,MUD);B(x,y,z+33,54,3,42,ROOFC);B(x,y+20.5,z+10,14,20,2,'#b83a28');
+  for(let i=0;i<4;i++)XC(x-24+i*8,y+26,z+5,3.5,10,'#6f8ea8');B(x+32,y-12,z+22,4,44,4,'#6b5a44');B(x+32,y-12,z+44,14,3,4,'#6b5a44');XD(x+32,y-12,z+36,5,7,'#c9a040');B(x,y,z+40,6,6,6,col)}
+// the watchtower: tapered brick, battlements and the town's colour
+function drawTower(b,z,B,RF,col){const x=b.x,y=b.y,L=lv(b),h=60+35*L;B(x,y,z+h*.3,26,h*.6,26,MUD);B(x,y,z+h*.75,20,h*.3,20,MUD2);
+  for(const[dx,dy]of[[-9,-9],[9,-9],[-9,9],[9,9]])B(x+dx,y+dy,z+h+5,6,10,6,MUD);B(x,y,z+h+1,22,2,22,ROOFC);B(x,y,z+h+16,8,8,8,col)}
+// the barracks: a walled drill yard with a hall, weapon racks and practice posts
+function drawBarracks(b,z,B,RF,col){const x=b.x,y=b.y;for(const[dx,dy,w,d]of[[0,-40,100,4],[0,40,100,4],[-50,0,4,80]])B(x+dx,y+dy,z+8,w,16,d,MUD2);
+  B(x+30,y,z+17,36,34,70,'#9a8a72');RF(x+30,y,z+44,30,22,'#5b4a3a');for(let i=0;i<3;i++){B(x-34+i*14,y-28,z+12,2,24,2,'#6b5a44');B(x-34+i*14,y-28,z+18,8,2,2,'#c0c4cc')}
+  for(let i=0;i<3;i++)XC(x-30+i*16,y+16,z+10,3,20,'#8a6a45');B(x+30,y-38,z+40,4,80,4,'#d6d9de');B(x+36,y-38,z+72,10,8,2,col)}
+function drawEconBuild(b,z,B,RF,col,t){const k=b.k;
+  if(k==='house')drawHouse(b,z,B,RF,col);else if(k==='granary')drawGranary(b,z,B,RF,col);else if(k==='market')drawBazaar(b,z,B,RF,col);else if(k==='well')drawWell(b,z,B,RF,col,t||0);
+  else if(k==='woodcutter')drawWoodcutter(b,z,B,RF,col);else if(k==='quarry')drawQuarry(b,z,B,RF,col);else if(k==='firehouse')drawFirehouse(b,z,B,RF,col);else if(k==='tower')drawTower(b,z,B,RF,col);
+  else if(k==='barracks')drawBarracks(b,z,B,RF,col);else return false;return true}
 // roads the settlers wore in are painted onto the ground as they appear, in either view
 function paintRoads(){if(!S||!ground||!S.roadNew||!S.roadNew.length)return;const g=ground.getContext('2d'),r=LAND.CS/RES*.62;g.fillStyle='rgba(176,150,104,.92)';
   for(const c of S.roadNew){g.beginPath();g.arc((c%LAND.N)*LAND.CS/RES,Math.floor(c/LAND.N)*LAND.CS/RES,r,0,7);g.fill()}S.roadNew.length=0;G3.groundDirty=true;groundV++}

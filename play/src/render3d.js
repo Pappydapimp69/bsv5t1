@@ -106,7 +106,7 @@ function g3Build(){const sc=new THREE.Scene();if(G3.scene)g3Dispose(G3.scene);G3
   sc.add(G3.cloak,G3.head,G3.badge,G3.wolfB,G3.wolfH,G3.trollB,G3.trollH,G3.limb,G3.tool);
   G3.crystal=inst(new THREE.OctahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:0xbff4ff,emissive:0x2aa8c8}),300);sc.add(G3.crystal);
   G3.water=inst(new THREE.CircleGeometry(1,28).rotateX(-Math.PI/2),new THREE.MeshLambertMaterial({color:0x4f86a8,transparent:true,opacity:.92}),200);sc.add(G3.water);
-  G3.box=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),900);G3.roof=inst(new THREE.ConeGeometry(1,1,4),new THREE.MeshLambertMaterial({color:0xffffff}),300);
+  G3.box=inst(new THREE.BoxGeometry(1,1,1),new THREE.MeshLambertMaterial({color:0xffffff}),1800);G3.roof=inst(new THREE.ConeGeometry(1,1,4),new THREE.MeshLambertMaterial({color:0xffffff}),600);
   G3.disc=inst(new THREE.CylinderGeometry(1,1,1,32),new THREE.MeshLambertMaterial({color:0xffffff}),40);G3.ball=inst(new THREE.SphereGeometry(1,10,8),new THREE.MeshLambertMaterial({color:0x1d1d1d}),60);
   G3.beacon=new THREE.Mesh(new THREE.CylinderGeometry(34,34,1,20,1,true),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:.6,depthWrite:false,side:THREE.DoubleSide,fog:false}));G3.beacon.visible=false;sc.add(G3.beacon);
   G3.hornBeam=new THREE.Mesh(new THREE.CylinderGeometry(60,60,1,20,1,true),new THREE.MeshBasicMaterial({color:0xffe6a8,transparent:true,opacity:.5,depthWrite:false,side:THREE.DoubleSide,fog:false}));G3.hornBeam.visible=false;sc.add(G3.hornBeam);
@@ -230,21 +230,21 @@ function g3Update(){const g=S.g,t=S.t;
   // footprint lakes fill with water
   let wa=0;for(const pd of S.prints){if(wa>=200)break;const f=Math.min(1,(t-pd.t)/4);if(f<=0)continue;put(G3.water,wa++,pd.x,pd.y,groundH(pd.x,pd.y)+3,C.FOOT_R*1.15*f,1,C.FOOT_R*.75*f,-pd.a)}G3.water.count=wa;G3.water.instanceMatrix.needsUpdate=true;
   // towns, what people built, ruins, caravans, cannons and braces on the giant, shots
-  let bx=0,rf=0,dc=0,ba=0;const B=(x,y,z,sx,sy,sz,col,ry)=>{if(bx<900){put(G3.box,bx,x,y,z,sx,sy,sz,ry||0);G3.box.setColorAt(bx++,_c.set(col))}};
-  const RF=(x,y,z,r,h,col)=>{if(rf<300){put(G3.roof,rf,x,y,z,r,h,r,Math.PI/4);G3.roof.setColorAt(rf++,_c.set(col))}};
+  let bx=0,rf=0,dc=0,ba=0;econ3dStart();const B=(x,y,z,sx,sy,sz,col,ry)=>{if(bx<1800){put(G3.box,bx,x,y,z,sx,sy,sz,ry||0);G3.box.setColorAt(bx++,_c.set(col))}};
+  const RF=(x,y,z,r,h,col)=>{if(rf<600){put(G3.roof,rf,x,y,z,r,h,r,Math.PI/4);G3.roof.setColorAt(rf++,_c.set(col))}};
   for(const tw of S.towns){const z=groundH(tw.x,tw.y);if(dc<40){put(G3.disc,dc,tw.x,tw.y,z-2,tw.r,8,tw.r,0);G3.disc.setColorAt(dc++,_c.set(tw.alive?'#a58f69':'#4a423b'))}
     const r2=mulberry32(tw.id*97+11),n=tw.alive?(tw.outpost?7:14)+(tw.houses||0)*2:5;for(let i=0;i<n;i++){const a=r2()*6.28,dd=r2()*tw.r*.82,hx=tw.x+Math.cos(a)*dd,hy=tw.y+Math.sin(a)*dd,w=20+r2()*12,hh=tw.alive?16+r2()*14:5,roof=i%3?'#8a4a36':'#5a5f6b';
       B(hx,hy,z+hh/2,w,hh,w*.8,tw.alive?'#ddd1b6':'#4e4740',a);if(tw.alive)RF(hx,hy,z+hh+8,w*.78,16,roof)}
     if(tw.alive){B(tw.x,tw.y,z+55,10,110,10,'#cfc3aa');RF(tw.x,tw.y,z+125,10,30,'#cfc3aa');B(tw.x,tw.y,z+150,14,14,14,tw.col,t)}}
   for(const o of S.humans)if(o.job&&!o.dead){const j=o.job,f=j.t/j.dur;if(j.kind==='ground'){const z=groundH(j.x,j.y),hh=(j.k==='tower'?95:j.k==='outpost'?60:34)*Math.max(.08,f);B(j.x+30,j.y,z+hh/2,j.k==='outpost'?90:40,hh,j.k==='outpost'?90:32,'#9a7a4e');B(j.x+30,j.y,z+hh+4,j.k==='outpost'?100:48,4,j.k==='outpost'?100:40,'#6b5236')}else{const a=bodyWorld(j.s.c+.5,j.s.r+.5,climbing3D()?.face??o.cl?.face),z=groundH(a.x,a.y)+a.z;B(a.x,a.y,z,50*f+8,10,30,'#9a7a4e',g.ang)}}
   for(const b of S.builds){const z=groundH(b.x,b.y),L=lv(b),col=TOWNS[b.town].col;if(b.k==='house'&&Math.hypot(b.x-S.cam.x,b.y-S.cam.y)<3500){const hh=18+8*L;for(let k=0;k<2;k++){const ph=(t*.35+k*.5+b.x*.001)%1;B(b.x+8+ph*10,b.y-6,z+hh+34+ph*50,6+ph*10,6+ph*10,6+ph*10,ph<.5?'#d8d8d8':'#eeeeee')}}
-    if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
+    if(drawEconBuild(b,z,B,RF,col,t)){}
+    else if(b.k==='house'){const w=16+5*L,hh=18+8*L;B(b.x,b.y,z+hh/2,w*2,hh,w*1.6,'#e0d4ba');RF(b.x,b.y,z+hh+10,w*1.5,20,'#8a4e38');B(b.x,b.y,z+hh+30,6,6,6,col)}
     else if(b.k==='barracks'){B(b.x,b.y,z+17,74,34,48,'#9a8a72');B(b.x,b.y,z+36,78,6,52,'#4a3f33');RF(b.x,b.y,z+50,46,28,'#5b4a3a');B(b.x-30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x+30,b.y+30,z+11,6,22,6,'#6b5a44');B(b.x,b.y+30,z+16,60,6,4,'#6b5a44');B(b.x+40,b.y-20,z+70,4,80,4,'#d6d9de');B(b.x+52,b.y-20,z+98,22,16,3,col)}
     else if(b.k==='farm')drawFarm(b,z,B,RF,Math.hypot(b.x-S.cam.x,b.y-S.cam.y)<3000)
     else if(b.k==='market'){for(const[dx,c]of[[-40,'#d07a4a'],[0,'#4a8ad0'],[40,'#d0c04a']]){B(b.x+dx,b.y,z+14,28,28,24,'#9a8a72');B(b.x+dx,b.y,z+32,34,6,30,c)}B(b.x,b.y+30,z+30,6,60,6,'#6b5a44');B(b.x+10,b.y+30,z+56,22,14,3,col)}
     else if(b.k==='smithy'){B(b.x,b.y,z+20,56,40,44,'#6b6f78');RF(b.x,b.y,z+50,40,22,'#3e3a36');B(b.x+20,b.y-10,z+62,10,30,10,'#4a4440');B(b.x-34,b.y+20,z+10,18,14,12,'#2e2a28');B(b.x-34,b.y+20,z+18,10,4,6,'#ff8a3a')}
     else if(b.k==='stable'){B(b.x,b.y,z+18,70,36,40,'#8a6a44');RF(b.x,b.y,z+46,44,22,'#5a3f2a');for(let k=0;k<4;k++)B(b.x-45+k*30,b.y+36,z+10,4,20,4,'#6b5a44');B(b.x,b.y+36,z+16,96,4,4,'#6b5a44')}
-    else if(drawEconBuild(b,z,B,RF,col)){}
     else if(b.k==='well'){B(b.x,b.y,z+10,34,20,34,'#8d8f94');B(b.x,b.y,z+21,24,2,24,'#4f86a8');B(b.x-15,b.y,z+34,4,30,4,'#6b5a44');B(b.x+15,b.y,z+34,4,30,4,'#6b5a44');RF(b.x,b.y,z+54,26,14,'#7a4e38')}
     else{const hh=60+35*L;B(b.x,b.y,z+hh/2,18,hh,18,'#b9ab8e');B(b.x,b.y,z+hh+4,28,8,28,'#5a4a3a');B(b.x,b.y,z+hh+16,8,8,8,col)}}
   const dk=clamp((phase()/C.DUSK-.7)/.3,0,1)+(isNight()?1:0);
@@ -261,7 +261,7 @@ function g3Update(){const g=S.g,t=S.t;
   for(const e of S.events){if(e.k==='caravan'&&e.site){const z=groundH(e.site.x,e.site.y);B(e.site.x,e.site.y,z+60,5,120,5,'#6b5a44');B(e.site.x+14,e.site.y,z+108,26,18,3,TOWNS[e.i].col)}if(e.k==='caravan'){const z=groundH(e.x,e.y);B(e.x,e.y,z+24,60,26,30,'#8a6a44');B(e.x,e.y,z+44,56,16,28,'#e6dcc4');B(e.x,e.y,z+60,8,8,8,TOWNS[e.i].col)}}
   for(const s of S.sites)if(s.build){const face=climbing3D()?.face??s.build.face,a=bodyWorld(s.c,s.r,face),z=groundH(a.x,a.y)+a.z;if(s.build.k==='ladder'){const b2=bodyWorld(s.c,Math.max(0,s.r-30-25*(lv(s.build)-1)),face);B(a.x,a.y,(z+groundH(b2.x,b2.y)+b2.z)/2,6,Math.max(20,z-groundH(b2.x,b2.y)-b2.z),6,'#7a5a36');continue}if(s.build.k==='platform'){B(a.x,a.y,z,90,10,60,'#8a6a44',g.ang);continue}if(s.build.k==='brace'){B(a.x,a.y,z,110,14,14,'#3a3a3a',g.ang);B(a.x,a.y,z,14,110,14,'#3a3a3a',g.ang)}else{B(a.x,a.y,z,56,28,40,'#1b1b1b',g.ang);B(a.x,a.y,z+18,12,40,12,'#1b1b1b');B(a.x,a.y,z+40,10,10,10,TOWNS[s.build.town].col)}}
   for(const sh of S.shots){if(ba>=60)break;const z=1300*(1-sh.t)+Math.sin(sh.t*Math.PI)*350;put(G3.ball,ba++,sh.x,sh.y,groundH(sh.x,sh.y)+z,12,12,12,0)}
-  for(const[m,n]of[[G3.box,bx],[G3.roof,rf],[G3.disc,dc],[G3.ball,ba]]){m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
+  econ3dEnd();for(const[m,n]of[[G3.box,bx],[G3.roof,rf],[G3.disc,dc],[G3.ball,ba]]){m.count=n;m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true}
   // a mountain the camera is in, and the giant when it stands between the camera and you, turn see-through
   const cp=G3.cam.position;for(const mm of G3.marks){const m=mm.userData.m,d=Math.hypot(cp.x-m.x,cp.z-m.y),near=d<1100;mm.material.opacity+=((near?.25:1)-mm.material.opacity)*.15;mm.material.depthWrite=mm.material.opacity>.9}
   {let under=false;if(S.you&&!S.you.dead&&S.you.mode==='ground'){const ax=S.you.x-cp.x,ay=S.you.y-cp.z,bx=g.x-cp.x,by=g.y-cp.z,L=Math.hypot(ax,ay),t2=(ax*bx+ay*by)/(L*L||1);under=t2>0&&t2<1&&Math.abs(ax*by-ay*bx)/(L||1)<500}
@@ -271,7 +271,7 @@ function g3Update(){const g=S.g,t=S.t;
     for(let r=r0;r<=r1;r++)for(let c=0;c<COLS;c++){const k=hb[r*COLS+c];if(!k||n>=900)continue;const tt=S.body.g[r*COLS+c];if(tt===SITE||tt===JOINT||tt===HEART)continue;const a=climbViewPoint(c+.5,r+.5),z=groundH(a.x,a.y)+a.z;
       const led=tt===LEDGE;put(G3.hold,n,a.x,a.y,z,led?13:6,led?3:4,led?13:6,0);G3.hold.setColorAt(n++,_c.set(k===2?'#7fb055':k===3?'#e08a4a':led?'#e8dcb4':'#d9cdb2'))}}
     G3.hold.count=n;G3.hold.instanceMatrix.needsUpdate=true;if(G3.hold.instanceColor)G3.hold.instanceColor.needsUpdate=true;
-    if(cl){let bx2=G3.box.count;const B2=(x,y,z,sx,sy,sz,col)=>{if(bx2<400){put(G3.box,bx2,x,y,z,sx,sy,sz,g.ang);G3.box.setColorAt(bx2++,_c.set(col))}};
+    if(cl){let bx2=G3.box.count;const B2=(x,y,z,sx,sy,sz,col)=>{if(bx2<1800){put(G3.box,bx2,x,y,z,sx,sy,sz,g.ang);G3.box.setColorAt(bx2++,_c.set(col))}};
       for(const id in JOINTS){const J=JOINTS[id],j=S.joints[id];if(Math.abs(J.r0-cl.y)>40)continue;const a=climbViewPoint((J.c0+J.c1+1)/2,(J.r0+J.r1+1)/2),z=groundH(a.x,a.y)+a.z;
         B2(a.x,a.y,z,(J.c1-J.c0+1)*26,(J.r1-J.r0+1)*FT,10,j.crip?'#4a4a4a':id==='heart'?(Math.sin(t*4)>0?'#ff4d5e':'#c8303e'):'#ff9a4a');for(let w=0;w<j.wedges.length;w++)B2(a.x+(w-1)*20,a.y,z+18,6,18,6,'#222')}
       for(const st of S.sites){if(Math.abs(st.r-cl.y)>40||st.build)continue;const a=climbViewPoint(st.c+.5,st.r+.5),z=groundH(a.x,a.y)+a.z;B2(a.x,a.y,z,22,4,22,'#ffcf6a')}

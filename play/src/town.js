@@ -47,7 +47,7 @@ function stepBuilds(dt){
     if(b.cd>0)continue;if(!staffed(b)){b.cd=.5;continue}
     // beasts in range, and rival people inside this town's build area
     const foes=S.monsters.filter(m=>Math.hypot(m.x-b.x,m.y-b.y)<R2).map(m=>({m})).concat(S.humans.filter(o=>!o.dead&&o.mode==='ground'&&o.town!==b.town&&S.feud[b.town][o.town]>40&&Math.hypot(o.x-b.x,o.y-b.y)<R2&&inTerritory(b.town,o.x,o.y)).map(o=>({o})));
-    if(!foes.length){b.cd=.5;continue}b.cd=(sp==='ballista'?2.6:1.5)/Math.max(.5,staffK(b));const dmg=(sp==='ballista'?45:sp==='volley'?14:sp==='watchfire'?10:20)*L*(sp?1:1)+(sp===undefined&&L>1?0:0);
+    if(!foes.length){b.cd=.5;continue}b.cd=sp==='ballista'?2.6:1.5;const dmg=staffK(b)*(overseen(b)?C.OVERSEE:1)*(sp==='ballista'?45:sp==='volley'?14:sp==='watchfire'?10:20)*L*(sp?1:1)+(sp===undefined&&L>1?0:0);
     for(const f of foes.slice(0,sp==='volley'?3:1)){if(f.m){f.m.hp-=dmg;f.m.hitT=S.t;S.fx.push({k:'ring',x:f.m.x,y:f.m.y,r:30,t:0,life:.3,col:'#ffcf6a'})}else{hurtHuman(f.o,dmg*.6,'tower');S.fx.push({k:'ring',x:f.o.x,y:f.o.y,r:30,t:0,life:.3,col:'#ff8f80'})}}}
   if(Math.floor(S.t/RENT_INTERVAL)!==Math.floor((S.t-dt)/RENT_INTERVAL)){
     let collected=0;

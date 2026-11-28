@@ -21,7 +21,7 @@ function stepHuman(h,dt,mv){
     if(h.you){sfx('coin');toast('Sky crystal ('+packCount(h)+'/'+packCap(h)+' in pack)'+(h.quest&&h.quest.k==='gather'?' ('+Math.min(h.quest.n,h.quest.need)+'/'+h.quest.need+')':''))}}}
   const t=townAt(h);if(t){h.hp=Math.min(h.max,h.hp+10*dt);questTick(h,'arrive',t.id);if(t.i===h.town)unloadPack(h,t);
     if(folk&&t!==assigned)return;
-    if(h.quest&&h.quest.done){h.gold+=h.quest.gold;gainXp(h,h.quest.xp);h.claimed=(h.claimed||0)+1;if(h.you){toast('Quest reward: '+h.quest.gold+' gold.');sfx('coin')}h.quest=null}
+    if(h.quest&&h.quest.done){h.gold+=h.quest.gold;payMat(h,h.quest);gainXp(h,h.quest.xp);h.claimed=(h.claimed||0)+1;if(h.you){toast('Quest reward: '+h.quest.gold+' gold.');sfx('coin')}h.quest=null}
     if(!h.quest&&!h.you)h.quest=folk?foragerQuest(h,t):newQuest(h)}}
 function foragerQuest(h,t){const kinds=['gather','slay'];
   if(h.lvl>=2&&S.monsters.some(m=>m.kind==='troll'&&inForageRange(t,m)))kinds.push('troll');

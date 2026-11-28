@@ -73,10 +73,7 @@ async function main() {
         Object.assign(ashville, { x: town.x + 100 + i * 60, y: town.y });
         finishBuild0(ashville, 'house');
       }
-      const roomOnly = foragersIn(town).length === 1 && foragerCapacity(town) === 4;
-      town.food = 999; for (let i = 0; i < 3; i++) queueVillager(town);
-      for (let k = 0; k < 3 * C.VILLAGER_TIME + 2; k++) { state.t += 1; stepEconomy(1); }
-      const grown = roomOnly ? foragersIn(town).length : -1;
+      const grown = foragersIn(town).length;
       const giantGame = __col.newGame('giant', 1);
       return {
         start, kitParity, ashvilleIsPlayer: ashville === state.you,

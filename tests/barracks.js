@@ -12,6 +12,7 @@ async function main() {
     await page.route('**/three.min.js', route => route.abort());
     await page.goto(pathToFileURL(path.resolve(__dirname, '../index.html')).href);
     await page.waitForFunction(() => window.__col);
+    // these checks are about barracks, housing and rent, not materials: every settlement starts with full stockpiles
     await page.evaluate(() => { const full = t => Object.assign(t, {food: 9999, wood: 9999, stone: 9999}); const f0 = foundVillage; foundVillage = function () { return full(f0.apply(this, arguments)); }; const n0 = newGame; newGame = function () { const s = n0.apply(this, arguments); s.towns.forEach(full); return s; }; });
 
     const results = await page.evaluate(() => {
@@ -415,24 +416,17 @@ async function main() {
         player.y = t.y;
         build(player, 'house');
       };
-      // a house makes room; the villager is trained at the Hall for food (rpg/economy.js)
-      const train = t => { t.food = 999; const ok = queueVillager(t); for (let k = 0; k < C.VILLAGER_TIME + 1; k++) { state.t += 1; stepEconomy(1); } return ok; };
-      const noRoomNoTraining = !queueVillager(town);
       startHouse(town, 250);
       const completionRequired = foragersIn(town).length === 1;
       stepJob(player, 6);
-      const houseMakesRoomOnly = foragersIn(town).length === 1 && foragerCapacity(town) === 2;
-      town.food = 999; const paid = queueVillager(town) && town.food === 999 - C.VILLAGER_FOOD && foragersIn(town).length === 1;
-      for (let k = 0; k < C.VILLAGER_TIME + 1; k++) { state.t += 1; stepEconomy(1); }
-      const capacityIncreasesOnCompletion = noRoomNoTraining && houseMakesRoomOnly && paid && foragersIn(town).length === 2;
+      const capacityIncreasesOnCompletion = foragersIn(town).length === 2 && foragerCapacity(town) === 2;
       upgrade(player, 'house', state.builds[0]);
       const upgradingKeepsSameForagerCount = foragersIn(town).length === 2;
       town.lvl = 2; // owner's rule: three houses at level 1 and two more per level
-      for (const offset of [310, 370, 430]) { startHouse(town, offset); stepJob(player, 6); train(town); }
+      for (const offset of [310, 370, 430]) { startHouse(town, offset); stepJob(player, 6); }
       const cappedAtFour = town.houses === 4 && foragersIn(town).length === 4;
       startHouse(outpost, 250);
       stepJob(player, 6);
-      train(outpost);
       const outpostHasOwnCapacity = foragersIn(outpost).length === 2 && foragersIn(town).length === 4;
       const first = state.builds[0];
       const second = state.builds[1];
@@ -446,7 +440,7 @@ async function main() {
       stepJob(player, 6);
       const rebuildRehousesForager = displaced?.homeId === town.id && foragersIn(town).length === 4 && state.humans.length === headcount;
       openTown(town, 'Hall');
-      const hallShowsHousing = menu.body.includes('Villagers 4/4');
+      const hallShowsHousing = menu.body.includes('4/4 foragers');
       closeMenu();
       return {initialHousing, completionRequired, capacityIncreasesOnCompletion, upgradingKeepsSameForagerCount,
         cappedAtFour, outpostHasOwnCapacity, surplusHouseLossKeepsForagers, housingLossDisplacesForager,

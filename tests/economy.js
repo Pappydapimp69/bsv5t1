@@ -26,35 +26,48 @@ const {chromium} = require('playwright');
       out.housePaysWood = build(h, 'house') && home.wood === w0 - C.RES_COST.house.wood; stepJob(h, 10);
       home.wood = 10; h.x = home.x - 260; out.noWoodNoHouse = canBuild(h, 'house') === 'Need 30 more wood' && !build(h, 'house');
       home.wood = 500;
-      // villagers: the house made room; training costs food and takes time; nothing arrives for free
-      out.roomNotVillager = foragersIn(home).length === 1 && foragerCapacity(home) === 2;
-      home.food = 200; out.trainQueued = queueVillager(home) && home.food === 150 && !queueVillager(home);
-      run(S, C.VILLAGER_TIME + 1); out.trained = foragersIn(home).length === 2;
-      // a villager set to wood fells it and carries it home; one set to stone works a quarry
-      const [v1, v2] = foragersIn(home).sort((a, b) => a.id - b.id); v1.work = 'wood'; v2.work = 'stone'; v1.goal = v2.goal = null;
-      for (const v of [v1, v2]) { v.x = home.x; v.y = home.y; v.hp = v.max; }
-      const before = {wood: home.wood, stone: home.stone}; S.monsters = []; S.events = [];
-      run(S, 150);
-      out.woodGathered = home.wood - before.wood; out.stoneGathered = home.stone - before.stone;
-      // the trickle alone over 150 s is 30 wood and 15 stone: villagers must bring clearly more
-      out.villagersGather = out.woodGathered > 30 + C.CARRY.wood && out.stoneGathered > 15 + C.CARRY.stone;
-      // the Hall lets you set work by clicking a villager
-      h.x = home.x; h.y = home.y; openTown(home, 'Hall'); const vi = menu.items.find(i => /^Villager 1:/.test(i.label)); const w = v1.work; vi.act();
-      out.hallCyclesWork = v1.work !== w && menu.items.some(i => /^Train a villager/.test(i.label)); closeMenu();
-      // rival towns train villagers on their own when they have food and room
-      const rival = S.towns.find(t => t.i !== h.town); rival.houses = 3; rival.food = 400; run(S, 2 * C.VILLAGER_TIME + 12);
-      out.rivalsTrain = foragersIn(rival).length >= 2;
-      // ages: names follow the settlement's level
-      out.ages = ageOf({lvl: 1}) === 'Hamlet' && ageOf({lvl: 2}) === 'Village' && ageOf({lvl: 4}) === 'City' && ageOf({lvl: 1, outpost: true}) === 'Outpost';
-
+      // settlers: a house makes room for six; they walk in while there is food, and nobody is trained or assigned
+      out.startPop = S.towns.every(t => t.pop === C.HALL_POP) && popCap(home) === C.HALL_POP + C.HOUSE_POP;
+      S.monsters = []; S.events = []; home.food = 300; run(S, 40);
+      out.settlersArrive = home.pop > C.HALL_POP && home.pop <= popCap(home);
+      out.noTraining = typeof queueVillager === 'undefined' && !/Train a villager/.test((openTown(home, 'Hall'), menu.items.map(i => i.label).join('|'))); closeMenu();
+      // workplaces: placed by what they need, staffed from the settlers, and productive only while staffed
+      const at = p => { h.x = p.x; h.y = p.y; h.job = null; };
+      at(S.quarries.find(q => q.town === h.town)); h.x += 150; out.woodcutterNeedsForest = canBuild(h, 'woodcutter') !== null || treesNear(h.x, h.y, C.FOREST_R) >= C.FOREST_N;
+      for (let a = 0; a < 6.28; a += .5) { at({x: home.x + Math.cos(a) * (home.r + 90), y: home.y + Math.sin(a) * (home.r + 90)}); if (canBuild(h, 'quarry') !== 'Too close to another building' && !outcropNear(h.x, h.y)) break; } out.qWhy = canBuild(h, 'quarry'); out.quarryNeedsOutcrop = out.qWhy === 'Build it beside a stone outcrop';
+      const wsite = botSite(home, 'woodcutter', () => .5); at(wsite); out.woodcutterBuilt = build(h, 'woodcutter'); stepJob(h, 30);
+      const q0 = S.quarries.find(q => q.town === h.town); at({x: q0.x + 120, y: q0.y}); out.quarryBuilt = build(h, 'quarry'); stepJob(h, 30);
+      const wc = S.builds.find(b => b.k === 'woodcutter'), qy = S.builds.find(b => b.k === 'quarry');
+      allocate(home); out.staffedFromSettlers = wc.staff > 0 && qy.staff > 0 && home.employed <= home.pop && home.employed + home.idle === Math.floor(home.pop);
+      const tick = () => { const w = home.wood, st = home.stone; S.t = Math.floor(S.t / RENT_INTERVAL + 1) * RENT_INTERVAL + .01; stepEconomy(.02); return [home.wood - w, home.stone - st]; };
+      const [dw, ds] = tick(); out.workplacesProduce = dw >= C.PROD.woodcutter.wood * wc.staff / C.JOBS.woodcutter - .01 && ds > 0;
+      const pop = home.pop; home.pop = 0; allocate(home); const emptied = wc.staff === 0 && qy.staff === 0; const [dw0, ds0] = tick(); home.pop = pop; allocate(home);
+      out.emptyWorkplacesIdle = emptied && dw0 < 3 && ds0 < 2; // only the hall's small trickle (2 wood, 1 stone a 10 s)
+      // labour order: raising a kind in the Hall gives it workers first
+      home.pop = 5; home.pri = 'quarry'; allocate(home); const qFirst = qy.staff === 5 && wc.staff === 0; home.pri = 'woodcutter'; allocate(home);
+      out.labourPriority = qFirst && wc.staff === 4 && qy.staff === 1; home.pri = null; home.pop = pop; allocate(home);
+      // a granary (staffed) holds more food
+      const cap0 = foodCap(home); S.builds.push({k: 'granary', x: home.x + 40, y: home.y + 80, town: h.town, settlementId: home.id, cd: 0, staff: 3});
+      out.granaryStores = foodCap(home) === cap0 + C.GRANARY_CAP;
+      // fire: a building no fire station reaches can catch fire; you beat it out, or a staffed fire station does
+      const p0 = C.FIRE_P; C.FIRE_P = 1; wc.risk = C.FIRE_SAFE + 1; S.you.x = home.x; S.you.y = home.y; stepFires(); C.FIRE_P = p0;
+      const caught = !!wc.fire; at({x: wc.x + 40, y: wc.y}); stepFires(); stepFires(); stepFires();
+      out.youBeatItOut = caught && !wc.fire;
+      wc.fire = S.t; h.x = home.x; h.y = home.y; S.builds.push({k: 'firehouse', x: wc.x + 300, y: wc.y, town: h.town, settlementId: home.id, cd: 0, staff: 3}); stepFires(); stepFires(); stepFires();
+      out.fireStationPutsOut = !wc.fire && covered(wc) && (stepFires(), wc.risk === 0);
+      // roads: settlers walking to work wear the land into roads, which are faster to walk
+      run(S, 240); out.settlersWearRoads = (S.worn || 0) > 0 && S.land.road.some((v, i) => v && S.foot && S.foot[i] >= C.ROAD_STEPS);
+      // with no food the settlers leave
+      home.food = 0; for (const t of S.towns) if (t !== home) { t.food = 0; } const leave0 = home.pop; S.t = Math.floor(S.t / C.SETTLER_EVERY + 1) * C.SETTLER_EVERY + .01; stepEconomy(.02);
+      out.hungerDrivesThemOut = home.pop === leave0 - 1;
       // quests on the Board: offered, taken (at most three), each step pays when its state is true
       S = __col.newGame('human', 4); h = S.you; home = S.towns[h.town]; h.x = home.x; h.y = home.y; S.headless = false;
       openTown(home, 'Board');
       out.boardOffersQuests = menu.items.some(i => i.label === 'New quest · A town of our own') && menu.items.some(i => /^Task · /.test(i.label));
       menu.items.find(i => i.label === 'New quest · A town of our own').act();
       out.taken = questOpen(h).length === 1 && h.track === 'q:charter';
-      const g0 = h.gold; h.gold += 500; h.x = home.x + 150; h.y = home.y + 40; build(h, 'farm'); stepJob(h, 10); run(S, 2);
-      out.stepPays = questOpen(h)[0].i >= 1 && h.gold > g0 + 500 - C.COST.farm;
+      const g0 = h.gold; h.gold += 500; h.x = home.x + 150; h.y = home.y + 40; h.x = home.x + home.r + 60; h.y = home.y; out.hWhy = canBuild(h, 'house'); build(h, 'house'); stepJob(h, 10); run(S, 2);
+      out.stepPays = questOpen(h)[0].i >= 1 && h.gold > g0 + 500 - C.COST.house;
       takeQuest(h, 'walls'); h.qDone = {charter: 1}; home.lvl = 2; takeQuest(h, 'trade');
       openTown(home, 'Board'); const fourth = menu.items.find(i => i.label === 'New quest · The frontier');
       out.maxThree = questOpen(h).length === 3 && !!fourth && /finish or drop one/.test(fourth.why || ''); closeMenu();
@@ -81,6 +94,12 @@ const {chromium} = require('playwright');
       save.qOpen = 0; h.x = home.x + 900; h.y = home.y; h.pack.crystals = packCap(h); paintHud();
       const urgentShown = !!document.querySelector('#goal .jg.urgent'); h.pack.crystals = 0; paintHud();
       out.urgentNow = urgentShown && !document.querySelector('#goal .jg.urgent');
+      // during the first day the journal holds the goal box: a quest taken then must still show there (owner: quests were not tracked)
+      const F = __col.newGame('human', 6); F.tut = tutNewDay(); F.headless = false; const fh = F.you; takeQuest(fh, 'walls'); save.qOpen = 0; paintHud();
+      const fg = document.getElementById('goal'); const firstDayShowsQuest = tutActive() && fg.textContent.includes('Hold the walls') && !!fg.querySelector('[data-q="q:walls"]');
+      save.qOpen = 1; paintHud(); const firstDayOpenLists = fg.textContent.includes('Hold the walls'); save.qOpen = 0;
+      out.firstDayQuest = firstDayShowsQuest && firstDayOpenLists; F.headless = true; __col.newGame('human', 4); S = __col.S; h = S.you; home = S.towns[h.town];
+      takeQuest(h, 'charter'); takeQuest(h, 'walls'); S.headless = false;
       // nothing the feed says is lost: the message log keeps it
       toast('test message 42'); out.messageLog = msgLog.some(m => m.text === 'test message 42');
       // the resource bar shows the stockpile of your town
@@ -90,7 +109,7 @@ const {chromium} = require('playwright');
       return out;
     });
     assert.deepEqual(errors, []);
-    for (const [k, v] of Object.entries(r)) if (typeof v === 'boolean') assert.ok(v, k);
-    console.log(Object.keys(r).filter(k => typeof r[k] === 'boolean').length + ' economy and quest checks passed (villagers brought ' + r.woodGathered + ' wood and ' + r.stoneGathered + ' stone in 150 s)');
+    for (const [k, v] of Object.entries(r)) if (typeof v === 'boolean') assert.ok(v, k + ' ' + JSON.stringify(Object.fromEntries(Object.entries(r).filter(([, x]) => typeof x !== 'boolean'))));
+    console.log(Object.keys(r).filter(k => typeof r[k] === 'boolean').length + ' economy and quest checks passed ');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

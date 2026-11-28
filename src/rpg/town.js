@@ -15,7 +15,7 @@ const civicIn=(t,k)=>t?S.builds.filter(b=>b.k===k&&b.hp!==0&&b.settlementId===t.
 // a festival: a settlement of yours at 70+ prosperity holds one once a day; for a minute your strikes and earnings are blessed
 function stepFestival(){const h=S.you;if(!h||S.t%1>C.DT*1.5)return;for(const t of aliveTowns()){if(t.i!==h.town||t.festDay===Math.floor(S.t/dayLen())||prosperity(t)<70)continue;t.festDay=Math.floor(S.t/dayLen());t.festUntil=S.t+60;h.buff={k:'might',until:S.t+60};if(!S.headless){announce(t.name+' holds a festival for its prosperity! Blessed with might for a minute; '+30+' gold from the townsfolk.');sfx('fanfare')}h.gold+=30}}
 function prosperity(t){if(!t)return 0;const houses=t.houses||0,farms=civicIn(t,'farm'),hungry=Math.max(0,houses-2*farms-1);
-  const parts=[['Base',20],['Houses',6*houses],['Farms',8*farms],['Market',15*civicIn(t,'market')],['Smithy',10*civicIn(t,'smithy')],['Stable',8*civicIn(t,'stable')],['Wells',5*civicIn(t,'well')],['Hungry houses',-10*hungry],['Walls down',t.hp<t.max*.5?-20:0],['Recent raid',S.t-(t.raidT??-999)<120?-10:0]];
+  const parts=[['Base',20],['Houses',6*houses],['Farms',8*farms],['Market',15*civicOn(t,'market')],['Smithy',10*civicOn(t,'smithy')],['Stable',8*civicOn(t,'stable')],['Wells',5*civicOn(t,'well')],['Hungry houses',-10*hungry],['Walls down',t.hp<t.max*.5?-20:0],['Recent raid',S.t-(t.raidT??-999)<120?-10:0]];
   const v=clamp(parts.reduce((a,p)=>a+p[1],0),0,100);t.prosp=v;t.prospParts=parts.filter(p=>p[1]);return v}
 const prospK=t=>1+Math.max(0,prosperity(t)-40)/100; // above 40, each point of prosperity adds 1% to rent
 function civicWhy(h,k){const D=CIVIC[k];if(!D)return null;const t=nearestOwn(h.town,h.x,h.y);if(!t||!inTerritory(h.town,h.x,h.y))return'Build it inside a settlement\u2019s area';

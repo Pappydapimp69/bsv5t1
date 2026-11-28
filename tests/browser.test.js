@@ -90,7 +90,8 @@ async function playThrough(page, label, seed, mode, style) {
       const H = A.handle;
       switch (a.t) {
         case 'go': return H('goNode', { n: a.node });
-        case 'draw': case 'bank': return H(a.t, {});
+        case 'draw': return H('draw', {});
+        case 'bank': return H(a.stance === 'brace' ? 'brace' : 'strike', {});
         case 'take': return H('take', { i: a.i });
         case 'relic': return H('relicPick', { i: a.i });
         case 'done': return H('rewardDone', {});

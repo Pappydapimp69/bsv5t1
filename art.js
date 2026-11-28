@@ -486,7 +486,7 @@
     strike: '#ff6a5c', twin: '#ff6a5c', heavy: '#ff3d3d', pierce: '#ff8f5c', bash: '#ff7b9c', fuse: '#ffa53d', crescendo: '#ff5fa2', leech: '#e05cff',
     guard: '#5cb8ff', bulwark: '#3d8bff', ward: '#7cc8ff', calm: '#8cffd9', ground: '#9ad17c',
     spark: '#ffd84d', cache: '#ffcf6e', seer: '#7cf7ff', prism: '#ffffff', echo: '#c77dff',
-    static: '#9aa3ad', glitch: '#b6ff4d', hiss: '#d0d0d0', blank: '#55585e',
+    static: '#9aa3ad', glitch: '#b6ff4d', hiss: '#d0d0d0', howl: '#ff9f9f', blank: '#55585e',
   };
   function tokenIcon(ctx, id, s, up) {
     const c = TOKCOL[id] || '#fff';
@@ -521,6 +521,7 @@
       case 'glitch': ctx.fillRect(-14, -10, 16, 6); ctx.fillRect(-6, -2, 20, 6); ctx.fillRect(-12, 6, 12, 6); break;
       case 'hiss': L([[-14, -6], [-7, 2], [0, -6], [7, 2], [14, -6]]); L([[-14, 6], [-7, 14], [0, 6], [7, 14], [14, 6]]); break;
       case 'blank': circle(ctx, 0, 0, 10); ctx.stroke(); break;
+      case 'howl': L([[-14, -8], [-6, 4], [0, -10], [6, 4], [14, -8]]); L([[-14, 2], [-6, 14], [0, 0], [6, 14], [14, 2]]); ctx.fillRect(-2, -16, 4, 4); break;
     }
     ctx.restore();
   }

@@ -31,3 +31,15 @@ xrndm makes that line something the player can move. Lookahead turns blind draws
 1. Does buying lookahead make runs feel more skilful, or does it remove the tension of the blind draw?
 2. Is a lookahead of two the right default, or does it make the first encounters solved?
 3. Should there be a daily seed? If so, rank within each day only, since the seed is shared luck.
+
+## After the first playtest
+
+The owner found no strategy. Measured: 94 to 98% of draws had a 0% chance to overload, because the starting bag could not overload and noise reset every turn. Drawing more was always better, and the blind draw (the core verb) was never discovered, because only a help page explained it.
+
+Changes:
+- **Noise carries over and cools by 1 each turn.** An overload vents it to 0.
+- **Bad tokens come in three strengths:** Static (+1), Hiss (+2) and Howl (+3). The starting bag holds one Howl, one Hiss and two Static, against a limit of 4, so risk ramps up through a turn the way it does with Quacks of Quedlinburg's chips.
+- **Banking means choosing Strike (damage x1.4, block x0.6) or Brace (block x1.4, damage x0.6)**, against the foe's visible intent.
+- **The first fight teaches each verb where it is used.** The Draw button reads "Draw blind" with the exact overload chance, and blind tokens flip over as they land.
+
+Open question 1 is answered: seeing everything removed the gamble. Sight now only covers the start of each turn, and the decision is how far to push past it.

@@ -1,6 +1,6 @@
 # xrndm rules
 
-These rules bind every change. Each rule names the test that enforces it. Every test listed here was seen failing once against a deliberately broken build before it was trusted. Commit only when `node tests/core.test.js`, `node tests/browser.test.js` and `node tests/input.test.js` all exit 0. After changing `index.html`, run `python3 tools/build-artifact.py` so the playtest page matches.
+These rules bind every change. Each rule names the test that enforces it. Every test listed here was seen failing once against a deliberately broken build before it was trusted. Commit only when `node tests/core.test.js`, `node tests/browser.test.js` and `node tests/input.test.js` all exit 0. Tuning numbers live in `XR.CFG` at the top of the foe section in `core.js`; change them only with a `tests/decisions.js` run. After changing `index.html`, run `python3 tools/build-artifact.py` so the playtest page matches.
 
 | # | Rule | Test |
 |---|------|------|
@@ -14,14 +14,15 @@ These rules bind every change. Each rule names the test that enforces it. Every 
 | 8 | Bots read only `XR.view()`, which is what the player sees. They never see the hidden bag order. | `tests/core.test.js` "bots see only the player view" |
 | 9 | Every foe, foe behaviour, event and map node type actually occurs in play. | `tests/core.test.js` "every foe, intent, event, relic and map node type occurs" |
 | 10 | Every screen can be played with a controller or arrow keys alone. Focus moves by on-screen position and is always visible. The press that leaves a screen does nothing on the next one. A direction held while a screen opens must be released before it moves focus. | `tests/input.test.js` (a fake gamepad plays from the splash into a fight, plus the arrow keys) |
+| 11 | Fight choices matter. At least 15% of draws are a real gamble (overload odds above 0 and below 100%), the best thinking bot wins at least 12 points more often than a naive bot (draws only at 0% risk, always Strikes), and Brace is sometimes the right call. | `tests/core.test.js` "rule 11"; report with `node tests/decisions.js 150` |
 
 ## Last balance sweep
 
-`node tests/sweep.js 150`. The bots read exact odds, so a human will do worse.
+`node tests/decisions.js 150`, after the first playtest's redesign (noise carries over, Strike and Brace, bad tokens of strength 1 to 3). The bots read exact odds; a human who reads them well should land near the thinking bots.
 
-| Mode | Greedy bot wins | Cautious bot wins |
-|------|-----------------|-------------------|
-| Standard | 44% | 53% |
-| Story | 72% | 78% |
+| Mode | Naive bot wins | Greedy bot wins | Cautious bot wins | Real gambles (greedy / cautious) |
+|------|----------------|-----------------|-------------------|----------------------------------|
+| Standard | 19% | 41% | 35% | 22% / 17% of draws |
+| Story | 61% | 90% | 86% | 16% / 12% of draws |
 
-Deaths are spread across all three bosses. Normal fights end in about 2.5 turns, elites in 4 to 5, and bosses in 6 to 7.
+Before the redesign, about 3% of draws were a real gamble and drawing the whole bag was almost always safe.

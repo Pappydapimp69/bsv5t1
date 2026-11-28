@@ -75,7 +75,7 @@
     leech:     { name: 'Leech',     dmg: 3, heal: 2, up: { dmg: 1, heal: 1 }, rar: 1, desc: 'Deal {dmg}. Heal {heal}.' },
     seer:      { name: 'Seer',      special: 'seer', n: 2, up: { n: 1 }, rar: 1, desc: 'Reveal {n} more tokens.' },
     ward:      { name: 'Ward',      blk: 2, special: 'ward', per: 3, up: { per: 2 }, rar: 1, desc: 'Gain 2 block, +{per} per noisy token this turn.' },
-    calm:      { name: 'Calm',      noise: -2, blk: 3, special: 'calm', up: { blk: 3 }, rar: 1, desc: '-2 noise. Gain {blk} block. Banks at once.' },
+    calm:      { name: 'Calm',      noise: -2, blk: 3, up: { blk: 3 }, rar: 1, desc: '-2 noise. Gain {blk} block.' },
     bash:      { name: 'Bash',      special: 'bash', mul: 1, up: { mul: 1 }, rar: 1, desc: 'Deal damage equal to {mul}x the block before it.' },
     prism:     { name: 'Prism',     special: 'prism', rar: 2, desc: 'Double the next token.' },
     fuse:      { name: 'Fuse',      special: 'fuse', per: 4, up: { per: 2 }, rar: 2, desc: 'Deal {per} per noise you hold.' },
@@ -83,6 +83,7 @@
     crescendo: { name: 'Crescendo', special: 'cresc', per: 1, up: { per: 1 }, rar: 2, desc: 'Deal {per} per token drawn this turn.' },
     glitch:    { name: 'Glitch',    noise: 1, self: 1, curse: true, desc: '+1 noise. Lose 1 HP.' },
     hiss:      { name: 'Hiss',      noise: 2, curse: true, desc: '+2 noise.' },
+    howl:      { name: 'Howl',      noise: 3, curse: true, desc: '+3 noise.' },
     blank:     { name: 'Blank',     curse: true, desc: 'Does nothing.' },
   };
   const REWARD_POOL = Object.keys(T).filter(k => T[k].rar !== undefined);
@@ -114,6 +115,7 @@
     scrubber:  { name: 'Scrubber',      rar: 1, desc: 'The first curse you draw each fight is destroyed.' },
     loupe:     { name: 'Loupe',         rar: 2, desc: '+1 sight.' },
     keel:      { name: 'Keel',          rar: 2, desc: 'Overloading clears your line but does not end your turn.' },
+    sink:      { name: 'Heat Sink',     rar: 1, desc: 'Noise cools 1 more at the start of each turn.' },
   };
   // keel: on overload the staged line fizzles but you may keep drawing; noise resets to 0.
   const RELIC_POOL = Object.keys(R).filter(k => R[k].rar < 2);
@@ -122,7 +124,7 @@
   // --------------------------------------------------------------- FOES
   // Each ai returns an intent: a list of parts. It may read foe.turn and the
   // fight, and rolls only on the 'foe' stream.
-  const A = (n, hits) => ({ k: 'atk', n, hits: hits || 1 });
+  const A = (n, hits) => ({ k: 'atk', n: Math.max(1, Math.round(n * CFG.atk)), hits: hits || 1 });
   const D = n => ({ k: 'def', n });
   const F = {
     // ---- act 1: the Static Fields
@@ -189,6 +191,11 @@
         return weighted(run, 'foe', opts);
       } },
   };
+  // Tuning knobs, exported so sweeps can try variants without editing code.
+  // Chosen by tests/decisions.js: real gambles on about 20% of draws, and
+  // bots that weigh odds and stance win about twice as often as a naive one.
+  const CFG = { start: ['static', 'static', 'hiss', 'howl'], limit: 4, cool: 1,
+    strikeDmg: 1.4, strikeBlk: 0.6, braceDmg: 0.6, braceBlk: 1.4, hp: 0.55, atk: 0.65 };
   const HP_MULT = { normal: 2, elite: 1.5, boss: 1.3 };
   const foesFor = (act, kind) => Object.keys(F).filter(k => {
     const f = F[k];
@@ -395,11 +402,11 @@
     opts = opts || {};
     const run = {
       v: 1, seed: String(seed), mode: opts.mode === 'story' ? 'story' : 'standard',
-      rng: {}, act: 1, floor: 0, hp: 60, maxHp: 60, bits: 20, sight: 2, noiseLimit: 3,
+      rng: {}, act: 1, floor: 0, hp: 60, maxHp: 60, bits: 20, sight: 2, noiseLimit: CFG.limit,
       deck: [], relics: [], nextUid: 1, map: null, node: null, visited: [], screen: 'map',
       fight: null, reward: null, shop: null, event: null, rest: null, removeCost: 50,
       stats: { fights: 0, elites: 0, bosses: 0, overloads: 0, turns: 0, maxBank: 0, maxBlind: 0, maxBits: 20,
-        bitsEarned: 0, lowest: [], intents: {}, cleanBoss: false, leanBoss: false, draws: 0, blindDraws: 0 },
+        bitsEarned: 0, lowest: [], intents: {}, stances: { strike: 0, brace: 0 }, cleanBoss: false, leanBoss: false, draws: 0, blindDraws: 0 },
       won: false, cause: null, lastFoe: null, log: [],
     };
     if (run.mode === 'story') { run.hp = run.maxHp = 85; run.bits = 40; }
@@ -407,7 +414,7 @@
     for (let i = 0; i < 5; i++) addToken(run, 'strike');
     for (let i = 0; i < 4; i++) addToken(run, 'guard');
     for (let i = 0; i < 2; i++) addToken(run, 'spark');
-    for (let i = 0; i < 3; i++) addToken(run, 'static');
+    for (const id of CFG.start) addToken(run, id);
     addRelic(run, 'lens');
     run.map = genMap(run);
     return run;
@@ -421,7 +428,7 @@
     else { const pool = ids.filter(x => x !== run.lastFoe); id = pick(run, 'enc', pool.length ? pool : ids); }
     run.lastFoe = id;
     const fd = F[id];
-    const hp = Math.round((fd.hp[0] + ri(run, 'enc', fd.hp[1] - fd.hp[0] + 1)) * HP_MULT[kind] * (run.mode === 'story' ? 0.8 : 1));
+    const hp = Math.round((fd.hp[0] + ri(run, 'enc', fd.hp[1] - fd.hp[0] + 1)) * HP_MULT[kind] * CFG.hp * (run.mode === 'story' ? 0.8 : 1));
     const pile = run.deck.map(t => Object.assign({}, t));
     shuffle(run, 'bag', pile);
     run.fight = {
@@ -445,6 +452,7 @@
     }
     return false;
   }
+  function coolOf(run) { return CFG.cool + (has(run, 'sink') ? 1 : 0); }
   function startTurn(run, ev, first) {
     const f = run.fight;
     f.turn++; f.foe.turn++;
@@ -452,7 +460,8 @@
     f.block = first ? f.block : 0;
     if (has(run, 'coolant') && f.overloadedLast) { f.block += 8; ev.push({ e: 'relic', id: 'coolant' }); }
     f.overloadedLast = false;
-    f.noise = Math.min(f.limit, f.noiseNext); f.noiseNext = 0;
+    // noise carries over between turns and cools; foes can add more
+    f.noise = first ? 0 : Math.min(f.limit, Math.max(0, f.noise - coolOf(run)) + f.noiseNext); f.noiseNext = 0;
     f.staged = []; f.prism = false; f.rodUsed = false; f.blindThisTurn = 0;
     let sight = run.sight + f.sightMod - f.hushNext + (first && has(run, 'lens') ? 1 : 0);
     f.hushNext = 0;
@@ -528,7 +537,6 @@
       ev.push({ e: 'seer' });
     }
     if (f.noise > f.limit) return ev.concat(overload(run));
-    if (d.special === 'calm') return ev.concat(bank(run));
     return ev;
   }
   function resolve(run, staged) {
@@ -574,15 +582,24 @@
     for (const e of f.staged) if (!e.dead) f.discard.push(e.inst);
     f.staged = []; f.prism = false;
   }
-  function bank(run) {
+  // Strike: full damage, half block. Brace: full block, half damage.
+  function applyStance(res, stance) {
+    const out = Object.assign({}, res);
+    if (stance === 'brace') { out.dmg = Math.floor(res.dmg * CFG.braceDmg); out.pierce = Math.floor(res.pierce * CFG.braceDmg); out.blk = Math.floor(res.blk * CFG.braceBlk); }
+    else { out.blk = Math.floor(res.blk * CFG.strikeBlk); out.dmg = Math.floor(res.dmg * CFG.strikeDmg); out.pierce = Math.floor(res.pierce * CFG.strikeDmg); }
+    return out;
+  }
+  function bank(run, stance) {
     const f = run.fight;
     const ev = [];
-    const res = resolve(run, f.staged);
+    stance = stance === 'brace' ? 'brace' : 'strike';
+    const res = applyStance(resolve(run, f.staged), stance);
+    run.stats.stances[stance]++;
     const count = f.staged.filter(e => !e.dead).length;
     run.stats.maxBank = Math.max(run.stats.maxBank, count);
     run.stats.maxBlind = Math.max(run.stats.maxBlind, f.blindThisTurn);
     f.banked += count;
-    ev.push({ e: 'bank', count, res });
+    ev.push({ e: 'bank', count, res, stance });
     f.block += res.blk;
     if (res.blk) ev.push({ e: 'block', n: res.blk });
     if (res.heal) { heal(run, res.heal); ev.push({ e: 'heal', n: res.heal }); }
@@ -599,6 +616,7 @@
     const ev = [{ e: 'overload' }];
     run.stats.overloads++; f.overloads++;
     f.overloadedLast = true;
+    f.noise = 0; // the overload vents all noise: the line is lost, but you start clean
     const res = resolve(run, f.staged);
     if (res.self) hurt(run, res.self, 'your own Glitches');
     f.lastDmg = 0; f.lastBlk = 0;
@@ -763,7 +781,7 @@
       }
       case 'fight':
         if (a.t === 'draw') return draw(run);
-        if (a.t === 'bank') return bank(run);
+        if (a.t === 'bank') return bank(run, a.stance);
         return ev;
       case 'reward': {
         const rw = run.reward;
@@ -843,6 +861,8 @@
         hidden: count(hiddenPool(f)), hiddenCount: hiddenPool(f).length, pileCount: f.pile.length, discard: count(f.discard),
         staged: f.staged.map(e => ({ id: e.id, up: e.up, mult: e.mult, echo: e.echo ? e.echo.id : null, dead: !!e.dead })),
         noise: f.noise, limit: f.limit, block: f.block, risk: risk(run), preview: preview(run), canDraw: canDraw(run), turn: f.turn,
+        stances: { strike: applyStance(preview(run), 'strike'), brace: applyStance(preview(run), 'brace') }, cool: coolOf(run),
+        noiseNextTurn: Math.min(f.limit, Math.max(0, f.noise - coolOf(run)) + f.noiseNext),
         nextNoise: f.revealed > 0 ? noiseOf(run, f.pile[0]) : null, blindNow: f.revealed === 0,
       };
     }
@@ -862,20 +882,31 @@
 
   // -------------------------------------------------------------- BOTS
   const TOKEN_RANK = ['prism', 'pierce', 'heavy', 'bulwark', 'seer', 'leech', 'fuse', 'ward', 'calm', 'twin', 'crescendo', 'echo', 'ground', 'bash', 'cache'];
+  // Brace when the HP it saves is worth more than the damage it gives up.
+  function chooseStance(f) {
+    const st = f.stances.strike, br = f.stances.brace;
+    if (st.dmg + st.pierce >= f.foe.hp + f.foe.block) return 'strike';
+    const lossS = Math.max(0, f.foe.incoming - (f.block + st.blk)), lossB = Math.max(0, f.foe.incoming - (f.block + br.blk));
+    const dmgGap = (st.dmg + st.pierce) - (br.dmg + br.pierce);
+    return lossS - lossB > dmgGap * 0.9 ? 'brace' : 'strike';
+  }
   function bot(v, style) {
     const greedy = style === 'greedy';
     if (v.screen === 'fight') {
       const f = v.fight;
-      if (!f.canDraw) return { t: 'bank' };
-      const p = f.preview;
-      const lethal = p.dmg + p.pierce >= f.foe.hp + f.foe.block;
-      if (lethal && f.staged.length) return { t: 'bank' };
-      if (!f.blindNow) return f.risk >= 1 ? { t: 'bank' } : { t: 'draw' };
-      const needBlock = f.incoming - (f.block + p.blk);
+      // naive: the play the first build rewarded. Draw while it is free, always Strike.
+      if (style === 'naive') return f.canDraw && f.risk === 0 ? { t: 'draw' } : { t: 'bank', stance: 'strike' };
+      const bankNow = () => ({ t: 'bank', stance: chooseStance(f) });
+      if (!f.canDraw) return bankNow();
+      const s = f.stances.strike;
+      if (s.dmg + s.pierce >= f.foe.hp + f.foe.block && f.staged.length) return { t: 'bank', stance: 'strike' };
+      if (!f.blindNow) return f.risk >= 1 ? bankNow() : { t: 'draw' };
+      const needBlock = f.foe.incoming - (f.block + f.stances.brace.blk);
       let limit = greedy ? 0.42 : 0.2;
       if (!greedy && needBlock > v.hp * 0.4) limit = 0.3;
       if (v.hp < v.maxHp * 0.25) limit -= 0.08;
-      return f.risk <= limit ? { t: 'draw' } : { t: 'bank' };
+      if (!greedy && f.noise >= f.limit - 1) limit -= 0.1; // noise held now is carried into next turn
+      return f.risk <= limit ? { t: 'draw' } : bankNow();
     }
     if (v.screen === 'map') {
       const score = o => {
@@ -955,7 +986,7 @@
     return h.map(x => x.toString(16).padStart(8, '0')).join('');
   }
 
-  const XR = { T, R, F, EV, GOALS, STREAMS, SHOP_SERVICES, ROWS, COLS, newRun, act, view, bot, playBot, save, load, hash,
+  const XR = { CFG, T, R, F, EV, GOALS, STREAMS, SHOP_SERVICES, ROWS, COLS, newRun, act, view, bot, playBot, save, load, hash,
     tokenText, intentText, intentDamage, risk, options, makeStream, sfc32, cyrb128, preview };
   if (typeof module !== 'undefined' && module.exports) module.exports = XR;
   G.XR = XR;

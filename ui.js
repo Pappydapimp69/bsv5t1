@@ -15,7 +15,8 @@
   };
   const S = {
     screen: 'splash', run: null, busy: false, modal: null, cut: null, menu: null, t: 0, help: 0,
-    settings: Object.assign({ music: 0.55, sfx: 0.8, text: 'normal', shake: true, flash: true }, store.get('settings', {})),
+    settings: Object.assign({ music: 0.55, sfx: 0.8, text: 'normal', shake: true, flash: true, tips: true }, store.get('settings', {})),
+    tips: store.get('tips', {}), lastBlind: false,
     goals: store.get('goals', {}), best: store.get('best', { runs: 0, wins: 0, bestAct: 0 }),
     speed: 1, newSeed: '', newMode: 'standard', skipIntro: false, lastDrawn: -1, foeHurt: 0, ixHurt: 0, foeDying: 0, picker: null,
   };
@@ -185,13 +186,13 @@
     </div></div>`;
   }
   const HELP = [
-    ['Your bag', 'You carry a bag of tokens. Strikes deal damage, Guards give block, Sparks give bits. Static does nothing but add noise. In a fight you draw tokens one at a time onto your line.', ['strike', 'guard', 'spark', 'static']],
-    ['Sight', 'At the start of each turn the top tokens of your bag are face up: that is your sight. You start with 2. Draw past them and you draw blind, but you always see what is left in the bag and your exact odds of overloading.', ['seer']],
-    ['Noise', 'Every noisy token adds to your noise. Hold more noise than your limit (3 at first) and you overload: the whole line fizzles and the turn ends. Ground and Calm take noise away.', ['static', 'hiss', 'ground', 'calm']],
-    ['Bank', 'Bank whenever you like. Everything on your line happens at once: damage, block, bits, healing. Then the foe acts. You always see what it will do next.', ['heavy', 'bulwark']],
+    ['Your bag', 'You carry a bag of tokens. Strikes deal damage, Guards give block, Sparks give bits. Static, Hiss and Howl do nothing but add noise. In a fight you draw tokens one at a time onto your line.', ['strike', 'guard', 'spark', 'static']],
+    ['Keep drawing', 'At the start of each turn the next couple of tokens are face up. After that you can keep drawing blind: you do not see the token until it lands. Your exact chance to overload is always on the Draw button. How far you push is the whole game.', ['seer']],
+    ['Noise', 'Static adds 1 noise, Hiss 2, Howl 3. Hold more noise than your limit (4 at first) and you overload: the whole line fizzles and the foe acts. Noise carries into the next turn and cools by 1, so a big push now leaves you closer to the edge next turn. Overloading vents it all back to 0. Ground and Calm take noise away.', ['static', 'hiss', 'howl', 'ground']],
+    ['Strike or Brace', 'When you bank, choose how your line lands. Strike: more damage, less block. Brace: more block, less damage. You always see what the foe will do next, and how much you would take with each choice.', ['heavy', 'bulwark']],
     ['The way down', 'Each layer is a map of paths. Pick your route: fights, elites with relics, shops, quiet spots to rest, and strange events. A boss waits at the bottom of each of the three layers.', ['prism', 'echo']],
-    ['Build your luck', 'After fights you take new tokens. At the shop you can filter out Static, grind your lens for more sight, or insulate for a higher noise limit. A small, clean bag is a bag you can read.', ['pierce', 'fuse']],
-    ['Controls', 'Keyboard: arrow keys move, Enter chooses, Space or D draws, B banks, 1 to 4 pick, Esc opens the menu. Controller: D-pad or stick moves, A chooses, B goes back, X draws, Y banks, Start opens the menu, Select shows your bag. Mouse and touch work everywhere too.', []],
+    ['Build your luck', 'After fights you take new tokens. At the shop you can filter out noisy tokens, grind your lens to see further, or insulate for a higher noise limit. A small, clean bag is a bag you can read.', ['pierce', 'fuse']],
+    ['Controls', 'Keyboard: arrow keys move, Enter chooses, Space or D draws, S strikes, B braces, 1 to 4 pick, Esc opens the menu. Controller: D-pad or stick moves, A chooses, B goes back (Brace in a fight), X draws, Y strikes, Start opens the menu, Select shows your bag. Mouse and touch work everywhere too.', []],
   ];
   function helpHTML() {
     const [t, body, toks] = HELP[S.help];
@@ -217,6 +218,7 @@
       <div class="label">Text speed</div><div class="opt">${opt('text', ['slow', 'normal', 'fast', 'instant'])}</div>
       <div class="label">Screen shake</div><div class="opt"><button class="${st.shake ? 'on' : ''}" data-a="tog" data-k="shake">${st.shake ? 'on' : 'off'}</button></div>
       <div class="label">Flashes</div><div class="opt"><button class="${st.flash ? 'on' : ''}" data-a="tog" data-k="flash">${st.flash ? 'on' : 'off'}</button></div>
+      <div class="label">Fight tips</div><div class="opt"><button class="${st.tips ? 'on' : ''}" data-a="tog" data-k="tips">${st.tips ? 'on' : 'off'}</button><button data-a="resetTips">Show all tips again</button></div>
       <div class="row" style="justify-content:space-between;margin-top:10px">
         <button class="warn" data-a="resetAll">Reset progress</button>
         <button class="primary" data-a="go" data-s="${S.run && S.menu ? 'run' : 'title'}" autofocus>Done</button>
@@ -345,23 +347,41 @@
     const y = (70 + (XR.ROWS - row) * 78) / H * svg.getBoundingClientRect().height;
     el.scrollTop = Math.max(0, y - el.clientHeight * 0.6);
   }
+  // First-fight teaching: one tip at a time, shown where the player is acting.
+  function tipFor(v) {
+    if (!S.settings.tips) return null;
+    const seen = S.tips;
+    if (v.blindNow && v.canDraw && v.staged.length && !seen.blind) return { id: 'blind', text: 'Your face-up tokens are used up, but you can keep drawing. The next token is blind: you won\'t see it until it lands. The Draw button shows your exact chance to overload. Push your luck, or bank what you have.' };
+    if (v.turn >= 2 && v.noise > 0 && !v.staged.length && !seen.carry) return { id: 'carry', text: 'Noise carries over. You start this turn at ' + v.noise + ' noise. It cools by ' + v.cool + ' each turn. Overloading wipes your line, but it vents your noise to 0.' };
+    if (v.turn === 1 && !v.staged.length && !seen.draw) return { id: 'draw', text: 'Draw tokens onto your line. Nothing happens until you bank. The first few tokens are face up, so you know what you are getting.' };
+    if (v.staged.length >= 2 && !seen.stance && (seen.blind || !v.canDraw)) return { id: 'stance', text: 'Bank with Strike for more damage and less block, or Brace for more block and less damage. Check what the foe will do next.' };
+    return null;
+  }
+  function tipSeen(id) { if (!S.tips[id]) { S.tips[id] = true; store.set('tips', S.tips); } }
   function fightHTML() {
-    const r = S.run, v = XR.view(r).fight, f = r.fight;
-    const p = v.preview;
+    const r = S.run, v = XR.view(r).fight;
+    const p = v.preview, st = v.stances.strike, br = v.stances.brace;
     const noiseCells = [];
     for (let i = 1; i <= Math.max(v.limit + 1, v.noise); i++) noiseCells.push(`<i class="${i <= v.noise ? (i > v.limit ? 'over' : 'on') : (i === v.limit + 1 ? 'limit' : '')}" title="${i === v.limit + 1 ? 'Overload' : 'Noise ' + i}"></i>`);
     const riskPct = Math.round(v.risk * 100);
-    const riskCol = riskPct === 0 ? 'var(--good)' : riskPct < 25 ? 'var(--b)' : 'var(--bad)';
+    const riskCls = riskPct === 0 ? 'safe' : riskPct < 25 ? 'warn' : 'hot';
     const foeHpPct = Math.max(0, v.foe.hp / v.foe.maxHp * 100);
-    const dmgNow = p.dmg + p.pierce;
-    const nextLabel = v.blindNow ? 'Next draw is blind' : 'Face up (your sight)';
+    const lethal = st.dmg + st.pierce >= v.foe.hp + v.foe.block;
+    const takeS = Math.max(0, v.foe.incoming - v.block - st.blk), takeB = Math.max(0, v.foe.incoming - v.block - br.blk);
+    const next = v.revealed[0];
+    let drawLabel;
+    if (!v.canDraw) drawLabel = 'Bag empty';
+    else if (!v.blindNow) drawLabel = `Draw <small>${esc(XR.T[next.id].name)}${riskPct ? ' · overloads!' : ''}</small>`;
+    else drawLabel = `Draw blind <small class="${riskCls}">${riskPct}% overload</small>`;
+    const tip = tipFor(v);
+    const newCls = i => (i === v.staged.length - 1 && S.lastDrawn === v.staged.length ? (S.lastBlind ? 'flip' : 'new') : '');
     return `<div class="fight" id="fight">
       <div class="ixbox" id="ixbox"><canvas data-draw="ix"></canvas>
         <div class="col" style="gap:4px"><div class="foename">Ix</div>
         <div class="bar pbar"><i style="width:${r.hp / r.maxHp * 100}%"></i><b>${r.hp}/${r.maxHp}</b></div>
         <div>${v.block ? `<span class="shield">⛨ ${v.block} block</span>` : '<span class="dim">no block</span>'}</div></div></div>
       <div class="foebox" id="foebox">
-        <div class="intent" title="What the foe will do when you bank"><div class="label">Next it will</div>${esc(v.foe.intentText)}${v.foe.incoming ? `<div class="dmg">${v.foe.incoming} incoming${v.block + p.blk ? ` · ${Math.max(0, v.foe.incoming - v.block - p.blk)} after block` : ''}</div>` : ''}</div>
+        <div class="intent" title="What the foe will do when you bank"><div class="label">Next it will</div>${esc(v.foe.intentText)}${v.foe.incoming ? `<div class="dmg">${v.foe.incoming} incoming</div><div class="sub">you take ${takeS} on Strike · ${takeB} on Brace</div>` : ''}</div>
         <canvas data-draw="foe" data-art="${XR.F[v.foe.id].art}"></canvas>
         <div class="foename">${esc(v.foe.name)}</div>
         <div class="bar" style="width:220px"><i style="width:${foeHpPct}%"></i><b>${Math.max(0, v.foe.hp)}/${v.foe.maxHp}</b></div>
@@ -369,21 +389,23 @@
       </div>
       <div class="table">
         <div><div class="label">Your line · turn ${v.turn}</div>
-          <div class="line" id="line">${v.staged.map((e, i) => tokHTML(e.echo || e.id, e.up, { mult: e.mult, cls: (e.dead ? 'dead ' : '') + (i === v.staged.length - 1 && S.lastDrawn === v.staged.length ? 'new' : '') })).join('')}</div></div>
-        <div class="totals"><span class="d">⚔ ${dmgNow}</span><span class="k">⛨ ${p.blk}</span><span class="c">◆ ${p.bits}</span>${p.heal ? `<span class="h">✚ ${p.heal}</span>` : ''}${p.self ? `<span class="d">self -${p.self}</span>` : ''}${dmgNow >= v.foe.hp + v.foe.block ? '<b style="color:var(--good)">LETHAL</b>' : ''}</div>
-        <div class="row"><span class="label">Noise ${v.noise}/${v.limit}</span><div class="noise">${noiseCells.join('')}</div></div>
+          <div class="line" id="line">${v.staged.map((e, i) => tokHTML(e.echo || e.id, e.up, { mult: e.mult, cls: (e.dead ? 'dead ' : '') + newCls(i) })).join('')}</div></div>
+        <div class="totals"><span class="label">Line total</span><span class="d">⚔ ${p.dmg + p.pierce}</span><span class="k">⛨ ${p.blk}</span><span class="c">◆ ${p.bits}</span>${p.heal ? `<span class="h">✚ ${p.heal}</span>` : ''}${p.self ? `<span class="d">self -${p.self}</span>` : ''}${lethal ? '<b style="color:var(--good)">LETHAL on Strike</b>' : ''}</div>
+        <div class="row"><span class="label">Noise ${v.noise}/${v.limit}</span><div class="noise">${noiseCells.join('')}</div><span class="dim" style="font-size:12px">bank now and next turn starts at ${v.noiseNextTurn}</span></div>
         <div class="sightrow">
-          <div><div class="label">${nextLabel}</div><div class="next">${v.revealed.map((t, i) => tokHTML(t.id, t.up, { cls: 'face' + (i === 0 && v.noise + (XR.T[t.id].noise || 0) > v.limit ? ' danger' : '') })).join('') || '<div class="tok back"><img src="' + ART.tokenURL('blank', false) + '" alt=""><span>?</span></div>'}</div></div>
-          <div class="odds"><div class="label">${v.blindNow ? 'Blind draw' : 'After your sight'}</div>
-            <div><span class="risk" style="color:${riskCol}">${riskPct}%</span> ${v.blindNow ? 'chance to overload' : (riskPct ? 'the next token overloads you' : 'the next token is safe')}</div>
-            <div class="label" style="margin-top:6px">Blind part of the bag · ${v.hiddenCount}</div>
+          <div><div class="label">${v.blindNow ? 'Next draw is blind' : 'Face up next'}</div><div class="next">${v.revealed.map((t, i) => tokHTML(t.id, t.up, { cls: 'face' + (i === 0 && riskPct ? ' danger' : '') })).join('') || '<div class="tok back"><img src="' + ART.tokenURL('blank', false) + '" alt=""><span>?</span></div>'}</div></div>
+          <div class="odds"><div class="label">${v.blindNow ? 'Blind draw' : 'Next token'}</div>
+            <div><span class="risk ${riskCls}">${riskPct}%</span> ${v.blindNow ? 'chance to overload' : (riskPct ? 'it overloads you' : 'it is safe')}</div>
+            <div class="label" style="margin-top:6px">Still in the bag, order unknown · ${v.hiddenCount}</div>
             <div class="chips">${chipsHTML(v.hidden)}</div></div>
         </div>
       </div>
       <div class="controls">
-        <button class="primary big" data-a="draw" ${v.canDraw && !S.busy ? 'autofocus' : 'disabled'} title="Draw the top token (Space, or X on a controller)">Draw</button>
-        <button class="big" data-a="bank" ${S.busy ? 'disabled' : (v.canDraw ? '' : 'autofocus')} title="Resolve your line, then the foe acts (B, or Y on a controller)">Bank</button>
-        <span class="hint">${PAD.connected ? '<kbd>X</kbd> draw · <kbd>Y</kbd> bank · <kbd>Start</kbd> menu' : '<kbd>Space</kbd> draw · <kbd>B</kbd> bank'} · bag ${v.pileCount} · used ${Object.values(v.discard).reduce((s, n) => s + n, 0)}</span>
+        ${tip ? `<div class="coach" role="status"><span>${esc(tip.text)}</span><button data-a="tipOk" data-id="${tip.id}">Got it</button></div>` : ''}
+        <button class="primary big drawbtn" data-a="draw" ${v.canDraw && !S.busy ? 'autofocus' : 'disabled'} title="Draw the next token (Space, or X on a controller)">${drawLabel}</button>
+        <button class="big stance" data-a="strike" ${S.busy ? 'disabled' : (v.canDraw ? '' : 'autofocus')} title="Bank: damage x${XR.CFG.strikeDmg}, block x${XR.CFG.strikeBlk} (S, or Y on a controller)">Strike <small>⚔ ${st.dmg + st.pierce} ⛨ ${st.blk}</small></button>
+        <button class="big stance" data-a="brace" ${S.busy ? 'disabled' : ''} title="Bank: block x${XR.CFG.braceBlk}, damage x${XR.CFG.braceDmg} (B on keyboard or controller)">Brace <small>⚔ ${br.dmg + br.pierce} ⛨ ${br.blk}</small></button>
+        <span class="hint">${PAD.connected ? '<kbd>X</kbd> draw · <kbd>Y</kbd> strike · <kbd>B</kbd> brace' : '<kbd>Space</kbd> draw · <kbd>S</kbd> strike · <kbd>B</kbd> brace'} · bag ${v.pileCount} · used ${Object.values(v.discard).reduce((s, n) => s + n, 0)}</span>
       </div>
     </div>`;
   }
@@ -569,7 +591,7 @@
         case 'seer': at(t, () => sfx('reveal')); break;
         case 'reshuffle': at(t, () => sfx('shuffle')); t += 150; break;
         case 'overload': at(t, () => { sfx('overload'); flash('rgba(255,255,255,.8)'); shake(); floatAt('#line', 'OVERLOAD', '#ff5c5c'); }); t += 700; break;
-        case 'bank': at(t, () => sfx('bank')); t += 180; break;
+        case 'bank': at(t, () => { sfx('bank'); floatAt('#line', e.stance === 'brace' ? 'BRACE' : 'STRIKE', e.stance === 'brace' ? '#5cb8ff' : '#ff6a5c'); }); t += 220; break;
         case 'block': at(t, () => { sfx('block'); floatAt('#ixbox', '+' + e.n + ' block', '#5cb8ff'); }); t += 120; break;
         case 'heal': at(t, () => { sfx('heal'); floatAt('#ixbox', '+' + (e.n || '') + ' HP', '#8cff8c'); }); t += 100; break;
         case 'bits': at(t, () => { sfx('coin'); floatAt('#ixbox', '+' + e.n + ' ◆', '#ffcf6e'); }); t += 100; break;
@@ -624,7 +646,7 @@
     const fightish = before === 'fight';
     if (fightish && ev.length) {
       const quick = ev.length <= 2 && ev[0].e === 'draw';
-      if (a.t === 'draw') S.lastDrawn = r.fight && r.screen === 'fight' ? r.fight.staged.length : -1;
+      if (a.t === 'draw') { S.lastDrawn = r.fight && r.screen === 'fight' ? r.fight.staged.length : -1; S.lastBlind = ev.some(e => e.e === 'draw' && e.blind); }
       if (quick) { playEvents(ev, () => { }); render(); return; }
       S.busy = true; render();
       playEvents(ev, () => {
@@ -686,6 +708,7 @@
       case 'helpNext': sfx('click'); S.help = Math.min(HELP.length - 1, S.help + 1); return render();
       case 'set': sfx('click'); S.settings[d.k] = d.v; store.set('settings', S.settings); return render();
       case 'tog': sfx('click'); S.settings[d.k] = !S.settings[d.k]; store.set('settings', S.settings); return render();
+      case 'resetTips': sfx('click'); S.tips = {}; store.set('tips', {}); S.settings.tips = true; store.set('settings', S.settings); toast('Tips will show again in your next fight.'); return render();
       case 'resetAll': S.modal = { k: 'confirm', text: 'Forget all goals, stats and your saved run?', yes: 'resetYes' }; return render();
       case 'resetYes': S.goals = {}; S.best = { runs: 0, wins: 0, bestAct: 0 }; store.del('save'); store.set('goals', {}); store.set('best', S.best); toast('Progress reset.'); return go('settings');
       case 'closeModal': sfx('click'); S.modal = null; return render();
@@ -697,8 +720,10 @@
       case 'bag': sfx('click'); S.modal = { k: 'bag' }; return render();
       case 'relicInfo': sfx('click'); S.modal = { k: 'relic', id: d.id }; return render();
       case 'goNode': sfx('step'); return doAct({ t: 'go', node: +d.n });
-      case 'draw': if (S.busy) return; return doAct({ t: 'draw' });
-      case 'bank': if (S.busy) return; return doAct({ t: 'bank' });
+      case 'draw': if (S.busy) return; tipSeen('draw'); if (r && r.fight && r.fight.revealed === 0) tipSeen('blind'); if (r && r.fight && r.fight.turn >= 2) tipSeen('carry'); return doAct({ t: 'draw' });
+      case 'bank': case 'strike': if (S.busy) return; tipSeen('stance'); return doAct({ t: 'bank', stance: 'strike' });
+      case 'brace': if (S.busy) return; tipSeen('stance'); return doAct({ t: 'bank', stance: 'brace' });
+      case 'tipOk': sfx('click'); tipSeen(d.id); return render();
       case 'take': return doAct({ t: 'take', i: +d.i });
       case 'relicPick': return doAct({ t: 'relic', i: +d.i });
       case 'rewardDone': return doAct({ t: 'done' });
@@ -847,7 +872,7 @@
   const PAD = { prev: [], held: {}, next: {}, connected: false };
   window.addEventListener('gamepadconnected', () => {
     PAD.connected = true;
-    toast('<div class="label">Controller connected</div>D-pad or stick: move · A: choose · B: back<br>X: draw · Y: bank · Start: menu · Select: bag');
+    toast('<div class="label">Controller connected</div>D-pad or stick: move · A: choose · B: back<br>In a fight: X draw · Y strike · B brace · Start: menu · Select: bag');
     if (S.screen === 'run') render();
   });
   window.addEventListener('gamepaddisconnected', () => { PAD.connected = false; });
@@ -870,11 +895,11 @@
     }
     PAD.held = NAV.latch ? {} : dirs;
     if (press(0)) navConfirm();
-    else if (press(1)) navBack();
+    else if (press(1)) { if (S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('brace', {}); } else navBack(); }
     else if (press(9)) navStart();
     else if (press(8) && S.screen === 'run' && S.run && !S.modal) { setPadMode(true); handle('bag', {}); }
     else if (press(2) && S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('draw', {}); }
-    else if (press(3) && S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('bank', {}); }
+    else if (press(3) && S.screen === 'run' && S.run && S.run.screen === 'fight' && !S.modal) { setPadMode(true); handle('strike', {}); }
     PAD.prev = gp.buttons.map((b, i) => btn(i));
   }
 
@@ -899,8 +924,9 @@
     if (k === 'escape') return handle('pause', {});
     if (r.screen === 'fight') {
       if (k === ' ' || k === 'd') { e.preventDefault(); return handle('draw', {}); }
-      if (k === 'b') { e.preventDefault(); return handle('bank', {}); }
-      if (k === 'enter' && !(onItem && focused.tagName === 'BUTTON')) { e.preventDefault(); return handle('bank', {}); }
+      if (k === 's') { e.preventDefault(); return handle('strike', {}); }
+      if (k === 'b') { e.preventDefault(); return handle('brace', {}); }
+      if (k === 'enter' && !(onItem && focused.tagName === 'BUTTON')) { e.preventDefault(); return handle('strike', {}); }
     }
     const n = parseInt(k, 10);
     if (n >= 1 && n <= 4) {

@@ -43,12 +43,12 @@ while loading may only use what earlier files define. The wrappers that extend f
 
 Styles: `src/style.css`. Tests: `tests/*.js` (Playwright, Three.js blocked, 2D fallback). `tests/fingerprint.js` hashes
 four seeded runs; run it after any change that should not alter gameplay, and `--record` only when gameplay is meant
-to change. `tests/load.js` checks every script loads with no errors and both roles start.
+to change. `tests/firstday.js` checks the first day's rules and plays it with a player that follows only what is drawn. `tests/load.js` checks every script loads with no errors and both roles start.
 
 Where to look:
 - **Human RPG layer** (talents, skills, charms, places, quests, civic buildings, mounts, renown): `src/rpg/`.
   Its drawing lives inside the render closures in `src/render3d.js` (figures, horses, places, decor) and in the overlay
   pass of `src/view2d.js` (labels, map, speech, effects), because those draw with the closures' instance pools.
 - **The giant** (walking, chains, waking, actions): `src/giant.js`; its bot: `src/bots.js`; its panel: `src/view2d.js`.
-- **The first day**: `src/tutorial.js`. **Menus**: `src/menus.js`, `src/menus-town.js`, `src/rpg/meta.js`.
+- **The first day**: `src/tutorial.js` (open chapters: a goal table drives the journal in `src/hud.js`, the marks in `src/view2d.js` and the landmark lights in `src/atmosphere.js`; tests in `tests/firstday.js`). **Menus**: `src/menus.js`, `src/menus-town.js`, `src/rpg/meta.js`.
 - **Sim step order**: `src/step.js`. **Frame loop and test hook**: `src/main.js`.

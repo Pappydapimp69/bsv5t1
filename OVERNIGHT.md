@@ -520,3 +520,40 @@ reassignments work unchanged.
   hashes match after the split. All suites pass. The real-input playtest and both renderers ran with no errors.
 - **Publishing:** the live page fetches `src/` with `?v=<sha>`, so a browser never mixes cached old scripts with a
   new page.
+
+## The first day as open chapters (2026-11-28)
+
+The owner found the first day "too linear and fast; it should be more exploratory". I checked the plan with ZaneGPT
+and GPTBS: lessons 12c9c7c8, demo-disc#E51, fe311386 and idea:e9058ebe; Breath of the Wild's Great Plateau; and two
+counterpoints, a Utrecht thesis on players being overwhelmed and The Outer Worlds 2's curated opening.
+
+What changed:
+- **Structure.**
+  - A guided **Morning**: one marked crystal to bring home.
+  - Three chapters whose goals are done in any order:
+    - **The land**: the job, a shrine, a spring or the stones, and 3 places found. All four are needed. Dodge,
+      heavy blow and first talent are lessons that don't count.
+    - **Your town**: 4 of house, raise, barracks, soldier, horse. The map is a lesson.
+    - **The giant** (last, the owner's rule): send your soldiers, strike a chain, climb, reach the knee.
+- **Goals appear as you meet them:** a fight, a barracks, a house, a climb.
+- **No handouts.** The elders lend the gap once a chapter, after 3 minutes without progress.
+- **No auto-advance**, and one card per chapter.
+- **Guidance:**
+  - a journal on the right;
+  - small map marks for goals with a known place;
+  - a goal light that you can switch with N or by clicking a journal line;
+  - soft landmark lights over the nearest undiscovered shrines, springs and stones.
+- **Waves and world events wait** until Your town opens or minute 8.
+
+Measured with `tests/firstday.js`, using a player that follows only what is drawn:
+- **Goal light on:** it finished on all 3 seeds in 4.8–6.6 sim minutes. That is a perfect player with no
+  hesitation, so it is a lower bound. The longest stretch without progress was 1.2 minutes, and no loans were
+  needed.
+- **Goal light off:** it walked 80–90% of minutes 3–8 and didn't finish in 25 minutes. Part of this is a test limit
+  (it can't read the map the way a person does). Even so, the light carries the guidance, which answers GPTBS
+  fe311386's next test as far as a bot can.
+- **Two fixes the test forced:**
+  - With 4-of-7, the wolf fight alone (job, dodge, heavy, talent) opened chapter 2 with no exploring at all, so
+    lessons no longer count.
+  - With exploration goals hidden until seen, the journal could go empty with nothing in view, so they are listed
+    from the start and gain a mark once seen.

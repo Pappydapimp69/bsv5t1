@@ -39,7 +39,7 @@ function openTown(t,tab){const h=S.you;if(!t||!h)return;if(tab)townTab=tab;const
   openMenu({title:t.name,body,items:[...tabs,...items,{label:t.outpost?'Leave outpost':'Leave town',act:closeMenu}],grid:true,back:closeMenu});setFocus(Math.min(fi,menu.items.length-1))}
 function start(role,seed,first,town=0){feed=[];cam.manualT=-99;document.body.classList.remove('titling');ov.classList.remove('title');newGame(role,seed==null?(Date.now()%1e9):seed,town);if(town)first=false;
   if(!(role==='human'&&!town&&(first||!save.firstDay))){applyOmen(drawOmen(S.seed));applyMemory()} /* the guided first day runs without an omen or memory */
-  cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut={i:0,t:0,shown:false,done:false};farLand=null;closeMenu();lastSig='';
+  cam.pitch=-.55;S.introCam=true;S.trumpetsDue=true;S.nextCall=24;if(role==='human'&&!town&&(first||!save.firstDay))S.tut=tutNewDay();farLand=null;closeMenu();lastSig='';
   if(S.memoryText)toast(S.memoryText);
   if(role==='human'&&S.you&&!S.tut)applyRenown(S.you);
   if(role==='human'&&S.you&&!S.tut)setTimeout(()=>{if(S&&S.you&&!S.over)toast('Today\u2019s goals (I to see them): '+matchGoals().map(g=>g.t.toLowerCase()).join('; ')+'.')},9000);

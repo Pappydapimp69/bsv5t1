@@ -253,8 +253,8 @@ async function main() {
       forager.goal = null;
       botHuman(forager, C.DT);
       const paysFromLocalForager = player.gold === before && forager.gold === 120 && barracks.q === 1;
-      const trainingStep = {i: FIRST_DAY.findIndex(step => step.id === 'soldier')};
-      state.tut = trainingStep;
+      // the first day reserves the first recruit for the player's training goal (Your town chapter, soldier not done)
+      state.tut = Object.assign(tutNewDay(), {ch: 2, chT: 1});
       const reservesTutorialTraining = !tendBarracks(forager, barracks) && barracks.q === 1;
       state.tut = null;
       const outpostForager = foragersIn(outpost)[0];
@@ -353,31 +353,26 @@ async function main() {
       const barracks = tutBarracks(player);
       trainSoldier(barracks);
       state.t = OPENING.len + 2;
-      state.tut = {i: FIRST_DAY.findIndex(step => step.id === 'rivals'), t: 0, shown: false};
-      openTutorialCard();
-      const namesBothRivals = menu.body.includes('Brindle') && menu.body.includes('Corvel');
-      menu.holdUntil = 0;
-      activate(0);
-      const showsRivalOnMap = state.fly?.to.x === state.towns[1].x;
-      state.fly = null;
-      stepTutorial(C.DT);
-      openTutorialCard();
-      const teachesAttack = menu.body.includes('Attack Brindle') && menu.body.includes('Stand down');
-      menu.holdUntil = 0;
-      activate(0);
+      // the first day's goals (open chapters): the map goal names both rivals and completes when the map opens;
+      // Defend giant completes the order goal, an attack order neither completes nor breaks it
+      state.tut = Object.assign(tutNewDay(), {ch: 2, chT: state.t});
+      const mapGoal = tutGoal('map');
+      const namesBothRivals = mapGoal.hint.includes('Brindle') && mapGoal.hint.includes('Corvel');
+      tutOpenGoal(mapGoal, player, true); state.tut.mapOpened = true; stepTutorial(C.DT);
+      const showsRivalOnMap = tutDone('map');
+      state.tut.ch = 3; tutOpenGoal(tutGoal('order'), player, true);
+      const teachesAttack = tutOpen('order') && tutGoal('order').hint.includes('Defend giant');
       openBarracks(barracks);
       activate(menu.items.findIndex(item => item.label === 'Attack Brindle'));
       stepTutorial(C.DT);
-      const attackAdvancesLesson = tutStep().id === 'order' && soldiersOf(barracks)[0].ord?.k === 'attack';
+      const attackAdvancesLesson = tutOpen('order') && soldiersOf(barracks)[0].ord?.k === 'attack';
       openBarracks(barracks);
       activate(menu.items.findIndex(item => item.label === 'Defend giant'));
-      const acceptsQueuedDefense = tutStep().check(player);
-      state.tut.i--;
-      openTutorialCard();
-      menu.holdUntil = 0;
-      activate(menu.items.findIndex(item => item.label === 'Skip this order'));
       stepTutorial(C.DT);
-      const attackCanBeSkipped = tutStep().id === 'order' && barracks.order.k === 'giant';
+      const acceptsQueuedDefense = tutDone('order');
+      const noBarracksNoOrderGoal = !tutGoal('order').only({...player, id: -1});
+      const attackCanBeSkipped = noBarracksNoOrderGoal && barracks.order.k === 'giant';
+      state.tut = null;
 
       player.x = town.x + 300;
       build(player, 'house');

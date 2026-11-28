@@ -21,7 +21,7 @@ function chained(id){const ch=S.chains.find(c=>c.id===id);return ch&&ch.hp>0}
 // wake horn or a person has started on the chains, and never before the player's own chain step on the first day, so the
 // waking is a turn of the match people cause and can see coming. Only a horn wakes it, or the giant player's own strain
 // once people have broken all four chains.
-function chainsOpen(){const st=tutStep();if(st&&FIRST_DAY.findIndex(x=>x.id==='chain')>=S.tut.i&&S.t<1200)return false;return !!S.chainsStarted||S.humans.some(h=>h.horn)}
+function chainsOpen(){if(tutChapter()<3&&S.t<1200)return false;return !!S.chainsStarted||S.humans.some(h=>h.horn)}
 // The sleeper stirs. From the first minute the chained giant can twitch one part of its body and strain against its chains,
 // and hunters may wedge it while it sleeps: half damage, and never below 60% of a joint, so nothing is crippled before it wakes.
 // (Overnight expansion: the giant player used to have no action at all until minute 15.)

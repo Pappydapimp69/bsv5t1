@@ -218,6 +218,7 @@ C.WAVE_FIRST=55;C.WAVE_REST=[30,60];C.WAVE_BOUNTY=15;
 function stepWaves(){S.waves=S.waves||[0,1,2].map(i=>({n:0,next:C.WAVE_FIRST+i*12,ev:null}));
   for(let i=0;i<3;i++){const W=S.waves[i],t=S.towns.find(x=>x.i===i&&x.alive&&!x.outpost);if(!t)continue;
     if(W.ev){if(S.events.includes(W.ev))continue;W.ev=null;W.next=S.t+rr(C.WAVE_REST[0],C.WAVE_REST[1])*(S.g.awake?1.5:1);continue}
+    if(tutChapter()<2&&S.t<480){W.next=Math.max(W.next,S.t+20);continue}
     if(S.t<W.next||nightLock())continue;W.n++;const size=Math.min(9,2+W.n),trolls=W.n>=3?Math.min(3,Math.floor((W.n-1)/2)):0;
     startRaid(t,'Wave '+W.n+': beasts gather beyond '+t.name+' and march in 20 s!',null,size,trolls);W.ev=S.events[S.events.length-1];W.ev.wave=W.n}}
 function stepEvents(dt){stepWaves();stepPois(dt);stepCritters(dt);stepGoals();stepFestival();humanHints();

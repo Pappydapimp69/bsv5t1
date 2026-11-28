@@ -8,7 +8,7 @@
 C.HORSE_COST=80;C.RIDE=1.9;C.RIDE_HIT=1.5;C.HORSE_HP=80;C.THROW=.3;C.HORSE_AWAY=60;
 const horseReady=h=>!!h.horse&&!(h.horse.away>S.t);
 function rideWhy(h){if(!h.horse)return'Buy a horse in town ('+C.HORSE_COST+' gold)';if(h.horse.away>S.t)return'Your horse bolted; it returns in '+Math.ceil(h.horse.away-S.t)+' s';if(h.mode!=='ground')return'Not on the giant';if(h.job)return'Not while building';return null}
-function setRide(h,on){if(on&&rideWhy(h))return false;if(!!h.riding===!!on)return true;h.riding=!!on;if(h.you){sfx(on?'coin':'thud');toast(on?'You mount your horse. R to get down.':'You get down from your horse.')}return true}
+function setRide(h,on){if(on&&rideWhy(h))return false;if(!!h.riding===!!on)return true;h.riding=!!on;if(on)h.rodeOnce=1;if(h.you){sfx(on?'coin':'thud');toast(on?'You mount your horse. R to get down.':'You get down from your horse.')}return true}
 function toggleRide(h){if(h.riding)return setRide(h,false);const w=rideWhy(h);if(w){if(h.you)toast(w);return false}return setRide(h,true)}
 function horseHurt(h,d){if(!h.riding||!h.horse)return;h.horse.hp-=d*.6;
   if(h.horse.hp<=0&&h.horse.barded){h.horse.hp=1;h.riding=false;if(h.you)toast('Your barded horse stumbles but stays: let it rest.');return}

@@ -142,10 +142,12 @@ function foragerHome(h){const t=S.towns[h.homeId];return t?.alive?t:null}
 const FORAGER_CAP=4;
 function foragerCapacity(t){return t.alive?Math.min(FORAGER_CAP,1+(t.houses||0)):0}
 function foragersIn(t){return S.humans.filter(h=>isForager(h)&&h.homeId===t.id)}
-function assignForagerHome(h,t){h.homeId=t?.id??null;h.name=(t?.name||TOWNS[h.town].name)+' forager';h.goal=null;h.quest=null;h.returnHome=!!t}
-function fillForagerHousing(t){if(foragersIn(t).length>=foragerCapacity(t))return false;
+function assignForagerHome(h,t){h.homeId=t?.id??null;h.name=(t?.name||TOWNS[h.town].name)+' villager';h.goal=null;h.quest=null;h.returnHome=!!t}
+// a villager left homeless (the giant trampled their house) moves into the first room; a new one comes only when free
+// (a new village's first settler) or is trained at the Hall for food (rpg/economy.js)
+function fillForagerHousing(t,free=true){if(foragersIn(t).length>=foragerCapacity(t))return false;
   const displaced=S.humans.find(h=>isForager(h)&&h.town===t.i&&h.homeId==null);
-  if(displaced)assignForagerHome(displaced,t);else S.humans.push(mkHuman(t.i,false,'folk',t));
+  if(displaced)assignForagerHome(displaced,t);else if(free)S.humans.push(mkHuman(t.i,false,'folk',t));else return false;
   return true}
 function inForageRange(home,p){return !!home&&dist(home,p)<=C.FORAGE_RANGE}
 function homeOf(h){if(isForager(h))return foragerHome(h);let b=null,bd=1e9;const own=aliveTowns().filter(o=>o.i===h.town),pool=own.length||h.hero?own:aliveTowns();for(const o of pool){const d=dist(o,h);if(d<bd){bd=d;b=o}}return b}

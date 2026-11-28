@@ -6,7 +6,8 @@
 let toastT=0;const toastEl=document.getElementById('toast');
 const feedEl=document.getElementById('feed');let feed=[];
 // messages queue instead of overwriting each other; a repeat folds into the one already showing
-function toast(s){const last=feed[feed.length-1];if(last&&last.text===s){last.n++;last.t=Math.max(last.t,3);return}feed.push({text:s,n:1,t:Math.min(6,2.6+s.length/40)});if(feed.length>3)feed.shift()}
+let msgLog=[];
+function toast(s){if(S&&!S.headless){msgLog.push({t:S.t,text:s});if(msgLog.length>60)msgLog.shift()}const last=feed[feed.length-1];if(last&&last.text===s){last.n++;last.t=Math.max(last.t,3);return}feed.push({text:s,n:1,t:Math.min(6,2.6+s.length/40)});if(feed.length>3)feed.shift()}
 function paintFeed(dt){if(!FILM)for(const f of feed)f.t-=dt; // messages wait out the opening film instead of expiring unseen
   feed=feed.filter(f=>f.t>0);const html=feed.map(f=>`<div style="opacity:${Math.min(1,f.t/.5)}">${f.text}${f.n>1?' <b>x'+f.n+'</b>':''}</div>`).join('');if(html!==feedEl._h){feedEl._h=html;feedEl.innerHTML=html}}
 function announce(s){toast(s)}

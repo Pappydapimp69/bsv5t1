@@ -43,7 +43,7 @@ const FIRST_DAY=[
   {id:'horse',ch:2,start:true,name:'Buy a horse and ride',hint:'The shop in town sells horses (80 gold). Press R to ride.',cost:()=>C.HORSE_COST,target:h=>h.horse?null:S.towns[h.town],check(h){return!!h.rodeOnce}},
   {id:'raise',ch:2,appear:h=>S.builds.some(b=>b.owner===h.id&&b.k==='house'),name:'Raise your house',hint:'With 3 sky crystals, stand by your house and press Upgrade.',
    target(h){return S.builds.find(b=>b.owner===h.id&&b.k==='house')},check(h){return S.builds.some(b=>b.owner===h.id&&b.k==='house'&&lv(b)>1)}},
-  {id:'soldier',ch:2,appear:h=>!!tutBarracks(h),name:'Train a soldier',hint:'Beside your barracks, press Barracks, then Train a soldier (30 gold).',cost:()=>ARMY.SOLDIER,
+  {id:'soldier',ch:2,appear:h=>!!tutBarracks(h),name:'Train a soldier',hint:'Beside your barracks, press Barracks, then Train a soldier (30 gold and 40 food from the town\u2019s stockpile).',cost:()=>ARMY.SOLDIER,
    setup(h){tutBase(h,'trained',h.trained||0)},target:h=>tutBarracks(h),check(h){const b=tutBarracks(h);return(h.trained||0)>tutBase(h,'trained',0)&&!!b&&b.sol.length>0}},
   {id:'map',ch:2,lesson:true,start:true,name:'Find Brindle and Corvel on the map',hint:'Press M for the full map. Brindle (orange square) tends the giant; Corvel (purple diamond) hunts it.',check(){return!!S.tut.mapOpened}},
   // 3 · the giant

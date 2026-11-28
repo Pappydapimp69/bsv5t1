@@ -132,3 +132,20 @@ body.titling #ver{display:block}
 #goal .jg.dn{color:#9be08a;opacity:.85}
 #goal .jg.hint{font-style:italic;opacity:.7;cursor:default}
 #goal .jg b{color:var(--accent);font-size:.7rem;font-weight:700}
+/* the resource bar: the stockpile of the settlement you stand in (or your nearest), your purse, crystals and villagers */
+#res{position:absolute;z-index:6;left:var(--sl);top:max(.6rem,env(safe-area-inset-top));display:flex;flex-wrap:wrap;align-items:center;gap:.15rem .55rem;max-width:calc(100% - 2*var(--sl));padding:.3rem .6rem;border-radius:.6rem;background:rgba(14,16,20,.72);font-size:.82rem;font-weight:600;pointer-events:none;font-variant-numeric:tabular-nums}
+#res .rs{display:inline-flex;align-items:center;gap:.2rem;white-space:nowrap}#res .rs b{color:var(--ink)}#res .rs i{color:var(--good);font-style:normal;font-size:.72rem}
+#res .rn{color:var(--dim);font-size:.72rem;font-weight:500;white-space:nowrap}
+body.film #res,body.titling #res{visibility:hidden}
+.card .stock{display:flex;gap:.8rem;font-weight:700;margin:.2rem 0 .4rem}.card .stock .rs{display:inline-flex;gap:.25rem}
+/* quieter controls: an action you cannot take fades back */
+.ab.off{opacity:.5}
+.msglog{max-height:55vh;overflow:auto;font-size:.85rem;display:flex;flex-direction:column;gap:.25rem;margin-bottom:.6rem}
+/* the quest tracker: one line, the arrow opens the list (O) */
+#goal .qh{display:flex;justify-content:flex-end;align-items:baseline;gap:.6rem}
+#goal .qt{pointer-events:auto;cursor:pointer;flex:none;padding:0 .35rem;border-radius:.35rem;background:rgba(255,255,255,.1);color:var(--accent);font-size:.75rem;font-weight:700}
+#goal .qt:hover{background:rgba(255,255,255,.2)}
+#goal .jg{margin-top:.2rem}#goal .jg .qn{color:var(--accent);font-weight:700}#goal .jg i{color:var(--dim);font-style:normal;font-size:.7rem}
+.card .mb.quest{border-left:4px solid var(--accent)}.card .mb.quest.new{background:#2f2c1c}
+#goal .jg.urgent{font-style:normal;opacity:1;color:#ffb8a8}
+#skillbar.side{transform:none;align-items:flex-start}#skillbar.side .skrow{flex-wrap:wrap;justify-content:flex-start}#skillbar.side .xpt{text-align:left}

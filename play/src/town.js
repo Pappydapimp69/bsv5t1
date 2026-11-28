@@ -18,7 +18,7 @@ function dropJob(h){const j=h.job;if(!j)return;h.job=null;if(j.kind==='site'&&j.
 function build(h,k){const placement=k==='barracks'?barracksPlacement(h):null,why=canBuild(h,k,placement);
   if(why){sayTo(h,why);return false}const job={kind:'ground',k,x:h.x,y:h.y};
   if(placement)job.settlementId=placement.town.id;
-  h.gold-=C.COST[k];startJob(h,job);return true}
+  h.gold-=C.COST[k];payRes(payerFor(h,k),k);startJob(h,job);return true}
 function finishBuild(h,j){sfx('build',h.you);if(j.k==='barracks')return finishBarracks(h,j);
   const hx=h.x,hy=h.y;h.x=j.x;h.y=j.y;const built=finishBuild0(h,j.k);h.x=hx;h.y=hy;return built}
 function foundVillage(ti,x,y){S.outposts[ti]++;const n=S.towns.length,names=[['Ashmere','Ashwell','Ashby'],['Brindle Ford','Brindlemoor','Brindlewick'],['Corvel Rest','Corvelmere','Corvel Hollow']];
@@ -32,15 +32,15 @@ function villageSite(from){if(S.outposts[from.i]>=3)return null;
     if(!outpostSiteOpen(x,y))continue;if(S.g.feet.some(f=>Math.hypot(f.x-x,f.y-y)<C.FOOT_R*4))continue;return{x,y}}
   return null}
 function finishBuild0(h,k){
-  if(k==='outpost'){if(S.outposts[h.town]>=3||!outpostSiteOpen(h.x,h.y)){h.gold+=C.COST.outpost;sayTo(h,'Outpost site is no longer available. Your gold was refunded.');return false}
+  if(k==='outpost'){if(S.outposts[h.town]>=3||!outpostSiteOpen(h.x,h.y)){h.gold+=C.COST.outpost;refundRes(payerFor(h,'outpost'),'outpost');sayTo(h,'Outpost site is no longer available. Your gold was refunded.');return false}
     const from=firstTown(h.town);if(!from){h.gold+=C.COST.outpost;return false}startCaravan(from,{x:h.x,y:h.y},h);gainXp(h,10);return true}
   const b={k,x:h.x,y:h.y,town:h.town,owner:h.id,cd:0};S.builds.push(b);
   questTick(h,'build');
   if(CIVIC[k]){const t=nearestOwn(h.town,h.x,h.y);if(t)b.settlementId=t.id;(h.stat=h.stat||{}).civic=(h.stat.civic||0)+1;gainXp(h,12);if(h.you)toast(CIVIC[k].n+' built in '+(t?t.name:'your town')+'. Prosperity '+prosperity(t)+'.');return true}
   let housed=false;
-  if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){if(h.hero)t.heroHouse=true;b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t);
-    if(housed&&!h.you&&S.you?.town===t.i)toast(t.name+' gained a forager from a new house.')}}
-  gainXp(h,10);sayTo(h,k==='house'?(housed?'House built. Your settlement gains a forager.':'House built. Your build area reaches further.'):'Watchtower built: it shoots beasts that come near.');return true}
+  if(k==='house'){const t=nearestOwn(h.town,h.x,h.y);if(t){if(h.hero)t.heroHouse=true;b.settlementId=t.id;t.max+=C.HOUSE_HP;t.hp+=C.HOUSE_HP;t.r+=C.HOUSE_GROW;t.houses=(t.houses||0)+1;housed=fillForagerHousing(t,false);
+    if(housed&&!h.you&&S.you?.town===t.i)toast('A villager moved back into '+t.name+'.')}}
+  gainXp(h,10);sayTo(h,k==='house'?(housed?'House built. A villager moves back in.':'House built: room for one more villager (train them at the Hall).'):'Watchtower built: it shoots beasts that come near.');return true}
 function stepBuilds(dt){
   for(const b of S.builds)if(b.k==='tower'){b.cd-=dt;const L=lv(b),sp=b.spec,R2=C.TOWER_R*(1+.25*(L-1))*(sp==='ballista'?1.8:1);
     if(sp==='watchfire')for(const o of S.humans)if(o.town===b.town&&!o.dead&&o.mode==='ground'&&Math.hypot(o.x-b.x,o.y-b.y)<R2)o.hp=Math.min(o.max,o.hp+6*dt);
@@ -55,7 +55,7 @@ function stepBuilds(dt){
     for(const b of S.builds){if(b.k!=='house'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;
       const st=S.towns[b.settlementId],gold=Math.round(HOUSE_RENT*(owner===S.you&&b.owner!==S.you.id?.5:1)*lv(b)*prospK(st)*(1+.25*civicIn(st,'market')));owner.gold+=gold;if(owner===S.you)collected+=gold}
     for(const b of S.builds){if(b.k!=='farm'||b.hp===0)continue;const owner=S.you&&b.town===S.you.town?S.you:S.humans.find(h=>h.id===b.owner);if(!owner)continue;owner.gold+=3;if(owner===S.you)collected+=3}
-    if(collected)toast((S.builds.some(b=>b.k==='farm'&&b.town===S.you?.town)?'Rent and harvest':'House rent')+': +'+collected+' gold.');
+    if(collected&&S.you){S.rentAcc=(S.rentAcc||0)+collected;if(S.t-(S.rentSaid??-99)>=60){toast('House rent: +'+S.rentAcc+' gold.');S.rentAcc=0;S.rentSaid=S.t}}
   }
   // the giant's lakes feed whoever settles beside them
   if(Math.floor(S.t/10)!==Math.floor((S.t-dt)/10)){const towns=aliveTowns();for(const i of [0,1,2]){const own=towns.filter(t=>t.i===i);
@@ -77,7 +77,7 @@ function upgrade(h,kind,o,bank=h){const near=bank===h&&h.you?storeNear(h):null,h
 function upgradeTarget(h){const b=buildNear(h),t=townAt(h);
   if(b){const tower=b.k==='tower',why=tower&&lv(b)===1&&!b.spec?(h.crystals<C.UP.tower[0]?'Need '+(C.UP.tower[0]-h.crystals)+' more crystals':null):canUpgrade(h,b.k,b);
     return{label:(tower?'tower':'house')+(upCost(b.k,b)!=null?' ('+upCost(b.k,b)+')':''),why,act:()=>tower&&!b.spec&&h.you&&!S.autoplay?(openTowerMenu(h,b),true):upgrade(h,b.k,b)}}
-  if(t&&t.i===h.town)return{label:(t.outpost?'outpost to town':'town')+' ('+(upCost('town',t)??'max')+')',why:canUpgrade(h,'town',t),act:()=>upgrade(h,'town',t)};
+  if(t&&t.i===h.town)return{label:(t.outpost?'outpost to town':'to '+nextAge(t)+' age')+' ('+(upCost('town',t)??'max')+')',why:canUpgrade(h,'town',t),act:()=>upgrade(h,'town',t)};
   return null}
 // a tower's first raise chooses what it becomes
 const TOWER_SPECS={sharpen:'More damage on every shot',ballista:'Long range, heavy bolts, slow',volley:'Hits up to three targets at once',watchfire:'Heals your people nearby and lights raiders early'};
@@ -124,7 +124,7 @@ function trainedCount(b){return b.sol.length+b.q+(b.train>0?1:0)}
 function barracksWork(h,b){
   const home=foragerHome(h);
   if(!home||b.hp===0||b.settlementId!==home.id||!heroBuilt(b))return null;
-  if(!tutHoldsTraining(b)&&h.gold>=ARMY.SOLDIER&&trainedCount(b)<ARMY.CAP)return{train:true};
+  if(!tutHoldsTraining(b)&&h.gold>=ARMY.SOLDIER&&!solFoodWhy(b)&&botFoodSpare(home)&&trainedCount(b)<ARMY.CAP)return{train:true};
   const soldiers=readySoldiers(b);
   for(const k of ['blade','armour'])for(const soldier of soldiers){
     const gear=nextGear(soldier,k);
@@ -136,7 +136,7 @@ function barracksWork(h,b){
 function tendBarracks(h,b){
   const work=barracksWork(h,b);
   if(!work||!S.builds.includes(b)||dist(h,b)>90)return false;
-  if(work.train){h.gold-=ARMY.SOLDIER;b.q++}
+  if(work.train){h.gold-=ARMY.SOLDIER;spendStock(S.towns[b.settlementId],'food',C.SOLDIER_FOOD);b.q++}
   else if(work.kit){h.gold-=C.COST[work.kit];work.soldier.kits[work.kit]++}
   else buyGear(work.soldier,work.k,h);
   return true;
@@ -262,7 +262,7 @@ function openBarracks(b){const h=S.you;if(!h)return;const sol=soldiersOf(b),read
   const ord=(k,ti,label,sub)=>({label:(on&&on.k===k&&on.ti===ti?'\u2713 ':'')+label,sub,why:!sol.length&&!tr?'No soldiers yet: train some':null,act:()=>{b.order={k,ti};const n=giveOrder(b,k,ti);closeMenu();toast((n?n+(n>1?' soldiers march':' soldier marches')+' to '+ordName(k,ti)+'. ':'')+'They will keep going back to '+ordName(k,ti)+' until you change the order.')}});
   const foes=[0,1,2].filter(j=>j!==b.town&&factionAlive(j)).map(j=>ord('attack',j,'Attack '+TOWNS[j].name,'Walk there, fight its people, buildings and walls for '+ARMY.HOLD+' s'));
   openMenu({title:'Barracks',body:`<p class="dim">${sol.length}/${ARMY.CAP} soldiers${tr?', '+tr+' training':''}${out?', '+out+' out':''}. ${h.gold} gold. Health ${Math.ceil(b.hp)}/${b.max}. ${on?'Standing order: '+ordName(on.k,on.ti)+'. ':''}Orders: they walk there in real time, hold ${ARMY.HOLD} s, tire and are back here at once, then set out again until you change the order.</p>`,
-    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:!home?'Its settlement has fallen':trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':null,act:()=>{h.gold-=ARMY.SOLDIER;b.q++;h.trained=(h.trained||0)+1;sfx('coin');openBarracks(b)}},braceItem,
+    items:[{label:'Train a soldier – '+ARMY.SOLDIER+' gold, '+C.SOLDIER_FOOD+' food',sub:ARMY.TRAIN+' s to train; this barracks holds '+ARMY.CAP,why:!home?'Its settlement has fallen':trainedCount(b)>=ARMY.CAP?'This barracks holds '+ARMY.CAP+' soldiers':h.gold<ARMY.SOLDIER?'Need '+(ARMY.SOLDIER-h.gold)+' more gold':solFoodWhy(b),act:()=>{h.gold-=ARMY.SOLDIER;spendStock(S.towns[b.settlementId],'food',C.SOLDIER_FOOD);b.q++;h.trained=(h.trained||0)+1;sfx('coin');openBarracks(b)}},braceItem,
       ...(home?[ord('town',null,'Defend town','Hold the walls of '+home.name)]:[]),ord('giant',null,'Defend giant','Stand at the nearest foot and fight what threatens it'),ord('tend',null,'Tend the giant','Break its chains once they open, sound a horn, pull wedges, bolt on braces and cannons'),ord('hunt',null,'Hunt the giant','Break its chains once they open, then wedge and strike its joints'),...foes,
       ...(on?[{label:'Stand down',sub:'Soldiers stay at the barracks when they come back',act:()=>{b.order=null;closeMenu();toast('Your soldiers will stay at the barracks when they return.')}}]:[]),
       {label:'Build here',sub:'House, watchtower or outpost',act:()=>openBuild()},{label:'Leave',act:closeMenu}],grid:true,back:closeMenu})}

@@ -36,7 +36,7 @@ function pickGoalFolk(h){
     if(withinLimits(home,x,y)&&!inSolid(x,y,30))return{k:'build',what:'house',x,y};
   }
   // a hero bot grows its town too: farms when houses go hungry, then a well, market, smithy and stable as gold allows
-  if(h.hero&&home&&!home.outpost){const hungry=(home.houses||0)>2*civicIn(home,'farm')+1,want=hungry?'farm':['well','market','smithy','stable'].find(k=>!civicIn(home,k)&&(!CIVIC[k].lvl||lv(home)>=CIVIC[k].lvl));
+  if(h.hero&&home&&!home.outpost){const hungry=(home.houses||0)>2*civicIn(home,'farm')+1||!civicIn(home,'farm')&&stockOf(home,'food')<150,want=hungry?'farm':['well','market','smithy','stable'].find(k=>!civicIn(home,k)&&(!CIVIC[k].lvl||lv(home)>=CIVIC[k].lvl));
     if(want&&h.gold>=C.COST[want]+30){const a=rr(0,6.28),d=home.r*.6+rr(40,160),x=home.x+Math.cos(a)*d,y=home.y+Math.sin(a)*d;if(withinLimits(home,x,y)&&!inSolid(x,y,30)&&!S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<60))return{k:'build',what:want,x,y}}}
   if(q?.k==='troll'){
     const troll=S.monsters.find(m=>m.kind==='troll'&&local(m));if(troll)return{k:'monster',id:troll.id};
@@ -74,10 +74,10 @@ function spendPool(t,c){for(const u of linked(t)){const d=Math.min(c,u.crystals|
 function storeNear(h){if(!h||h.mode==='climb')return null;let best=null;for(const t of aliveTowns())if(t.i===h.town&&withinLimits(t,h.x,h.y)&&(!best||dist(t,h)<dist(best,h)))best=t;return best}
 function folkRaiseTown(h,t){const c=upCost('town',t);if(c==null||poolOf(t)<c)return false;spendPool(t,c);const promote=t.outpost;t.lvl=lv(t)+1;t.max+=600;t.hp+=600;t.r+=20;if(promote)t.outpost=false;else startCaravan(t);
   if(S.you&&S.role==='human'&&S.you.town===t.i)toast(t.name+'\u2019s foragers raised it to level '+t.lvl+' with the town\u2019s crystals'+(promote?': it is now a town.':'.'));return true}
-function folkBuildHouse(h,t){if(!t.heroHouse||(t.houses||0)>=houseCap(t)||h.gold<C.COST.house+15)return false;
+function folkBuildHouse(h,t){if(!t.heroHouse||(t.houses||0)>=houseCap(t)||h.gold<C.COST.house+15||resWhy(t,'house'))return false;
   for(let k=0;k<12;k++){const a=rr(0,6.28),d=t.r+rr(50,170),x=t.x+Math.cos(a)*d,y=t.y+Math.sin(a)*d;
     if(!withinLimits(t,x,y)||inSolid(x,y,30)||S.builds.some(b=>Math.hypot(b.x-x,b.y-y)<50)||S.prints.some(p=>Math.hypot(p.x-x,p.y-y)<C.FOOT_R*1.2))continue;
-    h.gold-=C.COST.house;const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,'house');h.x=hx;h.y=hy;
+    h.gold-=C.COST.house;payRes(t,'house');const hx=h.x,hy=h.y;h.x=x;h.y=y;finishBuild0(h,'house');h.x=hx;h.y=hy;
     if(S.you&&S.role==='human'&&S.you.town===t.i&&nearPlayer(t))toast('A forager of '+t.name+' built a house.');return true}
   return false}
 function folkLayRoad(h,t){if(h.gold<C.ROAD_COST)return false;S.links=S.links||[];
@@ -243,7 +243,6 @@ function packCount(h){return h.pack.crystals+h.pack.pelts}
 function packAdd(h,what,n){let got=0;while(got<n&&packCount(h)<packCap(h)){h.pack[what]++;got++}if(got<n)sayTo(h,'Your pack is full. Go home to empty it.');if(what==='crystals'&&got)for(let i=0;i<got;i++)questTick(h,'gather');return got}
 function unloadPack(h,t=townAt(h)){if(isForager(h)&&(!t||t!==foragerHome(h)))return;
   const k=h.pack;if(!k.crystals&&!k.pelts&&!k.found)return;const c=k.crystals,keep=h.you&&!S.autoplay,n=keep?0:k.pelts,pg=n*C.PELT_GOLD,bank=isForager(h)?t:h;bank.crystals+=c;h.gold+=pg;if(keep)h.hides=(h.hides||0)+k.pelts;const kept=keep?k.pelts:0;k.crystals=0;k.pelts=0;k.found=0;
-  if(c&&isForager(h)&&S.you?.town===t.i)toast(t.name+' received '+c+' sky crystal'+(c===1?'':'s')+'.');
   const parts=[];if(c)parts.push(c+' sky crystal'+(c>1?'s':'')+' stored');if(n)parts.push(n+' pelt'+(n>1?'s':'')+' sold for '+pg+' gold');if(kept)parts.push(kept+' pelt'+(kept>1?'s':'')+' to your hide store ('+h.hides+'; craft or sell them at the Forge)');if(parts.length)sayTo(h,'You empty your pack: '+parts.join(', ')+'.')}
 // the giant's tasks: it wins by surviving until dusk and completing three of these five
 function giantTasks(){const g=S.g;return[

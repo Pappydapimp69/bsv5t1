@@ -18,3 +18,5 @@ g3Update=(f=>function(){const now=performance.now(),saved=[];
   const blend=G3.cameraBlend;if(blend){const u=clamp((performance.now()-blend.at)/320,0,1),weight=1-u*u*(3-2*u);
     cm.position.lerp(blend.position,weight);cm.quaternion.slerp(blend.rotation,weight);if(u===1)G3.cameraBlend=null}
   cm.updateMatrixWorld()}}
+// from rpg/economy.js: stockpiles, villagers at work and the materials on every building
+wireEconomy();

@@ -66,7 +66,7 @@ const {chromium} = require('playwright');
           if (tutOpen('map')) S.tut.mapOpened = true;
           const inTown = townAt(h) === town;
           if (inTown) {
-            if (tutJob()) { openTown(town, 'Board'); menuPick(/^Slay 3/); }
+            if (tutJob()) { openTown(town, 'Board'); menuPick(/^Task · Slay 3/); }
             if (h.quest && h.quest.done) { openTown(town, 'Board'); menuPick(/^Claim/); }
             if (tutOpen('horse') && !h.horse && h.gold >= C.HORSE_COST) { openTown(town, 'Shop'); menuPick(/^Horse/); }
           }

@@ -51,7 +51,7 @@ function mkHuman(ti,you,role,t=S.towns[ti],hero=you){
   return{id:S.nextId++,town:ti,you,hero,role,homeId:role==='folk'?t.id:null,x:t.x+rr(-60,60),y:t.y+rr(-60,60),hp:100,max:100,atk:10,lvl:1,xp:0,gold:hero?40:30,
     kits:{anchor:hero?3:0,wedge:hero&&role==='warden'?1:0,cannon:0,brace:0,ladder:hero?1:0,platform:0},potions:1,gloves:0,def:0,gear:{blade:0,armour:0,pack:0,gloves:0},bigPotions:0,crystals:0,horn:0,pack:{crystals:0,pelts:0,found:0},quest:null,mode:'ground',leg:0,cl:null,grip:C.GRIP,cd:0,dead:0,lastMove:-9,
     tx:null,ty:null,goal:null,think:0,face:0,swing:0,botClimb:null,rest:false,
-    name:you?'You':role==='folk'?t.name+' forager':hero?HERO_NAMES[ti]:TOWNS[ti].name+' '+role}}
+    name:you?'You':role==='folk'?t.name+' villager':hero?HERO_NAMES[ti]:TOWNS[ti].name+' '+role}}
 function maxGrip(h){return C.GRIP+h.gloves*25+(h.lvl-1)*5+40*perk(h,'grip')}
 // gear comes in tiers; a town sells a tier only once it has been raised to that level
 const GEAR={blade:[{n:'Bronze blade',v:4,g:40,t:1},{n:'Steel blade',v:7,g:90,t:2},{n:'Starmetal blade',v:11,g:160,t:3},{n:'Giantbone blade',v:16,g:340,t:3},{n:'Skyforged blade',v:22,g:650,t:3}],

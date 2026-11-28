@@ -26,29 +26,33 @@ while loading may only use what earlier files define. The wrappers that extend f
 | 13 | `src/rpg/world.js` | 125 | 27 | places (shrines, springs, stones, herbs, camps), merchant, travellers, deer, hound, treasure, world events, ruins |
 | 14 | `src/rpg/hero.js` | 91 | 22 | levels, talents, charms, crafting, the hero sheet, skills, hits on beasts, kills |
 | 15 | `src/rpg/quests.js` | 55 | 12 | board jobs, bounties, the elders' tale and the Rim Warlord, goal targets |
-| 16 | `src/climb.js` | 69 | 6 | a person's step on the ground and on the giant |
-| 17 | `src/combat.js` | 111 | 26 | monsters, shots, telegraphed combat, knockback |
-| 18 | `src/bots.js` | 202 | 12 | bots: the giant, heroes, foragers, soldiers |
-| 19 | `src/step.js` | 44 | 5 | the fixed sim step |
-| 20 | `src/input.js` | 139 | 29 | keys, mouse, touch and gamepad |
-| 21 | `src/menus.js` | 90 | 16 | menus: title, help, pause, army, chronicle |
-| 22 | `src/rpg/meta.js` | 37 | 10 | today's goals, first-time hints, renown, What's new |
-| 23 | `src/menus-town.js` | 49 | 5 | end screen, build menu, town menu, start() |
-| 24 | `src/render3d.js` | 275 | 30 | camera and render; the Three.js ground view (figures, beasts, places, decor are drawn here) |
-| 25 | `src/atmosphere.js` | 264 | 27 | atmosphere: haze, storm, rain, birds, wind and weather sound |
-| 26 | `src/view2d.js` | 360 | 55 | the canvas 2D fallback ground view and the giant's body panel |
-| 27 | `src/hud.js` | 103 | 15 | HUD, skill bar, buttons |
-| 28 | `src/wire.js` | 21 | 0 | wrappers that extend functions defined across files. In the single-file build these ran |
-| 29 | `src/main.js` | 34 | 6 | the frame loop, the test hook, start-up |
+| 16 | `src/rpg/economy.js` | 109 | 30 | the town economy: food, wood and stone stockpiles, villagers trained at the Hall and set to work (harvest goals), materials on buildings, quarries, ages, the resource bar; `wireEconomy()` hooks it into newGame, stepBuilds, unloadPack, pickGoalFolk and g3Build |
+| 17 | `src/rpg/questlog.js` | 72 | 20 | story quests taken from a town's Board (steps read from the town's state, paid as done; at most three), the collapsible quest tracker (O opens, N cycles) and where the tracked quest points |
+| 18 | `src/climb.js` | 69 | 6 | a person's step on the ground and on the giant |
+| 19 | `src/combat.js` | 111 | 26 | monsters, shots, telegraphed combat, knockback |
+| 20 | `src/bots.js` | 202 | 12 | bots: the giant, heroes, foragers, soldiers |
+| 21 | `src/step.js` | 44 | 5 | the fixed sim step |
+| 22 | `src/input.js` | 139 | 29 | keys, mouse, touch and gamepad |
+| 23 | `src/menus.js` | 90 | 16 | menus: title, help, pause, army, chronicle |
+| 24 | `src/rpg/meta.js` | 37 | 10 | today's goals, first-time hints, renown, What's new |
+| 25 | `src/menus-town.js` | 49 | 5 | end screen, build menu, town menu, start() |
+| 26 | `src/render3d.js` | 275 | 30 | camera and render; the Three.js ground view (figures, beasts, places, decor are drawn here) |
+| 27 | `src/atmosphere.js` | 264 | 27 | atmosphere: haze, storm, rain, birds, wind and weather sound |
+| 28 | `src/view2d.js` | 360 | 55 | the canvas 2D fallback ground view and the giant's body panel |
+| 29 | `src/hud.js` | 103 | 15 | HUD, skill bar, buttons |
+| 30 | `src/wire.js` | 21 | 0 | wrappers that extend functions defined across files. In the single-file build these ran |
+| 31 | `src/main.js` | 34 | 6 | the frame loop, the test hook, start-up |
 
 Styles: `src/style.css`. Tests: `tests/*.js` (Playwright, Three.js blocked, 2D fallback). `tests/fingerprint.js` hashes
 four seeded runs; run it after any change that should not alter gameplay, and `--record` only when gameplay is meant
-to change. `tests/firstday.js` checks the first day's rules and plays it with a player that follows only what is drawn. `tests/load.js` checks every script loads with no errors and both roles start.
+to change. `tests/firstday.js` checks the first day's rules and plays it with a player that follows only what is drawn. `tests/load.js` checks every script loads with no errors and both roles start. `tests/economy.js` checks the town economy and the quest Board and tracker.
 
 Where to look:
 - **Human RPG layer** (talents, skills, charms, places, quests, civic buildings, mounts, renown): `src/rpg/`.
   Its drawing lives inside the render closures in `src/render3d.js` (figures, horses, places, decor) and in the overlay
   pass of `src/view2d.js` (labels, map, speech, effects), because those draw with the closures' instance pools.
 - **The giant** (walking, chains, waking, actions): `src/giant.js`; its bot: `src/bots.js`; its panel: `src/view2d.js`.
+- **The town economy** (stockpiles, villagers, materials, ages, quarries, resource bar): `src/rpg/economy.js`; the Hall tab in `src/menus-town.js`; tests in `tests/economy.js`.
+- **Quests and the tracker**: `src/rpg/questlog.js` (Board quests, tracker); tasks (board jobs, bounties, the elders' tale) stay in `src/rpg/quests.js`; the Board tab in `src/menus-town.js`.
 - **The first day**: `src/tutorial.js` (open chapters: a goal table drives the journal in `src/hud.js`, the marks in `src/view2d.js` and the landmark lights in `src/atmosphere.js`; tests in `tests/firstday.js`). **Menus**: `src/menus.js`, `src/menus-town.js`, `src/rpg/meta.js`.
 - **Sim step order**: `src/step.js`. **Frame loop and test hook**: `src/main.js`.

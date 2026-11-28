@@ -35,7 +35,7 @@ function spawnWarlord(h){const M=C.MAP,R=mulberry32((S.seed^0xBADA55)>>>0);let x
   S.monsters.push({id:S.nextId++,kind:'troll',x,y,hx:x,hy:y,hp:520,max:520,atk:22,gold:120,xp:150,r:30,cd:0,elite:'The Rim Warlord',warlord:1});
   for(let k=0;k<3;k++)S.monsters.push({id:S.nextId++,kind:'wolf',x:x+rr(-120,120),y:y+rr(-120,120),hx:x,hy:y,hp:45,max:45,atk:8,gold:10,xp:14,r:13,cd:0});
   if(h.you)announce('The Rim Warlord has come down from the rim. Find it (marked on your map).')}
-function goalTarget(){if(tutActive()&&S.you){const g=tutTracked();return g?g.target(S.you):null}return questTarget(S.you)}
+function goalTarget(){if(tutActive()&&S.you){const g=tutTracked();return g?g.target(S.you):null}const h=S.you,tt=h&&h.track&&h.track!=='task'?trackedTarget(h):null;return tt||questTarget(h)}
 function questTarget(h){if(!h)return null;const near=xs=>xs.sort((a,b)=>Math.hypot(a.x-h.x,a.y-h.y)-Math.hypot(b.x-h.x,b.y-h.y))[0]||null;
   const g=h.saga&&!h.saga.done&&SAGA[h.saga.i],q=h.quest&&!h.quest.done?h.quest:null,k=q?q.k:g?g.k:null;
   if(!k){const p=h.aimPoi;return p&&(S.pois.includes(p)||p.golden&&!p.dead)&&Math.hypot(p.x-h.x,p.y-h.y)>140?{x:p.x,y:p.y}:null}

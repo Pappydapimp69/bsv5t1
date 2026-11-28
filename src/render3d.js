@@ -8,7 +8,7 @@ function shake(a){if(!reducedMotion)shakeA=Math.max(shakeA,a)}
 let UI=1,UIX={top:8,rb:0};const uiEls={};
 // one scale for everything: rem is set in CSS from the shorter screen side; canvas text and gauges follow it, and the HUD zones are measured so canvas drawing keeps clear of them
 function uiMeasure(){const g=n=>uiEls[n]||(uiEls[n]=document.getElementById(n));UI=(parseFloat(getComputedStyle(document.documentElement).fontSize)||16)/16;
-  const t=g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;g('side').style.top=UIX.top+'px';let rb=H-16*UI;
+  const t=g('hud');UIX.top=t.getBoundingClientRect().bottom+8*UI;{const re=g('res');if(re&&!re.hidden){const hr=t.getBoundingClientRect();re.style.top='';const rr0=re.getBoundingClientRect();if(rr0.right>hr.left-8*UI){re.style.top=UIX.top+'px';UIX.top+=rr0.height+6*UI}}}g('side').style.top=UIX.top+'px';let rb=H-16*UI;
   if(!document.body.classList.contains('titling'))for(const n of['stats','pad']){const r=g(n).getBoundingClientRect();if(r.width&&r.left<W-18*UI&&r.right>W-34*UI)rb=Math.min(rb,r.top-8*UI)}UIX.rb=Math.max(UIX.top+60*UI,rb);
   // the giant's body panel stands at the right edge; the goal line and feed keep to its left
   {const gs=S&&S.role==='giant'&&!document.body.classList.contains('titling');g('side').style.right=gs?(COLS*Math.min(UIX.rb-UIX.top,440*UI)/ROWS+30*UI)+'px':''}}

@@ -123,7 +123,7 @@ function canBuild(h,k,placement=k==='barracks'?barracksPlacement(h):null){if(!h.
   if(placement?.why)return placement.why;
   if(h.job)return'Finish your current build first';
   const onLake=S.prints.some(p=>Math.hypot(p.x-h.x,p.y-h.y)<C.FOOT_R*1.2);
-  if(h.gold<C.COST[k])return'Need '+(C.COST[k]-h.gold)+' more gold';if(onLake)return'Not in the lake';
+  if(h.gold<C.COST[k])return'Need '+(C.COST[k]-h.gold)+' more gold';{const w=resWhy(payerFor(h,k),k);if(w)return w}if(onLake)return'Not in the lake';
   if(S.builds.some(b=>Math.hypot(b.x-h.x,b.y-h.y)<45)||S.humans.some(o=>o.job&&o.job.kind==='ground'&&Math.hypot(o.job.x-h.x,o.job.y-h.y)<45))return'Too close to another building';
   if(k==='outpost')return !outpostSiteOpen(h.x,h.y)?'Too near a settlement':S.outposts[h.town]+pendingSettlers(h.town)>=3?'Your people have already founded three outposts':S.events.some(e=>e.k==='caravan'&&e.site&&Math.hypot(e.site.x-h.x,e.site.y-h.y)<C.OUTPOST_GAP)?'Settlers are already on their way near here':!firstTown(h.town)?'No town to send settlers from':null;
   if(k==='barracks')return null;

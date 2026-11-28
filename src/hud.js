@@ -80,12 +80,12 @@ function watchFavour(){if(!S.reg||S.g.dead)return;const f=favoredPerson();if(!f|
 const skillEl=document.getElementById('skillbar');let skSig='';
 skillEl.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-sk]');if(!el||!S||!S.you||menu)return;e.preventDefault();e.stopPropagation();const k=el.dataset.sk;if(k==='talent')openTalents();else if(k==='ride')toggleRide(S.you);else useSkill(S.you,k)});
 function paintSkills(){const h=S&&S.you;if(!h||FILM||S.role!=='human'){if(skSig){skSig='';skillEl.innerHTML=''}return}
-  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}',quake:'\u{1F4A5}'},parts=SKILLS.map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
+  const ic={cry:'\u{1F4E3}',whirl:'\u{1F300}',mend:'\u271A',spear:'\u{1F531}',quake:'\u{1F4A5}'},parts=SKILLS.filter(k=>h.lvl>=k.lvl).map(k=>{const lock=h.lvl<k.lvl,c=Math.max(0,((h.skCd&&h.skCd[k.id])||0)-S.t),tot=k.cd*(1-.25*perk(h,'focus'));
     return `<div class="sk${lock?' off':c<=0&&h.mode==='ground'?' ready':''}" data-sk="${k.id}" title="${k.text}"><span class="ky">${k.key}</span><span class="ic">${ic[k.id]}</span>${lock?'Lv '+k.lvl:k.name}${!lock&&c>0?`<div class="cdv" style="height:${Math.round(c/tot*100)}%"></div><div class="cdn">${Math.ceil(c)}</div>`:''}</div>`});
   if(h.picks>0)parts.push(`<div class="sk tal" data-sk="talent"><span class="ky">T</span><span class="ic">\u2605</span>Talent</div>`);
   if(h.horse)parts.push(`<div class="sk${h.riding?' ready':h.horse.away>S.t?' off':''}" data-sk="ride"><span class="ky">R</span><span class="ic">\u{1F40E}</span>${h.riding?'Riding':h.horse.away>S.t?Math.ceil(h.horse.away-S.t)+' s':'Ride'}</div>`);
   const f=Math.round(h.xp/(h.lvl*50)*100),sig=`<div class="xpt">Level ${h.lvl} \u00b7 ${h.xp}/${h.lvl*50} XP${h.buff&&h.buff.until>S.t?' \u00b7 '+SHRINES[h.buff.k].n.replace('Shrine of ','Blessed: ')+' '+Math.ceil(h.buff.until-S.t)+'s':''}${h.combo&&S.t-h.comboT<.9?' \u00b7 combo '+h.combo+'/3':''}${S.goals&&!tutActive()?' \u00b7 goals '+S.goals.filter(g=>g.done).length+'/3':''}</div><div class="xpb"><i style="width:${f}%"></i></div><div class="skrow">${parts.join('')}</div>`;if(sig!==skSig){skSig=sig;skillEl.innerHTML=sig}}
-function paintHud(){paintSkills();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
+function paintHud(){paintSkills();paintRes();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerHTML='<b>Colossus</b>';hud2.textContent='A giant, three towns, and the people who climb it.'}return}
   let a,b,n;const chip=(label,val,f,extra)=>`<span class="chip${extra||''}">${label} <b>${val}</b>${f!=null?`<i class="bar${f<.3?' low':f<.6?' mid':''}" style="width:${Math.round(clamp(f,0,1)*100)}%"></i>`:''}</span>`;
   paintPanel();
   if(S.role==='giant'){const J=S.joints,g=S.g,pc=id=>Math.ceil(J[id].hp/J[id].max*100)+'%'+(J[id].crip?' crippled':'');
@@ -95,8 +95,8 @@ function paintHud(){paintSkills();if(!S){if(hudSig!=='t'){hudSig='t';hud1.innerH
     b=!g.awake?(S.waker?'<span class="k">A horn sounds</span> at your head '+Math.round(S.wakeT/C.WAKE_TIME*100)+'%':allWeak()?'<span class="k">Free</span> strain once more to rise':'<span class="k">Chained</span> twitch off hunters, strain at your chains · aiming: '+ZONES[aimZone()]):g.fallen>0?'<span class="k">Down</span> '+Math.ceil(g.fallen)+' s':'';b=(b?b+'<br>':'')+'<span style="font-weight:500;font-size:.78rem">'+S.taskLine+'</span>'}
   else{const h=S.you;
     a=chip('HP',Math.ceil(h.hp)+'/'+h.max,h.hp/h.max)+(h.job?chip('Building',h.job.k,h.job.t/h.job.dur,' goal'):'')+(h.mode==='climb'?chip('Grip',Math.ceil(Math.max(0,h.grip)),h.grip/maxGrip(h))+chip('Height',Math.round(h.cl.y*FT)+' ft'):chip('Lv',h.lvl,h.xp/(h.lvl*50)))+(h.horse&&h.mode==='ground'?chip('Horse',h.riding?'riding':h.horse.away>S.t?'back in '+Math.ceil(h.horse.away-S.t)+' s':'R to ride',h.horse.hp/h.horse.max):'')+
-      chip('Gold',h.gold)+chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+chip('Crystals',h.crystals+((n=>n?' +'+n+' town':'')(storeNear(h)?poolOf(storeNear(h)):0)))+(h.horn?chip('Horn','ready'):'');
-    const st=tutActive(),q=h.quest;b=st?tutJournal(h):q?(q.done?'<span class="k">Job done</span> go home to be paid':'<span class="k">Job</span> '+q.text+' '+Math.min(q.n,q.need)+'/'+q.need):(st?'':(n=>n?'<span class="k">Now</span> '+n:'')(nextAim(h)));if(!st&&h.saga&&!h.saga.done&&SAGA[h.saga.i]){const g=SAGA[h.saga.i];b=(b?b+'<br>':'')+'<span class="k">Tale</span> '+g.text.replace(/^The elders\u2019 tale: /,'')+(g.need>1?' '+(h.saga.n||0)+'/'+g.need:'')}}
+      chip('Pack',packCount(h)+'/'+packCap(h),1-packCount(h)/packCap(h))+(h.horn?chip('Horn','ready'):'');
+    b=tutActive()?tutJournal(h):questTracker(h)}
   const sig=a+b;if(sig!==hudSig){hudSig=sig;hud1.innerHTML=a;goalEl.innerHTML=b||''}}
 const goalEl=document.getElementById('goal');
 // the first day's journal: the chapter, its progress, each open goal (the tracked one marked), and goals just done
@@ -104,6 +104,10 @@ function tutJournal(h){const T=S.tut,C2=CHAPTERS[T.ch],tr=tutTracked(),chGoals=F
   const head='<span class="k">'+(T.ch?'Chapter '+T.ch+' \u00b7 ':'')+C2.name+'</span>'+(T.ch===1?' \u00b7 '+n+' of 4':T.ch===2?' \u00b7 '+n+' of 4 to build or buy':'');
   const lines=tutGoals().sort((a,b)=>(b.ch===T.ch)-(a.ch===T.ch)).map(g=>'<div class="jg'+(g===tr?' tr':'')+(g.ch<T.ch?' old':'')+'" data-goal="'+g.id+'">'+(g===tr?'\u25b8 ':'\u25cb ')+g.name+(g.count&&g.count(h)?' '+g.count(h):'')+(g.req?' <b>needed</b>':g.lesson?' <i>lesson</i>':'')+'</div>');
   const just=FIRST_DAY.filter(g=>T.done_[g.id]&&S.t-T.done_[g.id]<6).map(g=>'<div class="jg dn">\u2713 '+g.name+'</div>');
-  return head+lines.join('')+just.join('')+(T.ch===1&&tutLandmarks().length?'<div class="jg hint">Soft lights mark places you have not found</div>':'')}
-goalEl.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-goal]');if(!el||!tutActive()||menu)return;e.preventDefault();e.stopPropagation();S.tut.track=el.dataset.goal;const g=tutGoal(el.dataset.goal);if(g&&!(g.target&&g.target(S.you)))toast(g.name+': '+g.hint)});
+  // collapsed (the default), the journal is the chapter and the goal the light follows; O or the arrow opens every goal
+  const open=!!save.qOpen,tog=`<span class="qt" data-q="toggle" title="Journal (O)">${open?'\u25b4':'\u25be'} ${tutGoals().length}</span>`;
+  if(!open)return'<div class="qh"><span>'+head+'</span>'+tog+'</div>'+(tr?'<div class="jg tr" data-goal="'+tr.id+'">\u25b8 '+tr.name+(tr.count&&tr.count(h)?' '+tr.count(h):'')+'</div>':'')+just.join('');
+  return'<div class="qh">'+head+tog+'</div>'+lines.join('')+just.join('')+(T.ch===1&&tutLandmarks().length?'<div class="jg hint">Soft lights mark places you have not found</div>':'')}
+goalEl.addEventListener('pointerdown',e=>{const qe=e.target.closest('[data-q]');if(qe&&S&&S.you&&!menu){e.preventDefault();e.stopPropagation();if(qe.dataset.q==='toggle')questToggle();else{S.you.track=qe.dataset.q;hudSig=''}hudSig='';return}
+  const el=e.target.closest('[data-goal]');if(!el||!tutActive()||menu)return;e.preventDefault();e.stopPropagation();S.tut.track=el.dataset.goal;const g=tutGoal(el.dataset.goal);if(g&&!(g.target&&g.target(S.you)))toast(g.name+': '+g.hint)});
 

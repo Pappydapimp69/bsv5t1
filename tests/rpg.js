@@ -147,8 +147,8 @@ const {chromium} = require('playwright');
       // new buildings can be destroyed; a Hero-Slayer still pays its bounty; a seed replays the same day
       const Rv = __col.newGame('human', 28), rv = Rv.you; __col.step(2); rv.hp = 20; giveCharm(rv, 'heart'); for (let i = 0; i < 3; i++) { removeCharm(rv, 'heart'); equipCharm(rv, 'heart'); }
       out.noSwapHeal = rv.hp <= 20;
-      rv.lore = {0: 1, 1: 1, 2: 1}; rv.claimed = 1; rv.quest = {k: 'slay', need: 1, n: 1, done: true, gold: 1, xp: 1, text: 'x'}; const ht = Rv.towns[rv.town]; rv.x = ht.x; rv.y = ht.y; openTown(ht, 'Board'); menu.items.find(i => i.label === 'Claim quest reward').act(); closeMenu();
-      out.taleCreditsStones = rv.saga && rv.saga.i === 1;
+      rv.lore = {0: 1, 1: 1, 2: 1}; rv.claimed = 1; rv.quest = {k: 'slay', need: 1, n: 1, done: true, gold: 1, xp: 1, text: 'x'}; const ht = Rv.towns[rv.town]; rv.x = ht.x; rv.y = ht.y; openTown(ht, 'Board'); menu.items.find(i => i.label === 'Claim task reward').act(); const taleOffered = !rv.saga && menu.items.some(i => i.label === 'New quest \u00b7 The elders\u2019 tale'); menu.items.find(i => i.label === 'New quest \u00b7 The elders\u2019 tale').act(); closeMenu();
+      out.taleCreditsStones = taleOffered && rv.saga && rv.saga.i === 1 && questOpen(rv).some(q => q.id === 'tale');
       rv.saga = {i: 3, n: 0}; Rv.monsters = Rv.monsters.filter(m => !m.warlord); Rv.t = 500; stepPois(.2); out.warlordReturns = Rv.monsters.some(m => m.warlord);
       const fb = {k: 'farm', x: ht.x + 100, y: ht.y, town: rv.town, owner: rv.id, cd: 0, settlementId: ht.id}; Rv.builds.push(fb); for (let i = 0; i < 20; i++) damageBuild(fb, 50, null);
       out.civicDestroyable = !Rv.builds.includes(fb) || fb.hp === 0;

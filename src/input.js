@@ -18,6 +18,8 @@ addEventListener('keydown',e=>{if(e.code==='F11'||e.ctrlKey||e.metaKey||e.altKey
   if((e.code==='KeyI'||e.code==='Tab')&&!e.repeat&&S.you){openSheet();e.preventDefault();return}
   if(e.code==='KeyM'&&!e.repeat){BIGMAP=!BIGMAP;if(BIGMAP&&tutActive())S.tut.mapOpened=true;e.preventDefault();return}
   if(e.code==='KeyN'&&!e.repeat&&tutActive()){tutCycle();e.preventDefault();return}
+  if(e.code==='KeyN'&&!e.repeat&&S.you){questCycle(S.you);e.preventDefault();return}
+  if(e.code==='KeyO'&&!e.repeat&&S.you){questToggle();e.preventDefault();return}
   {const sk=SKILLS.find(k=>'Digit'+k.key===e.code);if(sk&&!e.repeat&&S.you){useSkill(S.you,sk.id);e.preventDefault();return}}
   if(!keys.has(e.code)&&KEYMAP[e.code])presses.push(KEYMAP[e.code]);keys.add(e.code);
   if(/Arrow|Space/.test(e.code))e.preventDefault()});
@@ -95,7 +97,7 @@ function hintText(){const h=S&&S.you,cl=h&&h.mode==='climb';
   const tip=cl&&restful(cellT(h.cl.x,h.cl.y))?' On a ledge: grip refills.':cl?' Moss drains grip; orange stones crumble.':'';
   if(device==='touch')return cl?'Tap a hold to climb to it.'+tip:'Tap or drag to walk. Flick to dodge. Pinch to zoom.';
   if(device==='pad')return cl?'Left stick picks a hold.'+tip:'Left stick walks, right stick turns the camera. <kbd>RB</kbd> dodges. D-pad: skills. Press the left stick to ride.';
-  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>5</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks.'}
+  return cl?'Click a hold to climb to it.'+tip:'WASD or click to walk. Q and E turn the camera. <kbd>Shift</kbd> dodges. <kbd>1</kbd>-<kbd>5</kbd> skills, <kbd>T</kbd> talents, <kbd>I</kbd> your hero, <kbd>M</kbd> map, <kbd>R</kbd> ride, <kbd>B</kbd> barracks, <kbd>O</kbd> quests.'}
 function paintButtons(){document.body.dataset.dev=device;const info=slotInfo();if(!info)return;const kn=KEYNAMES[device]||KEYNAMES.keys;let sig=device;for(const s of SLOTS)sig+=info[s].l+'|'+info[s].why;if(sig===lastSig)return;lastSig=sig;
   padEl.querySelectorAll('.ab').forEach(b=>{const i=info[b.dataset.s];b.querySelector('.k').textContent=kn[b.dataset.s];b.querySelector('.l').textContent=i.l;b.querySelector('small').textContent=i.why||i.sub||'';b.classList.toggle('off',!!i.why)})}
 

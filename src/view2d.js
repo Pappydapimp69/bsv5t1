@@ -225,6 +225,7 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const tr of S.trees){const p=proj(tr.x,tr.y,0);if(!p||p.d>5200||p.x<-60||p.x>W+60)continue;add(p.d,()=>{const s=p.s,h=tr.r*3.2*s;ctx.globalAlpha=1-fogOf(p.d);ctx.fillStyle='#2f4528';ctx.beginPath();ctx.moveTo(p.x,p.y-h);ctx.lineTo(p.x+tr.r*s,p.y-h*.15);ctx.lineTo(p.x-tr.r*s,p.y-h*.15);ctx.closePath();ctx.fill();ctx.fillStyle='#3d5a32';ctx.beginPath();ctx.moveTo(p.x,p.y-h*.75);ctx.lineTo(p.x+tr.r*.8*s,p.y);ctx.lineTo(p.x-tr.r*.8*s,p.y);ctx.closePath();ctx.fill();ctx.globalAlpha=1})}
   // the mountains that were giants
   for(const m of S.marks){const p0=proj(m.x,m.y,0);if(!p0||p0.x<-W||p0.x>W*2)continue;for(const b of markBoulders(m)){const p=proj(b.x,b.y,b.z);if(!p)continue;add(p.d,()=>{ctx.globalAlpha=(1-fogOf(p.d)*.8)*nearFade(p);stone(p.x,p.y,b.r*p.s,['#8a8d72','#b2b394','#4e5442'],b.n);ctx.globalAlpha=1})}}
+  for(const q of S.quarries||[]){const R=mulberry32(q.seed);for(let k=0;k<6;k++){const a=R()*6.283,d=R()*q.r,x=q.x+Math.cos(a)*d,y=q.y+Math.sin(a)*d,r=12+R()*16;R();const p=proj(x,y,r*.35);if(!p||p.d>6000)continue;add(p.d,()=>{ctx.globalAlpha=1-fogOf(p.d)*.8;stone(p.x,p.y,r*p.s,['#b9b4a8','#cfcabd','#8f8a80'],q.seed+k);ctx.globalAlpha=1})}}
   for(const e of S.events){if(e.k==='star'){if(groundEllipse(e.x,e.y,220)){ctx.fillStyle='rgba(120,230,255,.18)';ctx.fill()}const p=proj(e.x,e.y,600);if(p&&p.d<12000)add(0,()=>lbl('Fallen star: '+e.left+' crystals',p.x,p.y,12,'#9fe8ff'))}
     if(e.k==='caravan'){const p=proj(e.x,e.y,0);if(p)add(p.d,()=>{const k=p.s,q=proj(e.x,e.y,40);ctx.fillStyle='#8a6a44';ctx.fillRect(p.x-30*k,q.y,60*k,p.y-q.y-6*k);ctx.fillStyle='#e6dcc4';ctx.beginPath();ctx.ellipse(p.x,q.y,30*k,16*k,0,Math.PI,0);ctx.fill();ctx.fillStyle='#2b2018';for(const sx of[-18,18]){ctx.beginPath();ctx.arc(p.x+sx*k,p.y-6*k,8*k,0,7);ctx.fill()}
       shapePath(ctx,p.x,q.y-24*k,Math.max(4,8*k),TOWNS[e.i].shape);ctx.fillStyle=TOWNS[e.i].col;ctx.fill();pbar(p.x,q.y-40*k,40,e.hp/e.max,'#9be08a')})}
@@ -250,7 +251,8 @@ function renderGround(){setCam();view.ox=view.oy=0;drawSky();drawGround();const 
   for(const h of climbers()){const a=climberWorld(h),p=proj(a.x,a.y,a.z);if(!p)continue;const T=TOWNS[h.town];add(p.d-90,()=>figure(p,Math.max(10,22*p.s),h.you?'#c0392b':T.col,T.shape,T.col,h.you))}
   for(const s of S.shots){const z=1300*(1-s.t)+Math.sin(s.t*Math.PI)*350,p=proj(s.x,s.y,z);if(!p)continue;add(p.d,()=>{ctx.fillStyle='#1d1d1d';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(3,12*p.s),0,7);ctx.fill()})}
   items.sort((a,b)=>b.d-a.d);for(const it of items)it.fn();
-  for(const t of S.towns){const p=proj(t.x,t.y,200);if(!p||p.d>9500)continue;lbl(t.name+(t.alive?'':' (ruins)')+(S.you&&S.you.town===t.i?' (home)':''),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
+  quarryLabels(proj);
+  for(const t of S.towns){const p=proj(t.x,t.y,200);if(!p||p.d>9500)continue;lbl(t.name+(t.alive?' \u00b7 '+ageOf(t):' (ruins)'),p.x,p.y-14,12,t.col);if(t.alive)pbar(p.x,p.y,90,t.hp/t.max,'#9be08a')}
   labelRivalHeroes(proj);
   if(g.fallen>0&&!g.dead){const p=proj(g.x+fwd(g).x*700,g.y+fwd(g).y*700,300);if(p)lbl('The giant is down: '+Math.ceil(g.fallen)+' s to strike the Heart-stone',p.x,Math.max(70,p.y),13,'#ffcf6a')}
   if(S.you&&!S.you.dead&&S.you.mode==='ground'&&nearFoot(S.you)>=0){const p=proj(S.you.x,S.you.y,0);if(p)lbl('Climb the '+(nearFoot(S.you)?'right':'left')+' foot',p.x,p.y+16,12,'#ffcf6a')}

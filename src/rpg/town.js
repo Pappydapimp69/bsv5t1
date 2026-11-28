@@ -9,7 +9,7 @@ const houseCap=t=>3+2*(lv(t)-1);
 // style (food for the houses, walls standing, a market, crafts) with Kingdom Two Crowns' plain coin payoff: prosperity
 // scales the rent you are paid, a market adds a quarter, a smithy cuts gear prices, a stable sells and heals horses,
 // a well heals people at home, farms feed two houses each and pay a little themselves.
-const CIVIC={farm:{n:'Farm',sub:'Feeds two houses; pays 3 gold every 15 s',one:false,col:'#c9b458'},market:{n:'Market',sub:'Rent here +25%; needs a level 2 settlement',one:true,lvl:2,col:'#d07a4a'},
+const CIVIC={farm:{n:'Farm',sub:'+6 food every 15 s, more with a villager on it; feeds two houses',one:false,col:'#c9b458'},market:{n:'Market',sub:'Rent here +25%; needs a level 2 settlement',one:true,lvl:2,col:'#d07a4a'},
   smithy:{n:'Smithy',sub:'Gear 20% cheaper in this town',one:true,col:'#6b6f78'},stable:{n:'Stable',sub:'Horses for 45 gold here; heals your horse',one:true,col:'#8a6a44'},well:{n:'Well',sub:'Heals your people near it',one:false,max:2,col:'#7fb8c9'}};
 const civicIn=(t,k)=>t?S.builds.filter(b=>b.k===k&&b.hp!==0&&b.settlementId===t.id).length:0;
 // a festival: a settlement of yours at 70+ prosperity holds one once a day; for a minute your strikes and earnings are blessed
